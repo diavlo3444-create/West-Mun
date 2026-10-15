@@ -1,7 +1,10 @@
 import React from 'react';
 import { Mic2, ScrollText, Users, Scale } from 'lucide-react';
+import { useInView } from '../hooks/useInView';
 
 export const ConferenceHighlights: React.FC = () => {
+  const { ref, isInView } = useInView<HTMLElement>();
+
   const highlights = [
     {
       icon: Scale,
@@ -34,8 +37,12 @@ export const ConferenceHighlights: React.FC = () => {
   ];
 
   return (
-    <section className="relative z-20 py-24 bg-[#0a0a0c] text-white border-t border-neutral-900">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
+    <section id="highlights" ref={ref} className="relative z-20 py-24 bg-[#0a0a0c] text-white border-t border-neutral-900">
+      <div
+        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
+          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`}
+      >
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
           <div>
             <div className="flex items-center gap-2 mb-3">

@@ -71,3 +71,24 @@ body {
   box-shadow: 0 0 20px -5px rgba(212, 175, 55, 0.08);
 }
 
+/* Subtle section viewport fade-in and upward slide animations */
+.reveal-entry {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-entry.is-in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-entry {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+

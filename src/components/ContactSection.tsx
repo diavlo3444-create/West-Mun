@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Mail, Instagram, Share2, MapPin, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useInView } from '../hooks/useInView';
 
 export const ContactSection: React.FC = () => {
+  const { ref, isInView } = useInView<HTMLElement>();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -37,8 +39,12 @@ export const ContactSection: React.FC = () => {
   };
 
   return (
-    <section id="contact" className="relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
+    <section id="contact" ref={ref} className="relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
+      <div
+        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
+          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`}
+      >
         {/* Section Header */}
         <div className="max-w-3xl mb-16">
           <div className="flex items-center gap-2 mb-3">
@@ -78,13 +84,23 @@ export const ContactSection: React.FC = () => {
                 </div>
 
                 {/* Instagram */}
-                <div className="flex items-start gap-3 p-3.5 bg-[#121215] border border-neutral-800/80 rounded-sm">
-                  <Instagram className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
+                <a
+                  href="https://www.instagram.com/westmun_27?rpxt=c3JkNHN2Mm44OTh5&utm_source=qr"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Visit WEST MUN on Instagram"
+                  className="flex items-start gap-3 p-3.5 bg-[#121215] border border-neutral-800/80 hover:border-[#d4af37]/60 rounded-sm transition-all group"
+                >
+                  <Instagram className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                   <div>
-                    <span className="text-neutral-400 block font-medium">Official Instagram</span>
-                    <span className="font-mono text-[#d4af37] font-semibold">TBA</span>
+                    <span className="text-neutral-400 block font-medium group-hover:text-white transition-colors">
+                      Official Instagram
+                    </span>
+                    <span className="font-mono text-[#d4af37] font-semibold text-xs">
+                      @westmun_27 ↗
+                    </span>
                   </div>
-                </div>
+                </a>
 
                 {/* Other Social Media */}
                 <div className="flex items-start gap-3 p-3.5 bg-[#121215] border border-neutral-800/80 rounded-sm">

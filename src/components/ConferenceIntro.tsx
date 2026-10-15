@@ -1,10 +1,17 @@
 import React from 'react';
 import { Compass, BookOpen, Handshake, Globe } from 'lucide-react';
+import { useInView } from '../hooks/useInView';
 
 export const ConferenceIntro: React.FC = () => {
+  const { ref, isInView } = useInView<HTMLElement>();
+
   return (
-    <section id="intro" className="relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
+    <section id="intro" ref={ref} className="relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
+      <div
+        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
+          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`}
+      >
         {/* Section Header */}
         <div className="max-w-3xl mb-16">
           <div className="flex items-center gap-2 mb-3">

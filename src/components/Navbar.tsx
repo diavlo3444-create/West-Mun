@@ -1,13 +1,18 @@
 import React from 'react';
-import { Globe2 } from 'lucide-react';
 
 interface NavbarProps {
   scrolled: boolean;
   menuOpen: boolean;
   setMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  logoVisible?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ scrolled, menuOpen, setMenuOpen }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  scrolled,
+  menuOpen,
+  setMenuOpen,
+  logoVisible = true,
+}) => {
   const navLinks = [
     { label: 'Home', href: '#hero' },
     { label: 'About', href: '#about' },
@@ -23,8 +28,8 @@ export const Navbar: React.FC<NavbarProps> = ({ scrolled, menuOpen, setMenuOpen 
       <header
         className={`fixed top-0 left-0 right-0 z-40 w-full transition-all duration-300 ${
           scrolled || menuOpen
-            ? 'bg-[#080808]/95 backdrop-blur-md border-b border-[#d4af37]/20 py-3.5 shadow-2xl'
-            : 'bg-gradient-to-b from-black/80 via-black/40 to-transparent py-5'
+            ? 'bg-[#080808]/98 border-b border-[#d4af37]/20 py-3 sm:py-3.5 shadow-2xl'
+            : 'bg-gradient-to-b from-black/85 via-black/40 to-transparent py-4 sm:py-5'
         }`}
       >
         <div className="max-w-7xl mx-auto px-5 sm:px-8 flex items-center justify-between">
@@ -34,13 +39,22 @@ export const Navbar: React.FC<NavbarProps> = ({ scrolled, menuOpen, setMenuOpen 
             className="flex items-center gap-3 text-white no-underline group"
             aria-label="WEST MUN Home"
           >
-            <div className="w-8 h-8 rounded-full border border-[#d4af37]/40 flex items-center justify-center bg-[#141414] text-[#d4af37] transition-transform duration-300 group-hover:scale-105">
-              <Globe2 className="w-4 h-4 text-[#d4af37]" />
+            <div
+              id="navbar-logo-target"
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden border border-[#d4af37]/50 flex items-center justify-center bg-[#141414] transition-all duration-500 group-hover:scale-105 group-hover:border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.2)] ${
+                logoVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+              }`}
+            >
+              <img
+                src="/westmun-logo.jpg"
+                alt="WEST MUN Official Logo"
+                className="w-full h-full object-cover object-center"
+              />
             </div>
             <div className="flex flex-col">
               <span
                 className="text-lg sm:text-xl font-bold tracking-wider text-white leading-tight font-serif"
-                style={{ fontFamily: "var(--font-heading)" }}
+                style={{ fontFamily: 'var(--font-heading)' }}
               >
                 WEST <span className="text-[#d4af37]">MUN</span>
               </span>
@@ -105,15 +119,24 @@ export const Navbar: React.FC<NavbarProps> = ({ scrolled, menuOpen, setMenuOpen 
 
       {/* Mobile Navigation Overlay */}
       <div
-        className={`fixed inset-0 z-30 bg-[#070707]/98 backdrop-blur-xl flex flex-col justify-center items-start px-8 sm:px-12 gap-6 lg:hidden transition-all duration-300 ease-in-out ${
+        className={`fixed inset-0 z-30 bg-[#070707]/98 flex flex-col justify-center items-start px-8 sm:px-12 gap-6 lg:hidden transition-all duration-300 ease-in-out ${
           menuOpen
             ? 'opacity-100 pointer-events-auto'
             : 'opacity-0 pointer-events-none'
         }`}
         aria-hidden={!menuOpen}
       >
-        <div className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold mb-2">
-          WEST MUN Conference Navigation
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-full overflow-hidden border border-[#d4af37]/50">
+            <img
+              src="/westmun-logo.jpg"
+              alt="WEST MUN Logo"
+              className="w-full h-full object-cover object-center"
+            />
+          </div>
+          <div className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">
+            WEST MUN Navigation
+          </div>
         </div>
         {navLinks.map((link) => (
           <a

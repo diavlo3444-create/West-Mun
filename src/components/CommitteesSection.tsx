@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, FileText, UserCheck, X, ExternalLink, Info } from 'lucide-react';
+import { useInView } from '../hooks/useInView';
 
 interface CommitteeData {
   id: string;
@@ -13,6 +14,7 @@ interface CommitteeData {
 }
 
 export const CommitteesSection: React.FC = () => {
+  const { ref, isInView } = useInView<HTMLElement>();
   const [selectedCommittee, setSelectedCommittee] = useState<CommitteeData | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
 
@@ -85,8 +87,12 @@ export const CommitteesSection: React.FC = () => {
       : committees.filter((c) => c.type.toLowerCase().includes(filterType.toLowerCase()));
 
   return (
-    <section id="committees" className="relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
+    <section id="committees" ref={ref} className="relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
+      <div
+        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
+          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`}
+      >
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
           <div>
@@ -190,7 +196,7 @@ export const CommitteesSection: React.FC = () => {
         {/* Modal for Committee Details (No fabricated details) */}
         {selectedCommittee && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90"
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"

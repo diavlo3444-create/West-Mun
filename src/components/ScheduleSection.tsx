@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { useInView } from '../hooks/useInView';
 
 interface ScheduleSession {
   time: string;
@@ -9,6 +10,7 @@ interface ScheduleSession {
 }
 
 export const ScheduleSection: React.FC = () => {
+  const { ref, isInView } = useInView<HTMLElement>();
   const [activeDay, setActiveDay] = useState<number>(1);
 
   const daysData = [
@@ -90,8 +92,12 @@ export const ScheduleSection: React.FC = () => {
   ];
 
   return (
-    <section id="schedule" className="relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
+    <section id="schedule" ref={ref} className="relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
+      <div
+        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
+          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`}
+      >
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
           <div>

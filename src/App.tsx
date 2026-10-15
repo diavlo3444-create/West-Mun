@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { OpeningIntro } from './components/OpeningIntro';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { ConferenceIntro } from './components/ConferenceIntro';
@@ -52,15 +53,41 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
+  // Check if intro has already run or user prefers reduced motion
+  const [introFinished, setIntroFinished] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const seen = sessionStorage.getItem('westmun_intro_seen');
+    return reducedMotion || seen === 'true';
+  });
+
+  const handleIntroComplete = () => {
+    sessionStorage.setItem('westmun_intro_seen', 'true');
+    setIntroFinished(true);
+  };
+
+  const handleReplayIntro = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    setIntroFinished(false);
+  };
+
   // Diplomatic dispatch text using preserved typewriter animation
   const typewriterText =
     'The floor is open for debate. Good diplomacy unites divided nations. What global crisis will your delegation solve?';
   const { displayed, done } = useTypewriter(typewriterText, 36, 500);
 
-  // Track scroll position for navbar styling
+  // Track scroll position for navbar styling with RAF throttling
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      setScrolled(window.scrollY > 40);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const isScrolled = window.scrollY > 40;
+          setScrolled((prev) => (prev !== isScrolled ? isScrolled : prev));
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -68,11 +95,17 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen w-full bg-[#070707] text-[#f5f5f5]">
+      {/* Opening Intro Animation (Logo Centered -> Falling Gold Particles -> Flight to Navbar) */}
+      {!introFinished && (
+        <OpeningIntro onComplete={handleIntroComplete} />
+      )}
+
       {/* A. Fixed Navigation Bar */}
       <Navbar
         scrolled={scrolled}
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
+        logoVisible={introFinished}
       />
 
       {/* B. Scroll-Controlled Cinematic Hero Section */}
@@ -109,7 +142,7 @@ export default function App() {
       <ContactSection />
 
       {/* L. Conference Footer */}
-      <Footer />
+      <Footer onReplayIntro={handleReplayIntro} />
     </div>
   );
 }

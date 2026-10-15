@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { CheckCircle2, AlertTriangle, Send, User, Mail, School, Sparkles } from 'lucide-react';
+import { useInView } from '../hooks/useInView';
 
 export const RegistrationSection: React.FC = () => {
+  const { ref, isInView } = useInView<HTMLElement>();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -37,8 +39,12 @@ export const RegistrationSection: React.FC = () => {
   };
 
   return (
-    <section id="register" className="relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
+    <section id="register" ref={ref} className="relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
+      <div
+        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
+          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`}
+      >
         {/* Section Header */}
         <div className="max-w-3xl mb-16">
           <div className="flex items-center gap-2 mb-3">
@@ -58,10 +64,10 @@ export const RegistrationSection: React.FC = () => {
           </p>
         </div>
 
-        {/* 3 Registration Tiers (With Mandatory TBA Flags) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        {/* 2 Registration Tiers (Centered & Balanced, With Mandatory TBA Flags) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-16">
           {/* Early Bird */}
-          <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm relative flex flex-col justify-between">
+          <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm relative flex flex-col justify-between hover:border-[#d4af37]/40 transition-all duration-300">
             <div>
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[11px] font-mono uppercase tracking-widest text-[#d4af37]">Tier 01</span>
@@ -90,7 +96,7 @@ export const RegistrationSection: React.FC = () => {
           </div>
 
           {/* Regular Delegate */}
-          <div className="p-8 bg-[#0e0e12] border border-[#d4af37]/40 rounded-sm relative flex flex-col justify-between shadow-[0_0_30px_rgba(212,175,55,0.05)]">
+          <div className="p-8 bg-[#0e0e12] border border-[#d4af37]/50 rounded-sm relative flex flex-col justify-between shadow-[0_0_30px_rgba(212,175,55,0.06)] hover:border-[#d4af37] transition-all duration-300">
             <div className="absolute -top-3 left-6 px-3 py-0.5 bg-[#d4af37] text-black text-[10px] uppercase font-bold tracking-widest rounded-sm">
               Standard Delegate
             </div>
@@ -118,35 +124,6 @@ export const RegistrationSection: React.FC = () => {
             </div>
             <div className="mt-6 pt-4 border-t border-neutral-800/80 text-[11px] text-neutral-400">
               Eligibility: Open to All Registered Delegates
-            </div>
-          </div>
-
-          {/* Delegation / School */}
-          <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm relative flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-[11px] font-mono uppercase tracking-widest text-[#d4af37]">Tier 03</span>
-                <span className="text-[10px] font-mono uppercase px-2 py-0.5 bg-[#17171d] text-neutral-400 border border-neutral-800 rounded-sm">
-                  Status: TBA
-                </span>
-              </div>
-              <h3 className="text-xl font-serif text-white mb-2">School & Delegation</h3>
-              <p className="text-xs text-neutral-400 mb-6 font-light leading-relaxed">
-                Bulk country allocations, faculty advisor accreditation, and dedicated delegation liaisons.
-              </p>
-              <div className="space-y-2 py-4 border-t border-neutral-800 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-neutral-500">Delegation Fee:</span>
-                  <span className="font-mono text-[#d4af37] font-bold">TBA</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-500">Roster Deadline:</span>
-                  <span className="font-mono text-neutral-300">TBA</span>
-                </div>
-              </div>
-            </div>
-            <div className="mt-6 pt-4 border-t border-neutral-800/80 text-[11px] text-neutral-500">
-              Eligibility: 6+ Delegates with Faculty Advisor
             </div>
           </div>
         </div>
