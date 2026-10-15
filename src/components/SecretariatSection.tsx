@@ -8,6 +8,7 @@ interface TeamMember {
   department: string;
   bio: string;
   image?: string;
+  fallbackImage?: string;
   isConfirmed: boolean;
   appointmentNumber: string;
 }
@@ -27,7 +28,7 @@ export const SecretariatSection: React.FC = () => {
     },
     {
       role: 'Deputy Secretary-General',
-      name: 'Yousef',
+      name: 'Yousef Saifi',
       department: 'Executive Secretariat',
       bio: 'Experienced debater with a deep passion for global diplomacy and constructive dialogue. Committed to youth empowerment, collaborative problem-solving, and delivering an unforgettable conference.',
       image: '/yousef.jpg',
@@ -36,12 +37,23 @@ export const SecretariatSection: React.FC = () => {
     },
     {
       role: 'Under-Secretary-General',
-      name: 'TBA',
+      name: 'Fahad',
       department: 'Executive Secretariat',
-      bio: 'Executive portfolio directing committee logistics, delegate affairs, and operational excellence. Official appointment to be ratified as the secretariat finalizes committee allocations.',
-      image: undefined,
-      isConfirmed: false,
+      bio: 'Directing substantive committee operations, delegate services, and institutional logistics. Dedicated to fostering high-level multilateral debate and diplomatic excellence.',
+      image: '/fahad.jpg',
+      fallbackImage: 'https://i.ibb.co/mrYKgTYc/Whats-App-Image-2026-10-15-at-1-36-37-PM.jpg',
+      isConfirmed: true,
       appointmentNumber: '03',
+    },
+    {
+      role: 'Senior Advisor',
+      name: 'Muaz Elamir',
+      department: 'Advisory Board',
+      bio: 'Hi im Muaz Elamir My job is to guide the team, share advice, and help make sure the conference runs smoothly so you all have a great MUN experience!',
+      image: '/muaz.jpg',
+      fallbackImage: 'https://i.ibb.co/4wCsnP6Q/Whats-App-Image-2026-10-15-at-11-07-35-PM.jpg',
+      isConfirmed: true,
+      appointmentNumber: '04',
     },
   ];
 
@@ -58,7 +70,7 @@ export const SecretariatSection: React.FC = () => {
             <div className="flex items-center gap-2 mb-3">
               <span className="w-8 h-[1px] bg-[#d4af37]" />
               <span className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">
-                Executive Leadership
+                Executive Leadership & Advisory
               </span>
             </div>
             <h2
@@ -73,52 +85,57 @@ export const SecretariatSection: React.FC = () => {
           </p>
         </div>
 
-        {/* Secretariat Profiles Grid — Consistent Layout Across All Profiles */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+        {/* Secretariat Profiles Grid — Consistent 4-Card Responsive Layout */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
           {secretariat.map((member) => (
             <div
               key={member.role}
-              className={`group p-7 sm:p-8 bg-[#0e0e11] border rounded-sm transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden h-full ${
+              className={`group p-6 sm:p-7 bg-[#0e0e11] border rounded-sm transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden h-full ${
                 member.isConfirmed
                   ? 'border-[#d4af37]/40 hover:border-[#d4af37] shadow-[0_0_25px_rgba(212,175,55,0.06)]'
                   : 'border-neutral-800/80 hover:border-[#d4af37]/30'
               }`}
             >
               {/* Top Department Badge (Equal Height) */}
-              <div className="h-5 flex items-center justify-center mb-5">
-                <span className="text-[11px] font-mono tracking-widest uppercase text-[#d4af37]">
+              <div className="h-5 flex items-center justify-center mb-4">
+                <span className="text-[10px] sm:text-[11px] font-mono tracking-widest uppercase text-[#d4af37]">
                   {member.department}
                 </span>
               </div>
 
-              {/* Portrait (Identical Dimensions & Border Treatment) */}
-              <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-full mb-6 relative overflow-hidden flex items-center justify-center shrink-0 bg-gradient-to-b from-[#18181f] to-[#0c0c0e] border-2 border-[#d4af37]/40 group-hover:border-[#d4af37] transition-all shadow-xl">
+              {/* Portrait (Identical Dimensions & Circular Border Treatment) */}
+              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full mb-5 relative overflow-hidden flex items-center justify-center shrink-0 bg-gradient-to-b from-[#18181f] to-[#0c0c0e] border-2 border-[#d4af37]/40 group-hover:border-[#d4af37] transition-all shadow-xl">
                 {member.image ? (
                   <img
                     src={member.image}
                     alt={member.name}
                     className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
+                    onError={(e) => {
+                      if (member.fallbackImage && e.currentTarget.src !== member.fallbackImage) {
+                        e.currentTarget.src = member.fallbackImage;
+                      }
+                    }}
                   />
                 ) : (
                   <div className="flex flex-col items-center justify-center text-neutral-400 group-hover:text-[#d4af37] transition-colors">
-                    <User className="w-12 h-12 mb-1 opacity-50" />
-                    <span className="text-[10px] font-mono tracking-widest uppercase text-[#d4af37]/80">
+                    <User className="w-10 h-10 mb-1 opacity-50" />
+                    <span className="text-[9px] sm:text-[10px] font-mono tracking-widest uppercase text-[#d4af37]/80">
                       PORTRAIT TBA
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Role Title (Fixed Min-Height to Guarantee Vertical Alignment) */}
-              <div className="min-h-[3rem] flex items-center justify-center mb-2">
-                <h3 className="text-xl font-serif text-white group-hover:text-[#f3e5ab] transition-colors leading-snug">
+              {/* Role Title (Fixed Min-Height to Guarantee Vertical Alignment Across All Rows) */}
+              <div className="min-h-[2.85rem] flex items-center justify-center mb-2">
+                <h3 className="text-lg sm:text-xl font-serif text-white group-hover:text-[#f3e5ab] transition-colors leading-snug">
                   {member.role}
                 </h3>
               </div>
 
               {/* Name Badge (Identical Offset & Dimensions) */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#141418] border border-neutral-800 rounded-sm mb-5 shrink-0">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#141418] border border-neutral-800 rounded-sm mb-4 shrink-0">
                 <Shield className="w-3 h-3 text-[#d4af37]" />
                 <span className="text-xs font-mono text-neutral-200 font-semibold tracking-wider">
                   {member.name}
@@ -127,18 +144,18 @@ export const SecretariatSection: React.FC = () => {
 
               {/* Bio Container (Starts at Identical Offset, Harmonious Typography) */}
               <div className="flex-1 flex items-start justify-center">
-                <p className="text-neutral-300 text-xs sm:text-sm leading-relaxed font-light">
+                <p className="text-neutral-300 text-xs sm:text-[13px] leading-relaxed font-light">
                   {member.bio}
                 </p>
               </div>
 
               {/* Card Footer (Pinned to Bottom via mt-auto, Consistent Status Layout) */}
-              <div className="mt-6 pt-4 w-full border-t border-neutral-800/60 flex items-center justify-between text-[10px] uppercase tracking-widest font-mono text-neutral-500">
+              <div className="mt-6 pt-3.5 w-full border-t border-neutral-800/60 flex items-center justify-between text-[10px] uppercase tracking-widest font-mono text-neutral-500">
                 <span>Appointment {member.appointmentNumber}</span>
                 <span className={`inline-flex items-center gap-1 ${member.isConfirmed ? 'text-[#d4af37]' : 'text-neutral-400'}`}>
                   {member.isConfirmed ? (
                     <>
-                      <CheckCircle2 className="w-3 h-3" />
+                      <CheckCircle2 className="w-3 h-3 text-[#d4af37]" />
                       <span>Confirmed</span>
                     </>
                   ) : (

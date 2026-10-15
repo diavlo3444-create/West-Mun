@@ -5,6 +5,7 @@ interface NavbarProps {
   menuOpen: boolean;
   setMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
   logoVisible?: boolean;
+  navVisible?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -12,6 +13,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   menuOpen,
   setMenuOpen,
   logoVisible = true,
+  navVisible = true,
 }) => {
   const navLinks = [
     { label: 'Home', href: '#hero' },
@@ -26,7 +28,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-40 w-full transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-40 w-full transition-all duration-700 ease-out ${
+          navVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        } ${
           scrolled || menuOpen
             ? 'bg-[#080808]/98 border-b border-[#d4af37]/20 py-3 sm:py-3.5 shadow-2xl'
             : 'bg-gradient-to-b from-black/85 via-black/40 to-transparent py-4 sm:py-5'
@@ -41,8 +45,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div
               id="navbar-logo-target"
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden border border-[#d4af37]/50 flex items-center justify-center bg-[#141414] transition-all duration-500 group-hover:scale-105 group-hover:border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.2)] ${
-                logoVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden border border-[#d4af37]/50 flex items-center justify-center bg-[#141414] transition-opacity duration-300 group-hover:scale-105 group-hover:border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.2)] ${
+                logoVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
             >
               <img

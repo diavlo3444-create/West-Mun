@@ -118,16 +118,6 @@ export const Footer: React.FC<FooterProps> = ({ onReplayIntro }) => {
         <div className="pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
           <p>© {currentYear} WEST MUN (Model United Nations). All rights reserved.</p>
           <div className="flex items-center gap-6">
-            {onReplayIntro && (
-              <button
-                type="button"
-                onClick={onReplayIntro}
-                className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-[#d4af37] transition-colors cursor-pointer text-[11px] font-mono uppercase tracking-wider"
-                aria-label="Replay opening cinematic animation"
-              >
-                <span>Replay Intro</span>
-              </button>
-            )}
             <span className="text-[11px] font-mono text-neutral-600 hidden sm:inline">Diplomatic Summit Portal</span>
             <button
               type="button"
@@ -140,6 +130,21 @@ export const Footer: React.FC<FooterProps> = ({ onReplayIntro }) => {
             </button>
           </div>
         </div>
+
+        {/* Dedicated Replay Intro Button at the very bottom */}
+        {onReplayIntro && (
+          <div className="pt-6 mt-6 border-t border-neutral-900/50 flex justify-center items-center">
+            <button
+              type="button"
+              onClick={onReplayIntro}
+              className="group inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-[#d4af37]/30 bg-[#0a0a0c]/80 hover:bg-[#d4af37]/10 hover:border-[#d4af37]/70 text-neutral-400 hover:text-[#f3e5ab] text-xs font-mono tracking-wider transition-all duration-300 shadow-sm hover:shadow-[0_0_15px_rgba(212,175,55,0.2)] active:scale-95 cursor-pointer"
+              aria-label="Replay intro animation"
+            >
+              <span className="text-sm font-sans transition-transform duration-500 group-hover:rotate-180">↻</span>
+              <span>Replay Intro</span>
+            </button>
+          </div>
+        )}
       </div>
     </footer>
   );

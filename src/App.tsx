@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { OpeningIntro } from './components/OpeningIntro';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -53,23 +53,47 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  // Check if intro has already run or user prefers reduced motion
+  // Intro animation playback state:
+  // Shows on first visit or when triggered by Replay Intro
   const [introFinished, setIntroFinished] = useState(() => {
     if (typeof window === 'undefined') return false;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const seen = sessionStorage.getItem('westmun_intro_seen');
-    return reducedMotion || seen === 'true';
+    try {
+      return sessionStorage.getItem('westmun_intro_seen') === 'true';
+    } catch {
+      return false;
+    }
   });
 
-  const handleIntroComplete = () => {
-    sessionStorage.setItem('westmun_intro_seen', 'true');
-    setIntroFinished(true);
-  };
+  const [introFlying, setIntroFlying] = useState(false);
+  const [introKey, setIntroKey] = useState(1);
 
-  const handleReplayIntro = () => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+  const handleIntroComplete = useCallback(() => {
+    try {
+      sessionStorage.setItem('westmun_intro_seen', 'true');
+    } catch {}
+    setIntroFlying(true);
+    setIntroFinished(true);
+  }, []);
+
+  const handleFlightStart = useCallback(() => {
+    setIntroFlying(true);
+  }, []);
+
+  const handleReplayIntro = useCallback(() => {
+    // Scroll cleanly to the very top so camera, navbar, and hero coordinates align
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    // Reset intro states & cycle key to mount a completely fresh OpeningIntro instance
+    try {
+      sessionStorage.removeItem('westmun_intro_seen');
+    } catch {}
+
+    setIntroFlying(false);
     setIntroFinished(false);
-  };
+    setIntroKey((prev) => prev + 1);
+  }, []);
 
   // Diplomatic dispatch text using preserved typewriter animation
   const typewriterText =
@@ -97,7 +121,11 @@ export default function App() {
     <div className="relative min-h-screen w-full bg-[#070707] text-[#f5f5f5]">
       {/* Opening Intro Animation (Logo Centered -> Falling Gold Particles -> Flight to Navbar) */}
       {!introFinished && (
-        <OpeningIntro onComplete={handleIntroComplete} />
+        <OpeningIntro
+          key={introKey}
+          onComplete={handleIntroComplete}
+          onFlightStart={handleFlightStart}
+        />
       )}
 
       {/* A. Fixed Navigation Bar */}
@@ -106,6 +134,7 @@ export default function App() {
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
         logoVisible={introFinished}
+        navVisible={introFinished || introFlying}
       />
 
       {/* B. Scroll-Controlled Cinematic Hero Section */}
@@ -132,7 +161,7 @@ export default function App() {
       {/* H. Secretariat & Organizing Team */}
       <SecretariatSection />
 
-      {/* I. Registration Portal & Pre-Registration */}
+      {/* I. Registration Portal */}
       <RegistrationSection />
 
       {/* J. Frequently Asked Questions */}
