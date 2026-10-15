@@ -23,7 +23,10 @@ export const RegistrationSection: React.FC = () => {
             className="text-3xl sm:text-5xl font-serif font-normal text-white tracking-tight leading-tight mb-6"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            Register for <span className="gold-gradient-text">WEST MUN</span>
+            Register for{' '}
+            <span className="gold-gradient-text shimmer-gold shimmer-stagger-2">
+              WEST MUN
+            </span>
           </h2>
           <p className="text-neutral-300 text-base sm:text-lg leading-relaxed font-light">
             Secure your delegation’s place at the Western Model United Nations Conference. Delegate registration proceeds in progressive windows. All official fee structures, financial aid criteria, and country allocation matrixes are To Be Announced (TBA).

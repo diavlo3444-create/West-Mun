@@ -106,7 +106,10 @@ export const CommitteesSection: React.FC = () => {
               className="text-3xl sm:text-5xl font-serif font-normal text-white tracking-tight"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
-              Conference <span className="gold-gradient-text">Committees</span>
+              Conference{' '}
+              <span className="gold-gradient-text shimmer-gold shimmer-stagger-2">
+                Committees
+              </span>
             </h2>
           </div>
           <p className="text-neutral-400 text-sm max-w-md font-light">

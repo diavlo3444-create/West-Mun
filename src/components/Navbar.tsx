@@ -45,22 +45,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div
               id="navbar-logo-target"
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden border border-[#d4af37]/50 flex items-center justify-center bg-[#141414] transition-opacity duration-300 group-hover:scale-105 group-hover:border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.2)] ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden border border-[#d4af37]/50 flex items-center justify-center bg-[#141414] group-hover:scale-105 group-hover:border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.2)] ${
                 logoVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
+              style={{
+                transition: logoVisible ? 'none' : 'opacity 200ms ease-out',
+              }}
             >
               <img
                 src="/westmun-logo.jpg"
                 alt="WEST MUN Official Logo"
-                className="w-full h-full object-cover object-center"
+                className="w-full h-full object-contain p-0.5 object-center"
               />
             </div>
             <div className="flex flex-col">
               <span
-                className="text-lg sm:text-xl font-bold tracking-wider text-white leading-tight font-serif"
+                className="text-lg sm:text-xl font-bold tracking-wider leading-tight font-serif select-none"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
-                WEST <span className="text-[#d4af37]">MUN</span>
+                <span className="shimmer-platinum">WEST</span>{' '}
+                <span className="shimmer-gold">MUN</span>
               </span>
               <span className="text-[10px] tracking-widest uppercase text-neutral-400 font-sans hidden sm:block">
                 Model United Nations
@@ -131,11 +135,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         aria-hidden={!menuOpen}
       >
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-full overflow-hidden border border-[#d4af37]/50">
+          <div className="w-10 h-10 rounded-full overflow-hidden border border-[#d4af37]/50 flex items-center justify-center bg-[#141414] shadow-[0_0_15px_rgba(212,175,55,0.2)]">
             <img
               src="/westmun-logo.jpg"
               alt="WEST MUN Logo"
-              className="w-full h-full object-cover object-center"
+              className="w-full h-full object-contain p-0.5 object-center"
             />
           </div>
           <div className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">

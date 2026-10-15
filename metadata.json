@@ -1,6 +1,8 @@
 {
-  "name": "Mainframe Creative Agency",
-  "description": "Full-screen hero landing page for creative agency Mainframe featuring mouse-scrubbed interactive video and responsive interface.",
+  "name": "WEST MUN — Model United Nations Conference",
+  "description": "WEST MUN (Western Model United Nations). Cultivating diplomatic dialogue, consensus building, and global leadership.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

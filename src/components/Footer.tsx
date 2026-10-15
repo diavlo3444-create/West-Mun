@@ -8,7 +8,7 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onReplayIntro }) => {
   const { ref, isInView } = useInView<HTMLElement>({ threshold: 0.05 });
-  const currentYear = 2026;
+  const currentYear = 2027;
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -29,7 +29,7 @@ export const Footer: React.FC<FooterProps> = ({ onReplayIntro }) => {
                 <img
                   src="/westmun-logo.jpg"
                   alt="WEST MUN Official Logo"
-                  className="w-full h-full object-cover object-center"
+                  className="w-full h-full object-contain p-0.5 object-center"
                 />
               </div>
               <div className="flex flex-col">

@@ -16,7 +16,6 @@
 }
 
 html {
-  scroll-behavior: smooth;
   background-color: #070707;
 }
 
@@ -66,6 +65,70 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+/* ========================================================
+   PREMIUM METALLIC LIGHT SHIMMER (Restrained Light Sweep)
+   ======================================================== */
+.shimmer-gold {
+  background: linear-gradient(
+    115deg,
+    #aa8232 0%,
+    #d4af37 20%,
+    #f7e7b4 38%,
+    #ffffff 50%,
+    #f7e7b4 62%,
+    #d4af37 80%,
+    #aa8232 100%
+  );
+  background-size: 280% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: metallicLightSweep 7.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Platinum specular shimmer for light/white lettering */
+.shimmer-platinum {
+  background: linear-gradient(
+    115deg,
+    #cfd2d6 0%,
+    #ffffff 22%,
+    #fff9e6 42%,
+    #ffffff 50%,
+    #f5e6b8 58%,
+    #ffffff 75%,
+    #cfd2d6 100%
+  );
+  background-size: 280% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: metallicLightSweep 7.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Staggered timings across sections so headings don't shimmer simultaneously */
+.shimmer-stagger-1 {
+  animation-delay: 1.8s;
+}
+
+.shimmer-stagger-2 {
+  animation-delay: 3.6s;
+}
+
+.shimmer-stagger-3 {
+  animation-delay: 5.2s;
+}
+
+.shimmer-stagger-4 {
+  animation-delay: 2.6s;
+}
+
+@keyframes metallicLightSweep {
+  0% {
+    background-position: 180% 0;
+  }
+  28%, 100% {
+    background-position: -80% 0;
+  }
+}
+
 .gold-border-glow {
   border-color: rgba(212, 175, 55, 0.25);
   box-shadow: 0 0 20px -5px rgba(212, 175, 55, 0.08);
@@ -89,6 +152,12 @@ body {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
+  }
+
+  .shimmer-gold,
+  .shimmer-platinum {
+    animation: none !important;
+    background-position: 50% 0 !important;
   }
 }
 

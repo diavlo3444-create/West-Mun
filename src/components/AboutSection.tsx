@@ -24,7 +24,10 @@ export const AboutSection: React.FC = () => {
             className="text-3xl sm:text-5xl font-serif font-normal text-white tracking-tight leading-tight mb-6"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            About <span className="gold-gradient-text">WEST MUN</span>
+            About{' '}
+            <span className="gold-gradient-text shimmer-gold shimmer-stagger-3">
+              WEST MUN
+            </span>
           </h2>
           <p className="text-neutral-300 text-base sm:text-lg leading-relaxed font-light">
             WEST MUN is established to offer an uncompromising, academically rigorous platform for high school and collegiate delegates. We convene future diplomats to test their grasp of real-time crises, treaty obligations, and international negotiation.

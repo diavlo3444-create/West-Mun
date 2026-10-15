@@ -24,7 +24,10 @@ export const ConferenceIntro: React.FC = () => {
             className="text-3xl sm:text-5xl font-serif font-normal text-white tracking-tight leading-tight mb-6"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            Diplomacy. Dialogue. <span className="gold-gradient-text">Impact.</span>
+            Diplomacy. Dialogue.{' '}
+            <span className="gold-gradient-text shimmer-gold shimmer-stagger-1">
+              Impact.
+            </span>
           </h2>
           <p className="text-neutral-300 text-base sm:text-lg leading-relaxed font-light">
             Model United Nations is an authentic simulation of the UN General Assembly, Security Council, and multilateral diplomatic agencies. Delegates represent sovereign nations, advocating foreign policy objectives, drafting binding resolutions, and navigating international crises.

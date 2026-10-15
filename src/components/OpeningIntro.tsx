@@ -5,7 +5,7 @@ interface OpeningIntroProps {
   onFlightStart?: () => void;
 }
 
-type IntroStage = 'chamber' | 'locking' | 'unlock' | 'appreciation' | 'flying' | 'finished';
+type IntroStage = 'darkness' | 'reveal' | 'tagline' | 'flying' | 'finished';
 
 export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlightStart }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -21,23 +21,34 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
     return window.innerWidth < 640 || window.innerHeight < 600;
   });
 
-  const [stage, setStage] = useState<IntroStage>('chamber');
+  const [isShortScreen, setIsShortScreen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerHeight < 520;
+  });
 
-  // Emblem and lock dimensions
-  const diameter = isMobile ? 90 : 122;
-  const svgSize = diameter + (isMobile ? 44 : 68);
+  const [stage, setStage] = useState<IntroStage>('darkness');
+
+  // Emblem and concentric summit architecture dimensions
+  const diameter = isMobile ? (isShortScreen ? 76 : 88) : 128;
+  const svgSize = diameter + (isMobile ? 48 : 80);
   const svgCenter = svgSize / 2;
-  const outerArcRadius = diameter / 2 + (isMobile ? 11 : 17);
-  const innerArcRadius = diameter / 2 + (isMobile ? 6 : 9);
+  const outerArcRadius = diameter / 2 + (isMobile ? 16 : 26);
+  const innerArcRadius = diameter / 2 + (isMobile ? 8 : 14);
 
-  // Resize listener strictly for mobile flag update
+  // Resize listener for responsive layout parameters
   useEffect(() => {
     const handleResize = () => {
       const mob = window.innerWidth < 640 || window.innerHeight < 600;
+      const short = window.innerHeight < 520;
       setIsMobile((prev) => (prev !== mob ? mob : prev));
+      setIsShortScreen((prev) => (prev !== short ? short : prev));
     };
     window.addEventListener('resize', handleResize, { passive: true });
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize, { passive: true });
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, []);
 
   // Lock body scroll during intro
@@ -50,15 +61,21 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
     };
   }, []);
 
-  // Gold dust particles canvas engine
+  // Gold dust particles canvas engine with depth tiers and specular glints
   useEffect(() => {
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (prefersReducedMotion) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let animId: number;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
 
     let viewW = window.innerWidth;
     let viewH = window.innerHeight;
@@ -86,7 +103,8 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
       phase: number;
       freq: number;
       baseAlpha: number;
-      depth: 1 | 2 | 3;
+      twinkleSpeed: number;
+      depth: 1 | 2 | 3; // 1: Distant subtle, 2: Midground warm gold, 3: Foreground specular glint
     }
 
     interface Spark {
@@ -100,25 +118,29 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
       color: string;
     }
 
-    const count = isMobile ? 14 : 26;
+    // Finely tuned particle density: restrained and spacious, like fine dust suspended in a quiet grand hall
+    const count = isMobile ? 12 : 26;
     const particles: Particle[] = Array.from({ length: count }).map((_, i) => {
       const depth: 1 | 2 | 3 = i % 4 === 0 ? 3 : i % 2 === 0 ? 2 : 1;
       let radius = 1.0;
-      let speedY = 0.35;
-      let baseAlpha = 0.35;
+      let speedY = 0.3;
+      let baseAlpha = 0.3;
 
       if (depth === 1) {
+        // Distant micro-dust
         radius = Math.random() * 0.4 + 0.6;
-        speedY = Math.random() * 0.2 + 0.2;
-        baseAlpha = Math.random() * 0.2 + 0.18;
+        speedY = Math.random() * 0.15 + 0.18;
+        baseAlpha = Math.random() * 0.15 + 0.15;
       } else if (depth === 2) {
-        radius = Math.random() * 0.5 + 1.1;
-        speedY = Math.random() * 0.3 + 0.35;
+        // Midground warm gold
+        radius = Math.random() * 0.5 + 1.0;
+        speedY = Math.random() * 0.22 + 0.28;
         baseAlpha = Math.random() * 0.2 + 0.35;
       } else {
-        radius = Math.random() * 0.6 + 1.6;
-        speedY = Math.random() * 0.4 + 0.5;
-        baseAlpha = Math.random() * 0.25 + 0.55;
+        // Foreground glinting specular
+        radius = Math.random() * 0.6 + 1.4;
+        speedY = Math.random() * 0.3 + 0.42;
+        baseAlpha = Math.random() * 0.25 + 0.5;
       }
 
       return {
@@ -126,10 +148,11 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
         y: Math.random() * viewH,
         radius,
         speedY,
-        driftBase: (Math.random() - 0.5) * 0.15,
-        driftAmp: Math.random() * 0.3 + 0.15,
+        driftBase: (Math.random() - 0.5) * 0.12,
+        driftAmp: Math.random() * 0.25 + 0.15,
         phase: Math.random() * Math.PI * 2,
-        freq: Math.random() * 0.02 + 0.015,
+        freq: Math.random() * 0.018 + 0.012,
+        twinkleSpeed: Math.random() * 0.03 + 0.02,
         baseAlpha,
         depth,
       };
@@ -142,65 +165,73 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
       frame++;
       ctx.clearRect(0, 0, viewW, viewH);
 
-      // Trigger burst on unlock
+      // Trigger subtle harmonic spark burst on emblem reveal
       if (unlockBurstRef.current) {
         unlockBurstRef.current = false;
         const centerX = viewW / 2;
-        const centerY = isMobile ? viewH * 0.36 : viewH * 0.38;
-        const sparkCount = isMobile ? 12 : 20;
+        const centerY = isMobile ? viewH * 0.38 : viewH * 0.39;
+        const sparkCount = isMobile ? 10 : 18;
         const radiusSpawn = diameter / 2 + 8;
 
         for (let s = 0; s < sparkCount; s++) {
           const angle = (s / sparkCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
-          const speed = Math.random() * 1.8 + 1.2;
+          const speed = Math.random() * 1.5 + 0.8;
           sparks.push({
             x: centerX + Math.cos(angle) * radiusSpawn,
             y: centerY + Math.sin(angle) * radiusSpawn,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
             life: 0,
-            maxLife: Math.random() * 25 + 35,
-            radius: Math.random() * 1.2 + 0.8,
-            color: s % 2 === 0 ? 'rgba(247, 231, 180,' : 'rgba(212, 175, 55,',
+            maxLife: Math.random() * 24 + 28,
+            radius: Math.random() * 1.1 + 0.8,
+            color: s % 2 === 0 ? 'rgba(255, 245, 210,' : 'rgba(212, 175, 55,',
           });
         }
       }
 
-      // Draw ambient particles
+      // Draw ambient gold particles
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
         p.y += p.speedY;
         p.x += p.driftBase + Math.sin(frame * p.freq + p.phase) * p.driftAmp;
 
-        if (p.y > viewH + 10) {
-          p.y = -10;
+        if (p.y > viewH + 12) {
+          p.y = -12;
           p.x = Math.random() * viewW;
         }
-        if (p.x < -10) p.x = viewW + 10;
-        if (p.x > viewW + 10) p.x = -10;
+        if (p.x < -12) p.x = viewW + 12;
+        if (p.x > viewW + 12) p.x = -12;
 
-        const twinkle = Math.sin(frame * 0.035 + p.phase) * 0.1;
-        const currentAlpha = Math.max(0.1, Math.min(1, p.baseAlpha + twinkle));
+        // Soft specular twinkle on foreground particles
+        const twinkle = Math.sin(frame * p.twinkleSpeed + p.phase) * (p.depth === 3 ? 0.25 : 0.12);
+        const currentAlpha = Math.max(0.08, Math.min(1, p.baseAlpha + twinkle));
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+
         if (p.depth === 3) {
-          ctx.fillStyle = `rgba(247, 231, 180, ${currentAlpha})`;
+          // Specular glint
+          ctx.fillStyle = `rgba(255, 248, 220, ${currentAlpha})`;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = `rgba(212, 175, 55, ${currentAlpha * 0.6})`;
         } else if (p.depth === 2) {
           ctx.fillStyle = `rgba(212, 175, 55, ${currentAlpha})`;
+          ctx.shadowBlur = 0;
         } else {
-          ctx.fillStyle = `rgba(197, 160, 89, ${currentAlpha})`;
+          ctx.fillStyle = `rgba(180, 145, 80, ${currentAlpha})`;
+          ctx.shadowBlur = 0;
         }
         ctx.fill();
       }
+      ctx.shadowBlur = 0;
 
-      // Draw unlock sparks
+      // Draw reveal sparks
       for (let s = sparks.length - 1; s >= 0; s--) {
         const sp = sparks[s];
         sp.x += sp.vx;
         sp.y += sp.vy;
-        sp.vx *= 0.94;
-        sp.vy *= 0.94;
+        sp.vx *= 0.93;
+        sp.vy *= 0.93;
         sp.life++;
 
         const progress = sp.life / sp.maxLife;
@@ -208,7 +239,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
 
         ctx.beginPath();
         ctx.arc(sp.x, sp.y, sp.radius * (1 - progress * 0.4), 0, Math.PI * 2);
-        ctx.fillStyle = `${sp.color} ${alpha * 0.85})`;
+        ctx.fillStyle = `${sp.color} ${alpha * 0.9})`;
         ctx.fill();
 
         if (sp.life >= sp.maxLife) {
@@ -227,12 +258,15 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
     };
   }, [diameter, isMobile]);
 
-  // Unified Orchestration Timeline — Runs once on mount
+  // Unified Orchestration Timeline — "The Golden Summit"
   useEffect(() => {
     isMountedRef.current = true;
     const timers = timersRef.current;
 
-    // Helper to queue timeouts safely
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const addTimer = (fn: () => void, ms: number) => {
       const id = window.setTimeout(() => {
         if (isMountedRef.current) {
@@ -243,23 +277,38 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
       return id;
     };
 
-    // Phase 1: Begin vault locking arcs rotation
-    addTimer(() => {
-      setStage('locking');
-    }, isMobile ? 550 : 650);
+    // If user prefers reduced motion: show brief static composition and unlock cleanly
+    if (prefersReducedMotion) {
+      setStage('tagline');
+      addTimer(() => {
+        if (isMountedRef.current) {
+          if (onFlightStart) onFlightStart();
+          setStage('finished');
+          onComplete();
+        }
+      }, 700);
 
-    // Phase 2: Lock alignment engage & unlock sweep
+      return () => {
+        isMountedRef.current = false;
+        timers.forEach((t) => clearTimeout(t));
+        timers.length = 0;
+      };
+    }
+
+    const mob = window.innerWidth < 640 || window.innerHeight < 600;
+
+    // ACT I -> ACT II: Reveal the centered WEST MUN emblem and architectural geometry
     addTimer(() => {
       unlockBurstRef.current = true;
-      setStage('unlock');
-    }, isMobile ? 1400 : 1600);
+      setStage('reveal');
+    }, mob ? 400 : 650);
 
-    // Phase 3: Tagline reveals & composition held for appreciation
+    // ACT II: Tagline reveal & full summit composition
     addTimer(() => {
-      setStage('appreciation');
-    }, isMobile ? 1750 : 1950);
+      setStage('tagline');
+    }, mob ? 1100 : 1600);
 
-    // Phase 4: Single-timeline flight to navbar logo position
+    // ACT III: The Cinematic Transition — Flight to exact navbar logo target
     addTimer(() => {
       if (!isMountedRef.current) return;
 
@@ -269,14 +318,17 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
         return;
       }
 
+      const currentlyMobile = window.innerWidth < 640 || window.innerHeight < 600;
+
       const targetEl = document.getElementById('navbar-logo-target');
       const currentRect = logoEl.getBoundingClientRect();
       const currentCenterX = currentRect.left + currentRect.width / 2;
       const currentCenterY = currentRect.top + currentRect.height / 2;
 
-      let targetCenterX = isMobile ? 38 : 52;
-      let targetCenterY = isMobile ? 34 : 40;
-      let targetWidth = isMobile ? 36 : 40;
+      // Fallback coordinates matching Navbar layout
+      let targetCenterX = currentlyMobile ? 38 : 52;
+      let targetCenterY = currentlyMobile ? 34 : 40;
+      let targetWidth = currentlyMobile ? 36 : 40;
 
       if (targetEl) {
         const targetRect = targetEl.getBoundingClientRect();
@@ -296,7 +348,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
         onFlightStart();
       }
 
-      const flightDuration = isMobile ? 950 : 1050;
+      const flightDuration = currentlyMobile ? 800 : 950;
 
       if (typeof logoEl.animate === 'function') {
         const anim = logoEl.animate(
@@ -326,7 +378,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
           }
         };
       } else {
-        // Fallback for environments without Web Animations API
+        // Fallback for browsers without Web Animations API
         addTimer(() => {
           if (isMountedRef.current) {
             setStage('finished');
@@ -334,15 +386,15 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
           }
         }, flightDuration);
       }
-    }, isMobile ? 2750 : 3100);
+    }, mob ? 2500 : 3300);
 
-    // Safety timeout: guaranteed unmount and site unlock even under extreme browser throttling
+    // Guaranteed unmount safety timeout
     addTimer(() => {
       if (isMountedRef.current) {
         setStage('finished');
         onComplete();
       }
-    }, isMobile ? 4200 : 4600);
+    }, mob ? 3700 : 4700);
 
     return () => {
       isMountedRef.current = false;
@@ -354,7 +406,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
         } catch {}
       }
     };
-  }, [isMobile, onComplete, onFlightStart]);
+  }, [onComplete, onFlightStart]);
 
   const handleSkip = () => {
     if (!isMountedRef.current) return;
@@ -370,31 +422,54 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
 
   if (stage === 'finished') return null;
 
+  const isDarkness = stage === 'darkness';
+  const isRevealed = stage === 'reveal' || stage === 'tagline' || stage === 'flying';
+  const isTaglineVisible = stage === 'tagline';
   const isFlying = stage === 'flying';
-  const isUnlocked = stage === 'unlock' || stage === 'appreciation' || stage === 'flying';
-  const isAppreciating = stage === 'appreciation';
 
   return (
     <div
       className={`fixed inset-0 z-50 overflow-hidden select-none transition-colors duration-1000 ease-out ${
-        isFlying ? 'pointer-events-none bg-transparent' : 'bg-[#040405]'
+        isFlying ? 'pointer-events-none bg-transparent' : 'bg-[#040406]'
       }`}
       aria-label="WEST MUN Introduction"
       role="dialog"
       aria-modal="true"
     >
-      {/* Background ambient gold aura */}
+      {/* 1. Deep Atmospheric Vignette */}
       <div
         className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${
-          isFlying ? 'opacity-0' : isUnlocked ? 'opacity-90' : 'opacity-40'
+          isFlying ? 'opacity-0' : 'opacity-100'
         }`}
         style={{
           background:
-            'radial-gradient(ellipse at 50% 40%, rgba(212,175,55,0.08) 0%, rgba(12,12,14,0.6) 55%, #040405 100%)',
+            'radial-gradient(ellipse at 50% 40%, rgba(18, 18, 22, 0.4) 0%, rgba(8, 8, 10, 0.85) 60%, #030304 100%)',
         }}
       />
 
-      {/* Floating Gold Particles Canvas */}
+      {/* 2. Soft Anamorphic Warm-Gold Light Beam (ACT I: Emerging through the darkness) */}
+      <div
+        className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${
+          isFlying ? 'opacity-0' : isRevealed ? 'opacity-80' : 'opacity-40'
+        }`}
+        style={{
+          background:
+            'radial-gradient(ellipse 65% 55% at 50% 36%, rgba(212, 175, 55, 0.12) 0%, rgba(180, 140, 45, 0.04) 42%, transparent 70%)',
+        }}
+      />
+
+      {/* 3. Subtle Volumetric Diagonal Sheen in the Darkness */}
+      <div
+        className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${
+          isDarkness ? 'opacity-70' : 'opacity-0'
+        }`}
+        style={{
+          background:
+            'linear-gradient(115deg, transparent 38%, rgba(212, 175, 55, 0.04) 48%, rgba(255, 245, 210, 0.09) 50%, rgba(212, 175, 55, 0.04) 52%, transparent 62%)',
+        }}
+      />
+
+      {/* 4. Falling Gold Dust Particles Canvas */}
       <canvas
         ref={canvasRef}
         className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${
@@ -402,11 +477,11 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
         }`}
       />
 
-      {/* Centered Anchor Container: Holds Logo & Concentric Unlock Mechanism */}
+      {/* 5. Centered Anchor: Holds Logo, Architectural Chamber Arcs, and Tagline */}
       <div
         className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center"
         style={{
-          transform: `translate3d(0, ${isMobile ? '-14%' : '-12%'}, 0)`,
+          transform: `translate3d(0, ${isShortScreen ? '-7%' : isMobile ? '-12%' : '-10%'}, 0)`,
         }}
       >
         {/* LOGO FLYER ELEMENT — Starting at translate3d(0,0,0) */}
@@ -418,16 +493,14 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
             height: diameter,
           }}
         >
-          {/* CONCENTRIC VAULT UNLOCK MECHANISM (SVG) */}
+          {/* ARCHITECTURAL DIPLOMATIC HALL ARCS & SUMMIT GEOMETRY (SVG) */}
           <div
-            className={`absolute pointer-events-none transition-all duration-700 ease-out ${
+            className={`absolute pointer-events-none transition-all duration-800 ease-out ${
               isFlying
                 ? 'opacity-0 scale-95'
-                : isUnlocked
-                ? 'opacity-0 scale-110 pointer-events-none'
-                : stage === 'locking'
+                : isRevealed
                 ? 'opacity-85 scale-100'
-                : 'opacity-40 scale-95'
+                : 'opacity-0 scale-90'
             }`}
             style={{
               width: svgSize,
@@ -437,26 +510,40 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
               transform: 'translate(-50%, -50%)',
             }}
           >
-            <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`} className="w-full h-full">
-              {/* Background diplomatic dial: fine concentric tick marks & compass gauge */}
+            <svg
+              width={svgSize}
+              height={svgSize}
+              viewBox={`0 0 ${svgSize} ${svgSize}`}
+              className="w-full h-full"
+            >
+              <defs>
+                <linearGradient id="arcGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#f7e7b4" stopOpacity="0.9" />
+                  <stop offset="50%" stopColor="#d4af37" stopOpacity="0.6" />
+                  <stop offset="100%" stopColor="#8c6d23" stopOpacity="0.3" />
+                </linearGradient>
+              </defs>
+
+              {/* Outer Assembly Amphitheater Ring with fine dash pattern */}
               <circle
                 cx={svgCenter}
                 cy={svgCenter}
-                r={outerArcRadius + 6}
+                r={outerArcRadius + (isMobile ? 6 : 10)}
                 fill="none"
                 stroke="#d4af37"
                 strokeWidth="0.75"
-                strokeDasharray="2 6"
-                strokeOpacity="0.25"
+                strokeDasharray="2 7"
+                strokeOpacity="0.3"
               />
 
-              {/* Diplomatic dial markers */}
-              {Array.from({ length: isMobile ? 8 : 12 }).map((_, i) => {
-                const count = isMobile ? 8 : 12;
+              {/* Radial Diplomatic Summit Markers around circumference */}
+              {Array.from({ length: isMobile ? 8 : 16 }).map((_, i) => {
+                const count = isMobile ? 8 : 16;
                 const angle = (i / count) * 360;
                 const rad = (angle * Math.PI) / 180;
-                const r1 = outerArcRadius + 3;
-                const r2 = outerArcRadius + 7;
+                const isCardinal = i % (count / 4) === 0;
+                const r1 = outerArcRadius + 1;
+                const r2 = outerArcRadius + (isCardinal ? 6 : 4);
                 return (
                   <line
                     key={i}
@@ -465,49 +552,48 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
                     x2={svgCenter + Math.cos(rad) * r2}
                     y2={svgCenter + Math.sin(rad) * r2}
                     stroke="#d4af37"
-                    strokeWidth="1"
-                    strokeOpacity={i % 3 === 0 ? '0.5' : '0.2'}
+                    strokeWidth={isCardinal ? '1' : '0.6'}
+                    strokeOpacity={isCardinal ? '0.6' : '0.25'}
                   />
                 );
               })}
 
-              {/* Outer Vault Arc — Rotates clockwise into locked alignment */}
+              {/* Primary Architectural Vault Arc — Clockwise alignment */}
               <circle
                 cx={svgCenter}
                 cy={svgCenter}
                 r={outerArcRadius}
                 fill="none"
-                stroke="#d4af37"
-                strokeWidth={isMobile ? '1.25' : '1.5'}
-                strokeDasharray={isMobile ? '65 25 15 25' : '90 35 25 35'}
+                stroke="url(#arcGoldGrad)"
+                strokeWidth={isMobile ? '1.2' : '1.4'}
+                strokeDasharray={isMobile ? '70 24 16 24' : '110 40 30 40'}
                 strokeLinecap="round"
-                strokeOpacity="0.8"
                 style={{
                   transformOrigin: `${svgCenter}px ${svgCenter}px`,
-                  transform: stage === 'locking' || isUnlocked ? 'rotate(0deg)' : 'rotate(-85deg)',
+                  transform: isRevealed ? 'rotate(0deg)' : 'rotate(-70deg)',
                   transition: 'transform 1000ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
               />
 
-              {/* Inner Vault Arc — Rotates counter-clockwise into locked alignment */}
+              {/* Inner Concentric Alignment Ring — Counter-clockwise alignment */}
               <circle
                 cx={svgCenter}
                 cy={svgCenter}
                 r={innerArcRadius}
                 fill="none"
                 stroke="#f7e7b4"
-                strokeWidth={isMobile ? '1.25' : '1.5'}
-                strokeDasharray={isMobile ? '45 20 10 20' : '65 25 15 25'}
+                strokeWidth={isMobile ? '1.1' : '1.3'}
+                strokeDasharray={isMobile ? '45 18 12 18' : '75 28 18 28'}
                 strokeLinecap="round"
-                strokeOpacity="0.9"
+                strokeOpacity="0.75"
                 style={{
                   transformOrigin: `${svgCenter}px ${svgCenter}px`,
-                  transform: stage === 'locking' || isUnlocked ? 'rotate(0deg)' : 'rotate(95deg)',
+                  transform: isRevealed ? 'rotate(0deg)' : 'rotate(80deg)',
                   transition: 'transform 1000ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
               />
 
-              {/* 4 Cardinal Diamond Alignment Markers */}
+              {/* Four Cardinal Summit Diamond Accents */}
               {[0, 90, 180, 270].map((deg) => {
                 const rad = (deg * Math.PI) / 180;
                 const px = svgCenter + Math.cos(rad) * (outerArcRadius + 0.5);
@@ -515,12 +601,12 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
                 return (
                   <polygon
                     key={deg}
-                    points={`${px},${py - 2.5} ${px + 2.5},${py} ${px},${py + 2.5} ${px - 2.5},${py}`}
+                    points={`${px},${py - 2} ${px + 2},${py} ${px},${py + 2} ${px - 2},${py}`}
                     fill="#f7e7b4"
-                    opacity={stage === 'locking' || isUnlocked ? 0.9 : 0.3}
+                    opacity={isRevealed ? 0.9 : 0.2}
                     style={{
                       transformOrigin: `${px}px ${py}px`,
-                      transform: isUnlocked ? 'scale(1.3)' : 'scale(1)',
+                      transform: isRevealed ? 'scale(1.2)' : 'scale(0.8)',
                       transition: 'all 500ms ease-out',
                     }}
                   />
@@ -529,104 +615,105 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
             </svg>
           </div>
 
-          {/* Soft Unlock Backlight Bloom */}
+          {/* Soft Golden Chamber Backlight Halo */}
           <div
             className={`absolute inset-0 rounded-full pointer-events-none transition-all duration-700 ease-out ${
               isFlying
                 ? 'opacity-0 scale-95'
-                : isUnlocked
-                ? 'opacity-60 scale-125 bg-[radial-gradient(circle,rgba(212,175,55,0.45)_0%,rgba(212,175,55,0.1)_50%,transparent_75%)]'
-                : 'opacity-15 scale-100 bg-[radial-gradient(circle,rgba(212,175,55,0.25)_0%,transparent_70%)]'
+                : isRevealed
+                ? 'opacity-70 scale-125 bg-[radial-gradient(circle,rgba(212,175,55,0.4)_0%,rgba(212,175,55,0.08)_50%,transparent_75%)]'
+                : 'opacity-10 scale-95 bg-[radial-gradient(circle,rgba(212,175,55,0.2)_0%,transparent_70%)]'
             }`}
           />
 
           {/* OFFICIAL WEST MUN EMBLEM CONTAINER */}
           <div
-            className={`relative w-full h-full rounded-full overflow-hidden bg-[#0d0d10] transition-all duration-700 ${
+            className={`relative w-full h-full rounded-full overflow-hidden bg-[#141414] flex items-center justify-center transition-[border-color,box-shadow,opacity,transform] duration-700 ease-out ${
               isFlying
                 ? 'border border-[#d4af37]/50 shadow-[0_0_15px_rgba(212,175,55,0.2)]'
-                : isUnlocked
-                ? 'border border-[#d4af37]/75 shadow-[0_0_35px_rgba(212,175,55,0.35)]'
-                : 'border border-[#d4af37]/40 shadow-[0_0_20px_rgba(212,175,55,0.15)] opacity-90'
+                : isRevealed
+                ? 'border border-[#d4af37]/75 shadow-[0_0_35px_rgba(212,175,55,0.35),0_0_70px_rgba(212,175,55,0.12)] scale-100 opacity-100'
+                : 'border border-[#d4af37]/30 shadow-[0_0_15px_rgba(212,175,55,0.1)] scale-95 opacity-0'
             }`}
           >
+            {/* The official WEST MUN logo image */}
             <img
               src="/westmun-logo.jpg"
               alt="WEST MUN Official Logo"
-              className="w-full h-full object-cover object-center select-none"
+              className="w-full h-full object-contain p-1.5 object-center select-none"
               draggable={false}
             />
 
-            {/* Precision Light Sweep on Unlock Revelation */}
+            {/* Restrained Golden Metallic Light Sweep Across Emblem */}
             <div
-              className={`absolute inset-0 pointer-events-none transition-transform duration-700 ease-out ${
-                isUnlocked ? 'translate-x-[180%]' : '-translate-x-[160%]'
+              className={`absolute inset-0 pointer-events-none transition-transform duration-1000 ease-out ${
+                isRevealed ? 'translate-x-[200%]' : '-translate-x-[180%]'
               }`}
               style={{
                 background:
-                  'linear-gradient(105deg, transparent 25%, rgba(255, 240, 190, 0.45) 50%, rgba(212, 175, 55, 0.2) 56%, transparent 75%)',
+                  'linear-gradient(105deg, transparent 25%, rgba(255, 245, 210, 0.45) 50%, rgba(212, 175, 55, 0.2) 58%, transparent 75%)',
               }}
             />
           </div>
         </div>
 
-        {/* Centered Diplomatic Tagline: Placed directly below emblem */}
+        {/* Centered Diplomatic Tagline: Placed directly below the emblem */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl px-5 text-center pointer-events-none will-change-[opacity,transform]"
+          className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl px-4 sm:px-6 text-center pointer-events-none will-change-[opacity,transform]"
           style={{
-            top: `calc(50% + ${diameter / 2 + (isMobile ? 18 : 26)}px)`,
-            opacity: isAppreciating ? 1 : 0,
-            transform: isAppreciating
+            top: `calc(50% + ${diameter / 2 + (isMobile ? 16 : 24)}px)`,
+            opacity: isTaglineVisible && !isFlying ? 1 : 0,
+            transform: isTaglineVisible && !isFlying
               ? 'translate3d(-50%, 0px, 0)'
               : isFlying
               ? 'translate3d(-50%, -10px, 0)'
-              : 'translate3d(-50%, 12px, 0)',
+              : 'translate3d(-50%, 14px, 0)',
             transition: isFlying
               ? 'opacity 250ms ease-in, transform 250ms ease-in'
-              : isAppreciating
-              ? 'opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1)'
+              : isTaglineVisible
+              ? 'opacity 700ms cubic-bezier(0.16, 1, 0.3, 1), transform 700ms cubic-bezier(0.16, 1, 0.3, 1)'
               : 'opacity 300ms ease-out, transform 300ms ease-out',
           }}
         >
           {/* Diplomatic Kicker */}
-          <div className="inline-flex items-center justify-center gap-2 mb-1.5 sm:mb-2">
-            <span className="w-5 sm:w-9 h-[1px] bg-gradient-to-r from-transparent to-[#d4af37]/70" />
-            <span className="text-[9px] sm:text-[11px] font-mono tracking-[0.3em] uppercase text-[#d4af37]/90 font-medium">
-              WEST MUN 2026
+          <div className="inline-flex items-center justify-center gap-2.5 mb-1.5 sm:mb-2">
+            <span className="w-6 sm:w-10 h-[1px] bg-gradient-to-r from-transparent via-[#d4af37]/60 to-[#d4af37]/90" />
+            <span className="text-[9px] sm:text-[11px] font-mono tracking-[0.25em] sm:tracking-[0.3em] uppercase text-[#d4af37] font-medium">
+              WEST MUN 2027
             </span>
-            <span className="w-5 sm:w-9 h-[1px] bg-gradient-to-l from-transparent to-[#d4af37]/70" />
+            <span className="w-6 sm:w-10 h-[1px] bg-gradient-to-l from-transparent via-[#d4af37]/60 to-[#d4af37]/90" />
           </div>
 
-          {/* Tagline */}
+          {/* Golden Shimmer Tagline */}
           <h1
-            className="text-xl sm:text-2xl md:text-3xl font-serif font-normal tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-[#f7e7b4] via-[#d4af37] to-[#e8c868] leading-tight mb-1.5 sm:mb-2"
+            className="text-xl sm:text-2xl md:text-3xl font-serif font-normal tracking-wide leading-snug sm:leading-tight mb-1.5 sm:mb-2 shimmer-gold"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
             Where Diplomacy Meets Leadership
           </h1>
 
           {/* Conference Dossier Line */}
-          <p className="text-[10px] sm:text-xs text-neutral-400 font-light tracking-[0.2em] uppercase">
+          <p className="text-[9px] sm:text-xs text-neutral-400 font-light tracking-[0.18em] sm:tracking-[0.22em] uppercase">
             Western Model United Nations Conference
           </p>
 
-          {/* Diamond Seal Motif */}
-          <div className="mt-2.5 sm:mt-3 flex items-center justify-center gap-2 opacity-65">
-            <span className="w-1.5 h-1.5 rotate-45 border border-[#d4af37]/70 bg-[#d4af37]/20" />
+          {/* Diplomatic Diamond Motif */}
+          <div className="mt-2.5 sm:mt-3 flex items-center justify-center gap-2 opacity-60">
+            <span className="w-1.5 h-1.5 rotate-45 border border-[#d4af37]/80 bg-[#d4af37]/25" />
           </div>
         </div>
       </div>
 
-      {/* Understated Skip Control */}
+      {/* Cinematic Skip Intro Control */}
       <button
         type="button"
         onClick={handleSkip}
-        className={`absolute bottom-6 right-6 z-50 text-[10px] font-mono tracking-widest uppercase text-neutral-400 hover:text-[#d4af37] transition-all duration-300 cursor-pointer py-1.5 px-3 border border-neutral-800/80 rounded-sm bg-black/60 hover:border-[#d4af37]/40 ${
+        className={`absolute bottom-5 right-5 sm:bottom-7 sm:right-7 z-50 text-[10px] sm:text-[11px] font-mono tracking-widest uppercase text-neutral-400 hover:text-[#d4af37] transition-all duration-300 cursor-pointer py-2 px-3.5 sm:px-4 border border-neutral-800/80 rounded-sm bg-black/60 backdrop-blur-sm hover:border-[#d4af37]/40 shadow-lg ${
           isFlying ? 'opacity-0 pointer-events-none' : 'opacity-70 hover:opacity-100'
         }`}
         aria-label="Skip opening intro"
       >
-        Skip Intro <span>→</span>
+        Skip Intro <span className="inline-block transition-transform duration-200">→</span>
       </button>
     </div>
   );

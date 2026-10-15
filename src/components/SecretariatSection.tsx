@@ -77,7 +77,10 @@ export const SecretariatSection: React.FC = () => {
               className="text-3xl sm:text-5xl font-serif font-normal text-white tracking-tight"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
-              The <span className="gold-gradient-text">Secretariat</span>
+              The{' '}
+              <span className="gold-gradient-text shimmer-gold shimmer-stagger-1">
+                Secretariat
+              </span>
             </h2>
           </div>
           <p className="text-neutral-400 text-sm max-w-md font-light leading-relaxed">

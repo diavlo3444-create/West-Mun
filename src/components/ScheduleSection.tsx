@@ -111,7 +111,10 @@ export const ScheduleSection: React.FC = () => {
               className="text-3xl sm:text-5xl font-serif font-normal text-white tracking-tight"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
-              Conference <span className="gold-gradient-text">Schedule</span>
+              Conference{' '}
+              <span className="gold-gradient-text shimmer-gold shimmer-stagger-4">
+                Schedule
+              </span>
             </h2>
           </div>
           <div className="p-3 bg-[#111114] border border-[#d4af37]/30 rounded-sm flex items-center gap-2 text-xs text-neutral-300">
