@@ -1,5 +1,6 @@
 import React from 'react';
 import { User, Shield, CheckCircle2, Clock } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 
 interface TeamMember {
@@ -59,13 +60,14 @@ export const SecretariatSection: React.FC = React.memo(() => {
 
   return (
     <section id="secretariat" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
-      <div
-        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
-          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        }`}
-      >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+          className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6"
+        >
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="w-8 h-[1px] bg-[#d4af37]" />
@@ -86,13 +88,22 @@ export const SecretariatSection: React.FC = React.memo(() => {
           <p className="text-neutral-400 text-sm max-w-md font-light leading-relaxed">
             The executive leadership body governing WEST MUN, ensuring academic excellence, parliamentary decorum, and an unforgettable delegate experience.
           </p>
-        </div>
+        </motion.div>
 
         {/* Secretariat Profiles Grid — Consistent 4-Card Responsive Layout */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
-          {secretariat.map((member) => (
-            <div
+          {secretariat.map((member, index) => (
+            <motion.div
               key={member.role}
+              initial={{ opacity: 0, y: 24 }}
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+              transition={{
+                duration: 0.5,
+                delay: index * 0.1,
+                ease: [0.25, 0.1, 0.25, 1],
+              }}
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              whileTap={{ scale: 0.99 }}
               className={`group p-6 sm:p-7 bg-[#0e0e11] border rounded-sm transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden h-full ${
                 member.isConfirmed
                   ? 'border-[#d4af37]/40 hover:border-[#d4af37] shadow-[0_0_25px_rgba(212,175,55,0.06)]'
@@ -169,7 +180,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
                   )}
                 </span>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Mail, Instagram, Share2, MapPin, Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, Instagram, MapPin, Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 import { submitInquiry } from '../lib/api';
 
@@ -85,13 +86,14 @@ export const ContactSection: React.FC = React.memo(() => {
 
   return (
     <section id="contact" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
-      <div
-        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
-          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        }`}
-      >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
         {/* Section Header */}
-        <div className="max-w-3xl mb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+          className="max-w-3xl mb-16"
+        >
           <div className="flex items-center gap-2 mb-3">
             <span className="w-8 h-[1px] bg-[#d4af37]" />
             <span className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">
@@ -107,11 +109,16 @@ export const ContactSection: React.FC = React.memo(() => {
           <p className="text-neutral-300 text-base sm:text-lg leading-relaxed font-light">
             Have questions regarding committee agendas, delegation quotas, or institutional sponsorships? Connect with the organizing team directly.
           </p>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* Official Contact Placeholders (With Mandatory TBA Policy) */}
-          <div className="lg:col-span-5 space-y-6">
+          {/* Official Contact Channels */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+            transition={{ duration: 0.6, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+            className="lg:col-span-5 space-y-6"
+          >
             <div className="p-6 bg-[#0c0c0e] border border-neutral-800 rounded-sm">
               <h3 className="text-lg font-serif text-white mb-4">Official Channels</h3>
               <p className="text-xs text-neutral-400 mb-6 font-light leading-relaxed">
@@ -120,16 +127,21 @@ export const ContactSection: React.FC = React.memo(() => {
 
               <div className="space-y-4 text-xs">
                 {/* Email */}
-                <div className="flex items-start gap-3 p-3.5 bg-[#121215] border border-neutral-800/80 rounded-sm">
+                <motion.div
+                  whileHover={{ x: 3, transition: { duration: 0.2 } }}
+                  className="flex items-start gap-3 p-3.5 bg-[#121215] border border-neutral-800/80 rounded-sm"
+                >
                   <Mail className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
                   <div>
                     <span className="text-neutral-400 block font-medium">Official Secretariat Email</span>
                     <span className="font-mono text-[#d4af37] font-semibold">TBA</span>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Instagram */}
-                <a
+                <motion.a
+                  whileHover={{ x: 3, transition: { duration: 0.2 } }}
+                  whileTap={{ scale: 0.99 }}
                   href="https://www.instagram.com/westmun_27?rpxt=c3JkNHN2Mm44OTh5&utm_source=qr"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -145,31 +157,30 @@ export const ContactSection: React.FC = React.memo(() => {
                       @westmun_27 ↗
                     </span>
                   </div>
-                </a>
-
-                {/* Other Social Media */}
-                <div className="flex items-start gap-3 p-3.5 bg-[#121215] border border-neutral-800/80 rounded-sm">
-                  <Share2 className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-neutral-400 block font-medium">LinkedIn & Social Channels</span>
-                    <span className="font-mono text-[#d4af37] font-semibold">TBA</span>
-                  </div>
-                </div>
+                </motion.a>
 
                 {/* Venue / Location */}
-                <div className="flex items-start gap-3 p-3.5 bg-[#121215] border border-neutral-800/80 rounded-sm">
+                <motion.div
+                  whileHover={{ x: 3, transition: { duration: 0.2 } }}
+                  className="flex items-start gap-3 p-3.5 bg-[#121215] border border-neutral-800/80 rounded-sm"
+                >
                   <MapPin className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
                   <div>
                     <span className="text-neutral-400 block font-medium">Conference Venue & City</span>
                     <span className="font-mono text-[#d4af37] font-semibold">TBA</span>
                   </div>
-                </div>
+                </motion.div>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Interactive Inquiries Form */}
-          <div className="lg:col-span-7">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+            transition={{ duration: 0.6, delay: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+            className="lg:col-span-7"
+          >
             <div className="p-8 sm:p-10 bg-[#0e0e11] border border-neutral-800/90 rounded-sm">
               <h3 className="text-xl font-serif text-white mb-2">Send a Diplomatic Inquiry</h3>
               <p className="text-xs text-neutral-400 mb-6 font-light">
@@ -183,7 +194,9 @@ export const ContactSection: React.FC = React.memo(() => {
                   <p className="text-xs text-neutral-300 max-w-md mx-auto mb-4 leading-relaxed">
                     Thank you, <span className="text-white font-semibold">{formData.name}</span>. Your inquiry regarding "{formData.subject}" has been queued. As official conference emails are currently TBA, inquiries will be addressed as secretariat communication channels activate.
                   </p>
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
                     type="button"
                     onClick={() => {
                       setSent(false);
@@ -192,7 +205,7 @@ export const ContactSection: React.FC = React.memo(() => {
                     className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] rounded-sm hover:bg-[#e5c158] transition-colors cursor-pointer"
                   >
                     Send Another Message
-                  </button>
+                  </motion.button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -269,7 +282,9 @@ export const ContactSection: React.FC = React.memo(() => {
                   )}
 
                   <div className="pt-2">
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.015 }}
+                      whileTap={{ scale: 0.985 }}
                       type="submit"
                       disabled={isSubmitting}
                       className="w-full inline-flex items-center justify-center gap-2 py-3 px-6 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-98 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
@@ -285,12 +300,12 @@ export const ContactSection: React.FC = React.memo(() => {
                           <span>Transmit Message</span>
                         </>
                       )}
-                    </button>
+                    </motion.button>
                   </div>
                 </form>
               )}
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

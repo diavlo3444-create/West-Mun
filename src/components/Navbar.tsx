@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 
 interface NavbarProps {
   scrolled?: boolean;
@@ -127,12 +128,14 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
 
           {/* Desktop Primary Action */}
           <div className="hidden lg:flex items-center gap-4">
-            <a
+            <motion.a
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               href="#register"
-              className="inline-flex items-center justify-center px-4 py-2 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-95 transition-all shadow-[0_2px_12px_rgba(212,175,55,0.25)]"
+              className="inline-flex items-center justify-center px-4 py-2 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 transition-all shadow-[0_2px_12px_rgba(212,175,55,0.25)]"
             >
               Registration: TBA
-            </a>
+            </motion.a>
           </div>
 
           {/* Mobile Hamburger Button */}
@@ -184,23 +187,27 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
           </div>
         </div>
         {navLinks.map((link) => (
-          <a
+          <motion.a
             key={link.label}
             href={link.href}
+            whileHover={{ x: 6 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setMenuOpen(false)}
             className="text-2xl sm:text-3xl font-serif text-white hover:text-[#d4af37] transition-colors"
           >
             {link.label}
-          </a>
+          </motion.a>
         ))}
         <div className="pt-4 w-full max-w-xs border-t border-neutral-800">
-          <a
+          <motion.a
             href="#register"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setMenuOpen(false)}
             className="w-full inline-flex items-center justify-center py-3 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 transition-all text-center"
           >
             Registration: TBA
-          </a>
+          </motion.a>
         </div>
       </div>
     </>

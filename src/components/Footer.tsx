@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUp, Shield, Instagram, Lock } from 'lucide-react';
+import { ArrowUp, Shield, Instagram } from 'lucide-react';
 import { useInView } from '../hooks/useInView';
 
 interface FooterProps {
@@ -7,7 +7,7 @@ interface FooterProps {
   onOpenAdminPortal?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro, onOpenAdminPortal }) => {
+export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
   const { ref, isInView } = useInView<HTMLElement>({ threshold: 0.05 });
   const currentYear = 2027;
 
@@ -119,22 +119,10 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro, onOpen
         <div className="pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
           <p>© {currentYear} WEST MUN (Model United Nations). All rights reserved.</p>
           <div className="flex items-center gap-6">
-            <span className="text-[11px] font-mono text-neutral-600 hidden sm:inline">Diplomatic Summit Portal</span>
-            {onOpenAdminPortal && (
-              <button
-                type="button"
-                onClick={onOpenAdminPortal}
-                className="inline-flex items-center gap-1.5 text-neutral-500 hover:text-[#d4af37] transition-colors text-xs font-mono cursor-pointer"
-                title="Secretariat Organizer Portal"
-              >
-                <Lock className="w-3 h-3 text-[#d4af37]" />
-                <span>Secretariat Portal</span>
-              </button>
-            )}
             <button
               type="button"
               onClick={scrollToTop}
-              className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-[#d4af37] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-[#d4af37] transition-colors cursor-pointer active:scale-95"
               aria-label="Back to top"
             >
               <span>Back to top</span>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ChevronDown, HelpCircle } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 
 interface FAQItem {
@@ -63,13 +64,14 @@ export const FAQSection: React.FC = React.memo(() => {
 
   return (
     <section id="faq" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
-      <div
-        className={`max-w-4xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
-          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        }`}
-      >
+      <div className="max-w-4xl mx-auto px-5 sm:px-8 md:px-12">
         {/* Section Header */}
-        <div className="text-center mb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+          className="text-center mb-16"
+        >
           <div className="inline-flex items-center gap-2 mb-3">
             <span className="w-8 h-[1px] bg-[#d4af37]" />
             <span className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">
@@ -86,16 +88,24 @@ export const FAQSection: React.FC = React.memo(() => {
           <p className="text-neutral-400 text-sm max-w-xl mx-auto font-light leading-relaxed">
             Essential guidelines for prospective delegates, faculty advisors, and institutional partners preparing for WEST MUN.
           </p>
-        </div>
+        </motion.div>
 
         {/* Accordion */}
         <div className="space-y-4">
-          {faqs.map((faq) => {
+          {faqs.map((faq, index) => {
             const isOpen = openId === faq.id;
             return (
-              <div
+              <motion.div
                 key={faq.id}
-                className="bg-[#0e0e11] border border-neutral-800/90 rounded-sm overflow-hidden transition-colors"
+                initial={{ opacity: 0, y: 20 }}
+                animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                transition={{
+                  duration: 0.45,
+                  delay: Math.min(index * 0.06, 0.45),
+                  ease: [0.25, 0.1, 0.25, 1],
+                }}
+                whileHover={{ y: -2, transition: { duration: 0.15 } }}
+                className="bg-[#0e0e11] border border-neutral-800/90 hover:border-neutral-700 rounded-sm overflow-hidden transition-colors"
               >
                 <button
                   type="button"
@@ -126,7 +136,7 @@ export const FAQSection: React.FC = React.memo(() => {
                     {faq.answer}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>

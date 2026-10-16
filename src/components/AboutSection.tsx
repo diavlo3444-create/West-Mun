@@ -1,5 +1,6 @@
 import React from 'react';
 import { Target, Award, Users2, Calendar, MapPin, Building } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 
 export const AboutSection: React.FC = React.memo(() => {
@@ -7,13 +8,14 @@ export const AboutSection: React.FC = React.memo(() => {
 
   return (
     <section id="about" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
-      <div
-        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
-          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        }`}
-      >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
         {/* Section Header */}
-        <div className="max-w-3xl mb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+          className="max-w-3xl mb-16"
+        >
           <div className="flex items-center gap-2 mb-3">
             <span className="w-8 h-[1px] bg-[#d4af37]" />
             <span className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">
@@ -32,13 +34,18 @@ export const AboutSection: React.FC = React.memo(() => {
           <p className="text-neutral-300 text-base sm:text-lg leading-relaxed font-light">
             WEST MUN is established to offer an uncompromising, academically rigorous platform for high school and collegiate delegates. We convene future diplomats to test their grasp of real-time crises, treaty obligations, and international negotiation.
           </p>
-        </div>
+        </motion.div>
 
         {/* 2-Column Split: Mission & Vision / Expectations */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
           {/* Mission & Vision */}
-          <div className="space-y-8">
-            <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+            transition={{ duration: 0.6, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
+            className="space-y-8"
+          >
+            <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm hover:border-[#d4af37]/30 transition-colors">
               <div className="flex items-center gap-3 mb-4 text-[#d4af37]">
                 <Target className="w-5 h-5" />
                 <h3 className="text-xl font-serif text-white">Mission & Vision</h3>
@@ -52,7 +59,7 @@ export const AboutSection: React.FC = React.memo(() => {
               </div>
             </div>
 
-            <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm">
+            <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm hover:border-[#d4af37]/30 transition-colors">
               <div className="flex items-center gap-3 mb-4 text-[#d4af37]">
                 <Award className="w-5 h-5" />
                 <h3 className="text-xl font-serif text-white">Why Participate?</h3>
@@ -72,11 +79,16 @@ export const AboutSection: React.FC = React.memo(() => {
                 </li>
               </ul>
             </div>
-          </div>
+          </motion.div>
 
           {/* What Delegates Can Expect + Facts Sheet */}
-          <div className="space-y-8">
-            <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+            transition={{ duration: 0.6, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+            className="space-y-8"
+          >
+            <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm hover:border-[#d4af37]/30 transition-colors">
               <div className="flex items-center gap-3 mb-4 text-[#d4af37]">
                 <Users2 className="w-5 h-5" />
                 <h3 className="text-xl font-serif text-white">What Delegates Can Expect</h3>
@@ -122,7 +134,7 @@ export const AboutSection: React.FC = React.memo(() => {
                 </dl>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

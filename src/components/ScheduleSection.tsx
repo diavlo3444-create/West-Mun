@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 
 interface ScheduleSession {
@@ -93,13 +94,14 @@ export const ScheduleSection: React.FC = React.memo(() => {
 
   return (
     <section id="schedule" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
-      <div
-        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
-          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        }`}
-      >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+          className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6"
+        >
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="w-8 h-[1px] bg-[#d4af37]" />
@@ -121,13 +123,15 @@ export const ScheduleSection: React.FC = React.memo(() => {
             <AlertCircle className="w-4 h-4 text-[#d4af37] shrink-0" />
             <span>Exact calendar dates, times, and venue rooms are TBA pending committee finalization.</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Day Selector Tabs */}
         <div className="flex items-center gap-3 mb-12 border-b border-neutral-800 pb-4 overflow-x-auto scrollbar-none">
           {daysData.map((d) => (
-            <button
+            <motion.button
               key={d.dayNumber}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setActiveDay(d.dayNumber)}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-sm transition-all text-xs uppercase tracking-widest font-semibold cursor-pointer whitespace-nowrap ${
                 activeDay === d.dayNumber
@@ -137,12 +141,18 @@ export const ScheduleSection: React.FC = React.memo(() => {
             >
               <span>Day {d.dayNumber}</span>
               <span className="text-[10px] font-mono opacity-80">(Date: TBA)</span>
-            </button>
+            </motion.button>
           ))}
         </div>
 
         {/* Active Day Title & Overview */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#0d0d10] border border-neutral-800 rounded-sm">
+        <motion.div
+          key={activeDay}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#0d0d10] border border-neutral-800 rounded-sm"
+        >
           <h3 className="text-lg font-serif text-white">
             {daysData[activeDay - 1].dayTitle}
           </h3>
@@ -150,16 +160,29 @@ export const ScheduleSection: React.FC = React.memo(() => {
             <Calendar className="w-4 h-4" />
             <span>Date: {daysData[activeDay - 1].date}</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Timeline Layout */}
         <div className="relative border-l border-neutral-800 ml-4 sm:ml-8 pl-6 sm:pl-10 space-y-8">
           {daysData[activeDay - 1].sessions.map((session: ScheduleSession, index: number) => (
-            <div key={session.title + index} className="relative group">
+            <motion.div
+              key={session.title + activeDay}
+              initial={{ opacity: 0, y: 20 }}
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+              transition={{
+                duration: 0.45,
+                delay: index * 0.1,
+                ease: [0.25, 0.1, 0.25, 1],
+              }}
+              className="relative group"
+            >
               {/* Timeline Gold Dot */}
               <div className="absolute -left-[31px] sm:-left-[47px] top-1.5 w-4 h-4 rounded-full bg-[#0a0a0c] border-2 border-[#d4af37] group-hover:scale-125 transition-transform" />
 
-              <div className="p-6 bg-[#0e0e11] border border-neutral-800/90 hover:border-[#d4af37]/40 rounded-sm transition-colors">
+              <motion.div
+                whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                className="p-6 bg-[#0e0e11] border border-neutral-800/90 hover:border-[#d4af37]/40 rounded-sm transition-colors"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
                   <h4 className="text-lg font-serif text-white group-hover:text-[#f3e5ab] transition-colors">
                     {session.title}
@@ -179,8 +202,8 @@ export const ScheduleSection: React.FC = React.memo(() => {
                 <p className="text-neutral-400 text-sm leading-relaxed font-light">
                   {session.description}
                 </p>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           ))}
         </div>
       </div>

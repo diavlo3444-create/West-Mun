@@ -70,6 +70,24 @@ export default function App() {
     setAdminPortalOpen(false);
   }, []);
 
+  // Preserve administrative access via shortcut or dev window call without public-facing link
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).openAdminPortal = handleOpenAdminPortal;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setAdminPortalOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).openAdminPortal;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleOpenAdminPortal]);
+
   return (
     <div className="relative min-h-screen w-full bg-[#070707] text-[#f5f5f5]">
       {/* Opening Intro Animation (Logo Centered -> Falling Gold Particles -> Flight to Navbar) */}

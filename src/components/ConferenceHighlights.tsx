@@ -1,5 +1,6 @@
 import React from 'react';
 import { Mic2, ScrollText, Users, Scale } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 
 export const ConferenceHighlights: React.FC = React.memo(() => {
@@ -67,9 +68,13 @@ export const ConferenceHighlights: React.FC = React.memo(() => {
           {highlights.map((item, idx) => {
             const Icon = item.icon;
             return (
-              <div
+              <motion.div
                 key={item.title}
-                className="group p-8 bg-[#0e0e11] border border-neutral-800/80 hover:border-[#d4af37]/50 transition-all duration-300 rounded-sm relative overflow-hidden"
+                initial={{ opacity: 0, y: 18 }}
+                animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
+                transition={{ duration: 0.5, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
+                whileHover={{ y: -4 }}
+                className="group p-8 bg-[#0e0e11] border border-neutral-800/80 hover:border-[#d4af37]/50 transition-colors duration-300 rounded-sm relative overflow-hidden"
               >
                 <div className="flex items-start justify-between mb-6">
                   <div className="w-12 h-12 rounded-sm bg-[#17171c] border border-[#d4af37]/20 flex items-center justify-center text-[#d4af37] group-hover:scale-105 group-hover:border-[#d4af37]/60 transition-all">
@@ -90,7 +95,7 @@ export const ConferenceHighlights: React.FC = React.memo(() => {
                 <div className="pt-4 border-t border-neutral-800/70 text-[11px] uppercase tracking-wider text-[#d4af37] font-sans">
                   {item.metrics}
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -99,3 +104,4 @@ export const ConferenceHighlights: React.FC = React.memo(() => {
   );
 });
 ConferenceHighlights.displayName = 'ConferenceHighlights';
+
