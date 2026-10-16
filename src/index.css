@@ -161,3 +161,10 @@ body {
   }
 }
 
+/* Content visibility optimization: Skips offscreen layout, paint, and keyframe calculations */
+.section-content-visibility {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 700px;
+}
+
+

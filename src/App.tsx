@@ -18,7 +18,6 @@ import { AdminPortalModal } from './components/AdminPortalModal';
 
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
   const [adminPortalOpen, setAdminPortalOpen] = useState(false);
 
   // Intro animation playback state:
@@ -63,21 +62,12 @@ export default function App() {
     setIntroKey((prev) => prev + 1);
   }, []);
 
-  // Track scroll position for navbar styling with RAF throttling
-  useEffect(() => {
-    let ticking = false;
-    const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          const isScrolled = window.scrollY > 40;
-          setScrolled((prev) => (prev !== isScrolled ? isScrolled : prev));
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+  const handleOpenAdminPortal = useCallback(() => {
+    setAdminPortalOpen(true);
+  }, []);
+
+  const handleCloseAdminPortal = useCallback(() => {
+    setAdminPortalOpen(false);
   }, []);
 
   return (
@@ -93,7 +83,6 @@ export default function App() {
 
       {/* A. Fixed Navigation Bar */}
       <Navbar
-        scrolled={scrolled}
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
         logoVisible={introFinished}
@@ -133,13 +122,13 @@ export default function App() {
       {/* L. Conference Footer */}
       <Footer
         onReplayIntro={handleReplayIntro}
-        onOpenAdminPortal={() => setAdminPortalOpen(true)}
+        onOpenAdminPortal={handleOpenAdminPortal}
       />
 
       {/* Secretariat Diplomatic Admin Portal Modal */}
       <AdminPortalModal
         isOpen={adminPortalOpen}
-        onClose={() => setAdminPortalOpen(false)}
+        onClose={handleCloseAdminPortal}
       />
     </div>
   );

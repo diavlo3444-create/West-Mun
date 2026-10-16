@@ -62,7 +62,7 @@ export const FAQSection: React.FC = React.memo(() => {
   };
 
   return (
-    <section id="faq" ref={ref} className="relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
+    <section id="faq" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
       <div
         className={`max-w-4xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
           isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'

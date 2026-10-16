@@ -1,20 +1,56 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface NavbarProps {
-  scrolled: boolean;
+  scrolled?: boolean;
   menuOpen: boolean;
   setMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
   logoVisible?: boolean;
   navVisible?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
-  scrolled,
+export const Navbar: React.FC<NavbarProps> = React.memo(({
+  scrolled: externalScrolled,
   menuOpen,
   setMenuOpen,
   logoVisible = true,
   navVisible = true,
 }) => {
+  const [internalScrolled, setInternalScrolled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.scrollY > 40;
+  });
+
+  const isScrolled = externalScrolled !== undefined ? externalScrolled : internalScrolled;
+
+  const isScrolledRef = useRef(internalScrolled);
+  isScrolledRef.current = isScrolled;
+
+  useEffect(() => {
+    if (externalScrolled !== undefined) return;
+
+    let rafId: number | null = null;
+    const handleScroll = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        const isNowScrolled = window.scrollY > 40;
+        // Only trigger state update when the threshold state genuinely changes
+        if (isNowScrolled !== isScrolledRef.current) {
+          isScrolledRef.current = isNowScrolled;
+          setInternalScrolled(isNowScrolled);
+        }
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [externalScrolled]);
+
   const navLinks = [
     { label: 'Home', href: '#hero' },
     { label: 'About', href: '#about' },
@@ -25,13 +61,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     { label: 'Contact', href: '#contact' },
   ];
 
+
   return (
     <>
       <header
         className={`fixed top-0 left-0 right-0 z-40 w-full py-3.5 sm:py-4 transition-[background-color,border-color,box-shadow,opacity] duration-500 ease-out ${
           navVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         } ${
-          scrolled || menuOpen
+          isScrolled || menuOpen
             ? 'bg-[#080808]/98 border-b border-[#d4af37]/20 shadow-2xl'
             : 'bg-gradient-to-b from-black/85 via-black/40 to-transparent border-b border-transparent'
         }`}
@@ -168,4 +205,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
     </>
   );
-};
+});
+
+Navbar.displayName = 'Navbar';

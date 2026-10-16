@@ -14,6 +14,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
   const timersRef = useRef<number[]>([]);
   const isMountedRef = useRef<boolean>(true);
   const unlockBurstRef = useRef<boolean>(false);
+  const isFlyingRef = useRef<boolean>(false);
 
   // Viewport detection
   const [isMobile, setIsMobile] = useState(() => {
@@ -162,6 +163,11 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
     let frame = 0;
 
     const render = () => {
+      if (isFlyingRef.current) {
+        // Stop canvas work during flight animation to free up 100% of GPU compositor thread
+        return;
+      }
+
       frame++;
       ctx.clearRect(0, 0, viewW, viewH);
 
@@ -206,24 +212,29 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
         const twinkle = Math.sin(frame * p.twinkleSpeed + p.phase) * (p.depth === 3 ? 0.25 : 0.12);
         const currentAlpha = Math.max(0.08, Math.min(1, p.baseAlpha + twinkle));
 
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-
         if (p.depth === 3) {
-          // Specular glint
+          // Specular glint with lightweight dual-pass glow (zero shadowBlur rasterization overhead)
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius * 2.2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(212, 175, 55, ${currentAlpha * 0.25})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(255, 248, 220, ${currentAlpha})`;
-          ctx.shadowBlur = 6;
-          ctx.shadowColor = `rgba(212, 175, 55, ${currentAlpha * 0.6})`;
+          ctx.fill();
         } else if (p.depth === 2) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(212, 175, 55, ${currentAlpha})`;
-          ctx.shadowBlur = 0;
+          ctx.fill();
         } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(180, 145, 80, ${currentAlpha})`;
-          ctx.shadowBlur = 0;
+          ctx.fill();
         }
-        ctx.fill();
       }
-      ctx.shadowBlur = 0;
 
       // Draw reveal sparks
       for (let s = sparks.length - 1; s >= 0; s--) {
@@ -343,6 +354,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
       const dy = targetCenterY - currentCenterY;
       const scale = targetWidth / currentRect.width;
 
+      isFlyingRef.current = true;
       setStage('flying');
       if (onFlightStart) {
         onFlightStart();
@@ -495,7 +507,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
         >
           {/* ARCHITECTURAL DIPLOMATIC HALL ARCS & SUMMIT GEOMETRY (SVG) */}
           <div
-            className={`absolute pointer-events-none transition-all duration-800 ease-out ${
+            className={`absolute pointer-events-none transition-[opacity,transform] duration-800 ease-out ${
               isFlying
                 ? 'opacity-0 scale-95'
                 : isRevealed

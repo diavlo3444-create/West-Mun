@@ -6,6 +6,9 @@ interface HeroProps {
   isDoneTyping?: boolean;
 }
 
+const FULL_DISPATCH_TEXT =
+  'The floor is open for debate. Good diplomacy unites divided nations. What global crisis will your delegation solve?';
+
 // Self-contained Typewriter Component: isolates character ticks so the rest of the application
 // is never re-rendered while typing is in progress.
 const TypewriterDispatch = memo(({
@@ -15,9 +18,6 @@ const TypewriterDispatch = memo(({
   fallbackText?: string;
   fallbackDone?: boolean;
 }) => {
-  const fullText =
-    'The floor is open for debate. Good diplomacy unites divided nations. What global crisis will your delegation solve?';
-
   const [text, setText] = useState(() => fallbackText || '');
   const [done, setDone] = useState(() => fallbackDone || false);
 
@@ -35,10 +35,10 @@ const TypewriterDispatch = memo(({
     timer = window.setTimeout(() => {
       interval = window.setInterval(() => {
         index++;
-        if (index <= fullText.length) {
-          setText(fullText.slice(0, index));
+        if (index <= FULL_DISPATCH_TEXT.length) {
+          setText(FULL_DISPATCH_TEXT.slice(0, index));
         }
-        if (index >= fullText.length) {
+        if (index >= FULL_DISPATCH_TEXT.length) {
           if (interval !== null) clearInterval(interval);
           setDone(true);
         }
@@ -49,7 +49,7 @@ const TypewriterDispatch = memo(({
       if (timer !== null) clearTimeout(timer);
       if (interval !== null) clearInterval(interval);
     };
-  }, [fallbackText, fallbackDone, fullText]);
+  }, [fallbackText, fallbackDone]);
 
   return (
     <p className="text-sm sm:text-base text-neutral-200 font-normal leading-relaxed text-center">
@@ -87,6 +87,8 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
   const pendingTimeRef = useRef<number | null>(null);
   const videoDurationRef = useRef<number>(8);
   const isSeekingRef = useRef<boolean>(false);
+  const lastSeekTimeMsRef = useRef<number>(0);
+  const lastDispatchedTimeRef = useRef<number>(-1);
   const rafIdRef = useRef<number | null>(null);
   const isLoopRunningRef = useRef<boolean>(false);
   const isHeroVisibleRef = useRef<boolean>(true);
@@ -96,22 +98,60 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
   const viewportHeightRef = useRef<number>(0);
   const trackTopRef = useRef<number>(0);
 
+  // Cached DOM state tracking to eliminate redundant CSSOM and DOM tree writes
+  const lastDomStateRef = useRef({
+    s1Opacity: -1,
+    s1Y: -999,
+    s1Display: '',
+    s1PointerEvents: '',
+    s2Opacity: -1,
+    s2Y: -999,
+    s2Display: '',
+    s2PointerEvents: '',
+    s3Opacity: -1,
+    s3Y: -999,
+    s3Display: '',
+    s3PointerEvents: '',
+    indOpacity: -1,
+    indY: -999,
+    indPointerEvents: '',
+    scrubPctText: '',
+    scrubSecText: '',
+    scrubScale: -1,
+  });
+
   const [videoSrc, setVideoSrc] = useState<string>('/background.mp4');
 
   const fallbackVideo =
     'https://flow-content.google/video/fa4bbb59-43c8-4a80-adf5-56331769e37f?Expires=1792033962&KeyName=labs-flow-prod-cdn-key&Signature=tdvKzLhOlfu06BKzGLvNYhyymI8';
 
-  // Apply visual updates directly to GPU-accelerated CSS properties
+  // Apply visual updates directly to GPU-accelerated CSS properties with change deadbands
   const applyVisuals = useCallback((p: number) => {
+    const last = lastDomStateRef.current;
+
     // Stage 1: Brand & Opening Headline (Visible 0.0 -> ~0.36)
     const stage1Opacity = p <= 0.22 ? 1 : Math.max(0, 1 - (p - 0.22) / 0.16);
     const stage1Y = p * -50;
     const stage1Display = stage1Opacity > 0.01 ? 'block' : 'none';
+    const stage1Pointer = stage1Opacity > 0.02 ? 'auto' : 'none';
+
     if (stage1Ref.current) {
-      stage1Ref.current.style.opacity = stage1Opacity.toFixed(3);
-      stage1Ref.current.style.transform = `translate3d(0, ${stage1Y.toFixed(1)}px, 0)`;
-      stage1Ref.current.style.display = stage1Display;
-      stage1Ref.current.style.pointerEvents = stage1Opacity > 0.02 ? 'auto' : 'none';
+      if (Math.abs(stage1Opacity - last.s1Opacity) >= 0.005) {
+        stage1Ref.current.style.opacity = stage1Opacity.toFixed(3);
+        last.s1Opacity = stage1Opacity;
+      }
+      if (Math.abs(stage1Y - last.s1Y) >= 0.2) {
+        stage1Ref.current.style.transform = `translate3d(0, ${stage1Y.toFixed(1)}px, 0)`;
+        last.s1Y = stage1Y;
+      }
+      if (stage1Display !== last.s1Display) {
+        stage1Ref.current.style.display = stage1Display;
+        last.s1Display = stage1Display;
+      }
+      if (stage1Pointer !== last.s1PointerEvents) {
+        stage1Ref.current.style.pointerEvents = stage1Pointer;
+        last.s1PointerEvents = stage1Pointer;
+      }
     }
 
     // Stage 2: Dispatch & Typewriter Card (Peaks 0.35-0.58)
@@ -127,11 +167,25 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     }
     const stage2Y = (1 - stage2Opacity) * 20;
     const stage2Display = stage2Opacity > 0.01 ? 'block' : 'none';
+    const stage2Pointer = stage2Opacity > 0.02 ? 'auto' : 'none';
+
     if (stage2Ref.current) {
-      stage2Ref.current.style.opacity = stage2Opacity.toFixed(3);
-      stage2Ref.current.style.transform = `translate3d(0, ${stage2Y.toFixed(1)}px, 0)`;
-      stage2Ref.current.style.display = stage2Display;
-      stage2Ref.current.style.pointerEvents = stage2Opacity > 0.02 ? 'auto' : 'none';
+      if (Math.abs(stage2Opacity - last.s2Opacity) >= 0.005) {
+        stage2Ref.current.style.opacity = stage2Opacity.toFixed(3);
+        last.s2Opacity = stage2Opacity;
+      }
+      if (Math.abs(stage2Y - last.s2Y) >= 0.2) {
+        stage2Ref.current.style.transform = `translate3d(0, ${stage2Y.toFixed(1)}px, 0)`;
+        last.s2Y = stage2Y;
+      }
+      if (stage2Display !== last.s2Display) {
+        stage2Ref.current.style.display = stage2Display;
+        last.s2Display = stage2Display;
+      }
+      if (stage2Pointer !== last.s2PointerEvents) {
+        stage2Ref.current.style.pointerEvents = stage2Pointer;
+        last.s2PointerEvents = stage2Pointer;
+      }
     }
 
     // Stage 3: Action Stage & Registration CTAs (Peaks 0.66-0.88)
@@ -147,50 +201,95 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     }
     const stage3Y = (1 - stage3Opacity) * 20;
     const stage3Display = stage3Opacity > 0.01 ? 'block' : 'none';
+    const stage3Pointer = stage3Opacity > 0.02 ? 'auto' : 'none';
+
     if (stage3Ref.current) {
-      stage3Ref.current.style.opacity = stage3Opacity.toFixed(3);
-      stage3Ref.current.style.transform = `translate3d(0, ${stage3Y.toFixed(1)}px, 0)`;
-      stage3Ref.current.style.display = stage3Display;
-      stage3Ref.current.style.pointerEvents = stage3Opacity > 0.02 ? 'auto' : 'none';
+      if (Math.abs(stage3Opacity - last.s3Opacity) >= 0.005) {
+        stage3Ref.current.style.opacity = stage3Opacity.toFixed(3);
+        last.s3Opacity = stage3Opacity;
+      }
+      if (Math.abs(stage3Y - last.s3Y) >= 0.2) {
+        stage3Ref.current.style.transform = `translate3d(0, ${stage3Y.toFixed(1)}px, 0)`;
+        last.s3Y = stage3Y;
+      }
+      if (stage3Display !== last.s3Display) {
+        stage3Ref.current.style.display = stage3Display;
+        last.s3Display = stage3Display;
+      }
+      if (stage3Pointer !== last.s3PointerEvents) {
+        stage3Ref.current.style.pointerEvents = stage3Pointer;
+        last.s3PointerEvents = stage3Pointer;
+      }
     }
 
     // Scroll Down Indicator
     const indicatorOpacity = p <= 0.01 ? 1 : Math.max(0, 1 - p / 0.08);
+    const indicatorY = p * -20;
+    const indicatorPointer = indicatorOpacity > 0.05 ? 'auto' : 'none';
+
     if (scrollIndicatorRef.current) {
-      scrollIndicatorRef.current.style.opacity = indicatorOpacity.toFixed(3);
-      scrollIndicatorRef.current.style.pointerEvents = indicatorOpacity > 0.05 ? 'auto' : 'none';
-      scrollIndicatorRef.current.style.transform = `translate3d(-50%, ${(p * -20).toFixed(1)}px, 0)`;
+      if (Math.abs(indicatorOpacity - last.indOpacity) >= 0.005) {
+        scrollIndicatorRef.current.style.opacity = indicatorOpacity.toFixed(3);
+        last.indOpacity = indicatorOpacity;
+      }
+      if (indicatorPointer !== last.indPointerEvents) {
+        scrollIndicatorRef.current.style.pointerEvents = indicatorPointer;
+        last.indPointerEvents = indicatorPointer;
+      }
+      if (Math.abs(indicatorY - last.indY) >= 0.2) {
+        scrollIndicatorRef.current.style.transform = `translate3d(-50%, ${indicatorY.toFixed(1)}px, 0)`;
+        last.indY = indicatorY;
+      }
     }
 
-    // Scrub Pill text & GPU-composited scaleX progress bar
+    // Scrub Pill text & GPU-composited scaleX progress bar (cached string comparisons)
     if (scrubPctRef.current) {
-      scrubPctRef.current.textContent = `${Math.round(p * 100)}%`;
+      const pctStr = `${Math.round(p * 100)}%`;
+      if (pctStr !== last.scrubPctText) {
+        scrubPctRef.current.textContent = pctStr;
+        last.scrubPctText = pctStr;
+      }
     }
     if (scrubBarRef.current) {
-      scrubBarRef.current.style.transform = `scaleX(${p.toFixed(3)})`;
+      if (Math.abs(p - last.scrubScale) >= 0.002) {
+        scrubBarRef.current.style.transform = `scaleX(${p.toFixed(3)})`;
+        last.scrubScale = p;
+      }
     }
     if (scrubSecRef.current) {
       const sec = Math.min(
         Math.floor(p * videoDurationRef.current),
         Math.floor(videoDurationRef.current)
       );
-      scrubSecRef.current.textContent = `00:0${sec}s`;
+      const secStr = `00:0${sec}s`;
+      if (secStr !== last.scrubSecText) {
+        scrubSecRef.current.textContent = secStr;
+        last.scrubSecText = secStr;
+      }
     }
   }, []);
 
-  // Efficient request-coalescing seek manager:
-  // Decoupled from artificial setTimeout timers. When the decoder is busy, updates are
-  // automatically coalesced into pendingTimeRef so obsolete requests are discarded, and seeks
-  // execute smoothly at the native hardware decoder throughput in both directions.
+  // Efficient request-coalescing seek manager with frame deadband and watchdog recovery:
+  // Decoupled from artificial setTimeout timers. Discards obsolete seeks while keeping the video
+  // frame synchronized cleanly in both directions at native hardware decoder throughput.
   const dispatchVideoSeek = useCallback((desiredTime: number) => {
     const video = videoRef.current;
     if (!video || !isFinite(video.duration) || video.duration <= 0) return;
 
     const targetTime = Math.max(0, Math.min(desiredTime, video.duration));
 
-    // Avoid seek if video is already at this frame
-    if (Math.abs(video.currentTime - targetTime) < 0.012) {
+    // Avoid seek if timestamp delta is less than half a 24fps frame (~20ms)
+    if (
+      Math.abs(video.currentTime - targetTime) < 0.02 &&
+      Math.abs(lastDispatchedTimeRef.current - targetTime) < 0.02
+    ) {
       return;
+    }
+
+    const now = performance.now();
+    // Safety watchdog recovery: if isSeeking has been held for >200ms without a seeked event, reset
+    if (isSeekingRef.current && now - lastSeekTimeMsRef.current > 200) {
+      isSeekingRef.current = false;
     }
 
     if (video.seeking || isSeekingRef.current) {
@@ -199,6 +298,8 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     } else {
       try {
         isSeekingRef.current = true;
+        lastSeekTimeMsRef.current = now;
+        lastDispatchedTimeRef.current = targetTime;
         video.currentTime = targetTime;
       } catch {
         isSeekingRef.current = false;
@@ -257,9 +358,11 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     if (pending !== null) {
       pendingTimeRef.current = null;
       const video = videoRef.current;
-      if (video && Math.abs(video.currentTime - pending) > 0.012) {
+      if (video && Math.abs(video.currentTime - pending) >= 0.02) {
         try {
           isSeekingRef.current = true;
+          lastSeekTimeMsRef.current = performance.now();
+          lastDispatchedTimeRef.current = pending;
           video.currentTime = pending;
         } catch {
           isSeekingRef.current = false;
@@ -268,39 +371,60 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     }
   }, []);
 
+  const scrollRafIdRef = useRef<number | null>(null);
+  const resizeRafIdRef = useRef<number | null>(null);
+
   // Read scroll position with cached layout offset — NO getBoundingClientRect on scroll
-  const handleScroll = useCallback(() => {
+  const computeScrollProgress = useCallback(() => {
     const scrollableDistance = trackHeightRef.current - viewportHeightRef.current;
     if (scrollableDistance <= 0) return;
 
     const scrollY = window.scrollY || window.pageYOffset || 0;
     const currentScroll = scrollY - trackTopRef.current;
 
-    // Viewport bounds check without triggering DOM reflow
-    if (currentScroll < -50 || currentScroll > scrollableDistance + viewportHeightRef.current + 50) return;
-
+    // Clamped progress calculation: cleanly handles fast scrolls past boundaries
     const rawProgress = currentScroll / scrollableDistance;
-    const clamped = Math.min(Math.max(rawProgress, 0), 1);
+    const clamped = currentScroll <= 0 ? 0 : currentScroll >= scrollableDistance ? 1 : rawProgress;
 
+    // Only update progress and wake the animation loop if progress genuinely changed
     if (Math.abs(clamped - targetProgressRef.current) > 0.0001) {
       targetProgressRef.current = clamped;
       startAnimationLoop();
     }
   }, [startAnimationLoop]);
 
+  // RAF-coalesced scroll handler: coalesces high-frequency scroll events to exactly one calculation per frame
+  const handleScroll = useCallback(() => {
+    if (scrollRafIdRef.current !== null) return;
+    scrollRafIdRef.current = requestAnimationFrame(() => {
+      scrollRafIdRef.current = null;
+      computeScrollProgress();
+    });
+  }, [computeScrollProgress]);
+
   // Measure and cache layout metrics on mount and resize ONLY
   const updateLayoutMetrics = useCallback(() => {
     const track = heroTrackRef.current;
+    const currentInnerHeight = window.innerHeight;
     if (track) {
       trackHeightRef.current = track.offsetHeight;
       trackTopRef.current = track.offsetTop;
     } else {
-      trackHeightRef.current = window.innerHeight * 3.2;
+      trackHeightRef.current = currentInnerHeight * 3.2;
       trackTopRef.current = 0;
     }
-    viewportHeightRef.current = window.innerHeight;
-    handleScroll();
-  }, [handleScroll]);
+    viewportHeightRef.current = currentInnerHeight;
+    computeScrollProgress();
+  }, [computeScrollProgress]);
+
+  // RAF-coalesced resize handler to avoid layout thrashing during dynamic address bar changes
+  const handleResize = useCallback(() => {
+    if (resizeRafIdRef.current !== null) return;
+    resizeRafIdRef.current = requestAnimationFrame(() => {
+      resizeRafIdRef.current = null;
+      updateLayoutMetrics();
+    });
+  }, [updateLayoutMetrics]);
 
   // Mount setup: listeners, IntersectionObserver, and cleanups
   useEffect(() => {
@@ -346,7 +470,7 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', updateLayoutMetrics, { passive: true });
+    window.addEventListener('resize', handleResize, { passive: true });
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Initial video setup
@@ -363,15 +487,23 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', updateLayoutMetrics);
+      window.removeEventListener('resize', handleResize);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (observer) observer.disconnect();
+      if (scrollRafIdRef.current !== null) {
+        cancelAnimationFrame(scrollRafIdRef.current);
+        scrollRafIdRef.current = null;
+      }
+      if (resizeRafIdRef.current !== null) {
+        cancelAnimationFrame(resizeRafIdRef.current);
+        resizeRafIdRef.current = null;
+      }
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
     };
-  }, [applyVisuals, handleScroll, startAnimationLoop, updateLayoutMetrics]);
+  }, [applyVisuals, handleResize, handleScroll, startAnimationLoop, updateLayoutMetrics]);
 
   return (
     <section
@@ -417,7 +549,7 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
             }
             startAnimationLoop();
           }}
-          className="absolute inset-0 h-full w-full object-cover pointer-events-none select-none opacity-85 will-change-transform"
+          className="absolute inset-0 h-full w-full object-cover pointer-events-none select-none opacity-85"
           style={{
             objectPosition: '70% center',
           }}
