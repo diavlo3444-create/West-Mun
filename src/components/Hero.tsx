@@ -1,12 +1,74 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, memo } from 'react';
 import { ArrowRight, ShieldCheck, Sparkles, ChevronDown } from 'lucide-react';
 
 interface HeroProps {
-  displayedText: string;
-  isDoneTyping: boolean;
+  displayedText?: string;
+  isDoneTyping?: boolean;
 }
 
-export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
+// Self-contained Typewriter Component: isolates character ticks so the rest of the application
+// is never re-rendered while typing is in progress.
+const TypewriterDispatch = memo(({
+  fallbackText,
+  fallbackDone,
+}: {
+  fallbackText?: string;
+  fallbackDone?: boolean;
+}) => {
+  const fullText =
+    'The floor is open for debate. Good diplomacy unites divided nations. What global crisis will your delegation solve?';
+
+  const [text, setText] = useState(() => fallbackText || '');
+  const [done, setDone] = useState(() => fallbackDone || false);
+
+  useEffect(() => {
+    if (fallbackText !== undefined) {
+      setText(fallbackText);
+      setDone(fallbackDone || false);
+      return;
+    }
+
+    let index = 0;
+    let timer: number | null = null;
+    let interval: number | null = null;
+
+    timer = window.setTimeout(() => {
+      interval = window.setInterval(() => {
+        index++;
+        if (index <= fullText.length) {
+          setText(fullText.slice(0, index));
+        }
+        if (index >= fullText.length) {
+          if (interval !== null) clearInterval(interval);
+          setDone(true);
+        }
+      }, 36);
+    }, 500);
+
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      if (interval !== null) clearInterval(interval);
+    };
+  }, [fallbackText, fallbackDone, fullText]);
+
+  return (
+    <p className="text-sm sm:text-base text-neutral-200 font-normal leading-relaxed text-center">
+      <span className="text-[#d4af37] font-semibold mr-2 font-serif tracking-wider">
+        DELEGATE DISPATCH:
+      </span>
+      {text}
+      {!done && (
+        <span
+          className="inline-block w-[2px] h-[1.1em] bg-[#d4af37] align-middle ml-1 animate-blink"
+          aria-hidden="true"
+        />
+      )}
+    </p>
+  );
+});
+TypewriterDispatch.displayName = 'TypewriterDispatch';
+
+export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) => {
   const heroTrackRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -29,9 +91,10 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
   const isLoopRunningRef = useRef<boolean>(false);
   const isHeroVisibleRef = useRef<boolean>(true);
 
-  // Cached layout metrics to prevent forced synchronous reflows on scroll
+  // Cached layout metrics to completely eliminate getBoundingClientRect on scroll
   const trackHeightRef = useRef<number>(0);
   const viewportHeightRef = useRef<number>(0);
+  const trackTopRef = useRef<number>(0);
 
   const [videoSrc, setVideoSrc] = useState<string>('/background.mp4');
 
@@ -115,22 +178,28 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
     }
   }, []);
 
-  // Dispatch video seek when decoder is free and time difference is meaningful
+  // Efficient request-coalescing seek manager:
+  // Decoupled from artificial setTimeout timers. When the decoder is busy, updates are
+  // automatically coalesced into pendingTimeRef so obsolete requests are discarded, and seeks
+  // execute smoothly at the native hardware decoder throughput in both directions.
   const dispatchVideoSeek = useCallback((desiredTime: number) => {
     const video = videoRef.current;
-    if (!video || isNaN(video.duration) || video.duration <= 0) return;
+    if (!video || !isFinite(video.duration) || video.duration <= 0) return;
 
-    const diff = Math.abs(video.currentTime - desiredTime);
-    // Threshold ~0.035s (approximately 1 video frame at 24fps)
-    if (diff < 0.035) return;
+    const targetTime = Math.max(0, Math.min(desiredTime, video.duration));
+
+    // Avoid seek if video is already at this frame
+    if (Math.abs(video.currentTime - targetTime) < 0.012) {
+      return;
+    }
 
     if (video.seeking || isSeekingRef.current) {
-      // Decoder busy: record latest pending time to seek once current frame resolves
-      pendingTimeRef.current = desiredTime;
+      // Coalesce: continuously store the single newest target timestamp
+      pendingTimeRef.current = targetTime;
     } else {
       try {
         isSeekingRef.current = true;
-        video.currentTime = desiredTime;
+        video.currentTime = targetTime;
       } catch {
         isSeekingRef.current = false;
       }
@@ -144,26 +213,17 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
       return;
     }
 
-    const prefersReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
     const targetP = targetProgressRef.current;
     let currentP = smoothProgressRef.current;
 
-    if (prefersReducedMotion) {
+    // Responsive LERP (0.22) for smooth, jitter-free glide and crisp settling
+    const delta = targetP - currentP;
+    if (Math.abs(delta) < 0.0006) {
       currentP = targetP;
       smoothProgressRef.current = targetP;
     } else {
-      // Carefully tuned LERP (0.16) for responsive, jitter-free glide
-      const delta = targetP - currentP;
-      if (Math.abs(delta) < 0.0004) {
-        currentP = targetP;
-        smoothProgressRef.current = targetP;
-      } else {
-        currentP += delta * 0.16;
-        smoothProgressRef.current = currentP;
-      }
+      currentP += delta * 0.22;
+      smoothProgressRef.current = currentP;
     }
 
     // Apply visual transforms directly to DOM nodes
@@ -173,9 +233,9 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
     const desiredTime = currentP * videoDurationRef.current;
     dispatchVideoSeek(desiredTime);
 
-    // Continue loop if animation has not fully settled or pending seeks remain
+    // Continue loop until animation has cleanly settled
     const deltaRemaining = Math.abs(targetProgressRef.current - smoothProgressRef.current);
-    if (deltaRemaining > 0.0004 || pendingTimeRef.current !== null) {
+    if (deltaRemaining > 0.0006) {
       rafIdRef.current = requestAnimationFrame(tickAnimation);
       isLoopRunningRef.current = true;
     } else {
@@ -196,34 +256,47 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
     const pending = pendingTimeRef.current;
     if (pending !== null) {
       pendingTimeRef.current = null;
-      dispatchVideoSeek(pending);
+      const video = videoRef.current;
+      if (video && Math.abs(video.currentTime - pending) > 0.012) {
+        try {
+          isSeekingRef.current = true;
+          video.currentTime = pending;
+        } catch {
+          isSeekingRef.current = false;
+        }
+      }
     }
-  }, [dispatchVideoSeek]);
+  }, []);
 
-  // Read scroll position with accurate viewport offset
+  // Read scroll position with cached layout offset — NO getBoundingClientRect on scroll
   const handleScroll = useCallback(() => {
-    const track = heroTrackRef.current;
-    if (!track) return;
     const scrollableDistance = trackHeightRef.current - viewportHeightRef.current;
     if (scrollableDistance <= 0) return;
 
-    const rect = track.getBoundingClientRect();
-    if (rect.bottom < -50 || rect.top > viewportHeightRef.current + 50) return;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const currentScroll = scrollY - trackTopRef.current;
 
-    const currentScroll = -rect.top;
+    // Viewport bounds check without triggering DOM reflow
+    if (currentScroll < -50 || currentScroll > scrollableDistance + viewportHeightRef.current + 50) return;
+
     const rawProgress = currentScroll / scrollableDistance;
     const clamped = Math.min(Math.max(rawProgress, 0), 1);
 
-    targetProgressRef.current = clamped;
-    startAnimationLoop();
+    if (Math.abs(clamped - targetProgressRef.current) > 0.0001) {
+      targetProgressRef.current = clamped;
+      startAnimationLoop();
+    }
   }, [startAnimationLoop]);
 
-  // Measure and cache layout metrics on resize only
+  // Measure and cache layout metrics on mount and resize ONLY
   const updateLayoutMetrics = useCallback(() => {
-    if (heroTrackRef.current) {
-      trackHeightRef.current = heroTrackRef.current.offsetHeight;
+    const track = heroTrackRef.current;
+    if (track) {
+      trackHeightRef.current = track.offsetHeight;
+      trackTopRef.current = track.offsetTop;
     } else {
       trackHeightRef.current = window.innerHeight * 3.2;
+      trackTopRef.current = 0;
     }
     viewportHeightRef.current = window.innerHeight;
     handleScroll();
@@ -295,6 +368,7 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
       if (observer) observer.disconnect();
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
       }
     };
   }, [applyVisuals, handleScroll, startAnimationLoop, updateLayoutMetrics]);
@@ -312,12 +386,19 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
           ref={videoRef}
           src={videoSrc}
           onError={() => {
+            isSeekingRef.current = false;
+            pendingTimeRef.current = null;
             if (videoSrc !== fallbackVideo) {
               setVideoSrc(fallbackVideo);
             }
           }}
+          onSeeking={() => {
+            isSeekingRef.current = true;
+          }}
           muted
           playsInline
+          disablePictureInPicture
+          disableRemotePlayback
           preload="auto"
           onSeeked={handleSeeked}
           onLoadedMetadata={(e) => {
@@ -422,18 +503,10 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
 
               {/* Typewriter Text Container */}
               <div className="mb-6 p-5 sm:p-6 bg-[#0c0c0e]/95 border border-[#d4af37]/35 rounded-sm shadow-xl text-center max-w-2xl w-full mx-auto">
-                <p className="text-sm sm:text-base text-neutral-200 font-normal leading-relaxed text-center">
-                  <span className="text-[#d4af37] font-semibold mr-2 font-serif tracking-wider">
-                    DELEGATE DISPATCH:
-                  </span>
-                  {displayedText}
-                  {!isDoneTyping && (
-                    <span
-                      className="inline-block w-[2px] h-[1.1em] bg-[#d4af37] align-middle ml-1 animate-blink"
-                      aria-hidden="true"
-                    />
-                  )}
-                </p>
+                <TypewriterDispatch
+                  fallbackText={displayedText}
+                  fallbackDone={isDoneTyping}
+                />
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-xs font-mono text-neutral-400 mx-auto">
@@ -462,7 +535,7 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
               }}
             >
               <div className="inline-flex items-center justify-center gap-2 mb-3 px-3 py-1 bg-[#141418] border border-[#d4af37]/30 rounded-sm text-xs text-[#f3e5ab] font-medium uppercase tracking-wider">
-                Registration & Delegations
+                Registration: TBA
               </div>
 
               <h2
@@ -485,7 +558,7 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
                   href="#register"
                   className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 text-xs sm:text-sm font-semibold uppercase tracking-widest text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_20px_rgba(212,175,55,0.3)] cursor-pointer"
                 >
-                  <span>Register Now</span>
+                  <span>Registration: TBA</span>
                   <ArrowRight className="w-4 h-4 text-black" />
                 </a>
 
@@ -518,38 +591,41 @@ export const Hero: React.FC<HeroProps> = ({ displayedText, isDoneTyping }) => {
             className="flex flex-col items-center gap-2 text-center group cursor-pointer"
             aria-label="Scroll down to advance cinematic experience"
           >
-            {/* Elegant Gold Mouse / Pill with Bouncing Dot */}
             <div className="w-5 h-8 rounded-full border border-[#d4af37]/70 flex items-start justify-center pt-1.5 bg-[#0e0e11]/90 group-hover:border-[#d4af37] transition-colors shadow-[0_0_12px_rgba(212,175,55,0.2)]">
-              <div className="w-1 h-2 rounded-full bg-gradient-to-b from-[#f3e5ab] to-[#d4af37] animate-bounce" />
+              <div className="w-1 h-2 bg-[#d4af37] rounded-full animate-bounce" />
             </div>
-
-            {/* Subtle Label with Double Chevron */}
-            <div className="flex items-center gap-1.5 text-[10px] font-mono tracking-[0.25em] uppercase text-[#f3e5ab]/90 font-medium">
-              <span>Scroll Down</span>
-              <ChevronDown className="w-3 h-3 text-[#d4af37] animate-pulse" />
-            </div>
+            <span className="text-[9px] sm:text-[10px] font-mono tracking-widest text-[#f3e5ab] uppercase opacity-80 group-hover:opacity-100 transition-opacity">
+              Scroll
+            </span>
           </a>
         </div>
 
-        {/* Cinematic Scrub Pill (Bottom Right) */}
-        <div className="absolute bottom-5 right-5 sm:right-8 z-20 flex items-center gap-3 bg-[#0e0e11]/95 border border-neutral-800/90 rounded-sm px-3.5 py-1.5 text-[11px] font-mono text-neutral-400">
-          <span className="text-[#d4af37] font-semibold">SCROLL SCRUB</span>
-          <span className="w-1 h-1 rounded-full bg-neutral-600" />
-          <span ref={scrubPctRef} className="text-white">
+        {/* HIGH-PERFORMANCE VIDEO SCRUB INDICATOR PILL */}
+        <div
+          className="absolute bottom-6 right-6 sm:bottom-8 sm:right-8 z-20 hidden md:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-[#0a0a0c]/85 border border-[#d4af37]/30 shadow-lg text-[10px] font-mono text-neutral-400 select-none pointer-events-none will-change-transform"
+          aria-hidden="true"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-pulse" />
+          <span className="text-[#f3e5ab]">SUMMIT REEL</span>
+          <span className="text-neutral-600">|</span>
+          <span ref={scrubSecRef} className="text-neutral-300">
+            00:00s
+          </span>
+          <span className="text-neutral-600">|</span>
+          <span ref={scrubPctRef} className="text-[#d4af37]">
             0%
           </span>
-          <div className="w-16 h-1 bg-neutral-800 rounded-full overflow-hidden hidden sm:block">
+          {/* Hardware-accelerated progress bar using scaleX */}
+          <div className="w-12 h-1 bg-neutral-800 rounded-full overflow-hidden ml-1">
             <div
               ref={scrubBarRef}
-              className="h-full w-full bg-gradient-to-r from-[#d4af37] to-[#e5c158] origin-left will-change-transform"
+              className="h-full bg-gradient-to-r from-[#d4af37] to-[#f7e7b4] origin-left will-change-transform"
               style={{ transform: 'scaleX(0)' }}
             />
           </div>
-          <span ref={scrubSecRef} className="text-neutral-500">
-            00:00s
-          </span>
         </div>
       </div>
     </section>
   );
-};
+});
+Hero.displayName = 'Hero';

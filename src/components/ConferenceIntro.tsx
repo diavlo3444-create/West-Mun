@@ -2,7 +2,7 @@ import React from 'react';
 import { Compass, BookOpen, Handshake, Globe } from 'lucide-react';
 import { useInView } from '../hooks/useInView';
 
-export const ConferenceIntro: React.FC = () => {
+export const ConferenceIntro: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
 
   return (
@@ -87,4 +87,5 @@ export const ConferenceIntro: React.FC = () => {
       </div>
     </section>
   );
-};
+});
+ConferenceIntro.displayName = 'ConferenceIntro';

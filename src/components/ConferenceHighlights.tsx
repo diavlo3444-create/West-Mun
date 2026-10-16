@@ -2,7 +2,7 @@ import React from 'react';
 import { Mic2, ScrollText, Users, Scale } from 'lucide-react';
 import { useInView } from '../hooks/useInView';
 
-export const ConferenceHighlights: React.FC = () => {
+export const ConferenceHighlights: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
 
   const highlights = [
@@ -97,4 +97,5 @@ export const ConferenceHighlights: React.FC = () => {
       </div>
     </section>
   );
-};
+});
+ConferenceHighlights.displayName = 'ConferenceHighlights';

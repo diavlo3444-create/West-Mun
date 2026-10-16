@@ -13,7 +13,7 @@ interface CommitteeData {
   level: string;
 }
 
-export const CommitteesSection: React.FC = () => {
+export const CommitteesSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
   const [selectedCommittee, setSelectedCommittee] = useState<CommitteeData | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
@@ -272,4 +272,5 @@ export const CommitteesSection: React.FC = () => {
       </div>
     </section>
   );
-};
+});
+CommitteesSection.displayName = 'CommitteesSection';

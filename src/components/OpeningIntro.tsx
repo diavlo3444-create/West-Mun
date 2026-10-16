@@ -119,7 +119,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
     }
 
     // Finely tuned particle density: restrained and spacious, like fine dust suspended in a quiet grand hall
-    const count = isMobile ? 12 : 26;
+    const count = 26;
     const particles: Particle[] = Array.from({ length: count }).map((_, i) => {
       const depth: 1 | 2 | 3 = i % 4 === 0 ? 3 : i % 2 === 0 ? 2 : 1;
       let radius = 1.0;
@@ -739,7 +739,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
       <button
         type="button"
         onClick={handleSkip}
-        className={`absolute bottom-5 right-5 sm:bottom-7 sm:right-7 z-50 text-[10px] sm:text-[11px] font-mono tracking-widest uppercase text-neutral-400 hover:text-[#d4af37] transition-all duration-300 cursor-pointer py-2 px-3.5 sm:px-4 border border-neutral-800/80 rounded-sm bg-black/60 backdrop-blur-sm hover:border-[#d4af37]/40 shadow-lg ${
+        className={`absolute bottom-5 right-5 sm:bottom-7 sm:right-7 z-50 text-[10px] sm:text-[11px] font-mono tracking-widest uppercase text-neutral-400 hover:text-[#d4af37] transition-all duration-300 cursor-pointer py-2 px-3.5 sm:px-4 border border-neutral-800/80 rounded-sm bg-[#0c0c0e]/95 hover:border-[#d4af37]/40 shadow-lg ${
           isFlying ? 'opacity-0 pointer-events-none' : 'opacity-70 hover:opacity-100'
         }`}
         aria-label="Skip opening intro"

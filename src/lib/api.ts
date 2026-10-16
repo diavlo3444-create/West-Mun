@@ -31,7 +31,7 @@ export interface ApiResponse<T = unknown> {
 }
 
 /**
- * Submit delegate priority pre-registration
+ * Submit delegate registration
  */
 export async function submitRegistration(payload: {
   fullName: string;

@@ -2,7 +2,7 @@ import React from 'react';
 import { Target, Award, Users2, Calendar, MapPin, Building } from 'lucide-react';
 import { useInView } from '../hooks/useInView';
 
-export const AboutSection: React.FC = () => {
+export const AboutSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
 
   return (
@@ -127,4 +127,5 @@ export const AboutSection: React.FC = () => {
       </div>
     </section>
   );
-};
+});
+AboutSection.displayName = 'AboutSection';

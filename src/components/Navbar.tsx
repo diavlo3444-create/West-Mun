@@ -28,12 +28,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-40 w-full transition-all duration-700 ease-out ${
+        className={`fixed top-0 left-0 right-0 z-40 w-full py-3.5 sm:py-4 transition-[background-color,border-color,box-shadow,opacity] duration-500 ease-out ${
           navVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         } ${
           scrolled || menuOpen
-            ? 'bg-[#080808]/98 border-b border-[#d4af37]/20 py-3 sm:py-3.5 shadow-2xl'
-            : 'bg-gradient-to-b from-black/85 via-black/40 to-transparent py-4 sm:py-5'
+            ? 'bg-[#080808]/98 border-b border-[#d4af37]/20 shadow-2xl'
+            : 'bg-gradient-to-b from-black/85 via-black/40 to-transparent border-b border-transparent'
         }`}
       >
         <div className="max-w-7xl mx-auto px-5 sm:px-8 flex items-center justify-between">
@@ -92,9 +92,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="hidden lg:flex items-center gap-4">
             <a
               href="#register"
-              className="inline-flex items-center justify-center px-5 py-2 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-95 transition-all shadow-[0_2px_12px_rgba(212,175,55,0.25)]"
+              className="inline-flex items-center justify-center px-4 py-2 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-95 transition-all shadow-[0_2px_12px_rgba(212,175,55,0.25)]"
             >
-              Register Now
+              Registration: TBA
             </a>
           </div>
 
@@ -162,7 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => setMenuOpen(false)}
             className="w-full inline-flex items-center justify-center py-3 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 transition-all text-center"
           >
-            Register Now
+            Registration: TBA
           </a>
         </div>
       </div>

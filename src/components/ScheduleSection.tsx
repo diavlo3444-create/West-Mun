@@ -9,7 +9,7 @@ interface ScheduleSession {
   description: string;
 }
 
-export const ScheduleSection: React.FC = () => {
+export const ScheduleSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
   const [activeDay, setActiveDay] = useState<number>(1);
 
@@ -186,4 +186,5 @@ export const ScheduleSection: React.FC = () => {
       </div>
     </section>
   );
-};
+});
+ScheduleSection.displayName = 'ScheduleSection';

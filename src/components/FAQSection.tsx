@@ -8,7 +8,7 @@ interface FAQItem {
   answer: string;
 }
 
-export const FAQSection: React.FC = () => {
+export const FAQSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
   const [openId, setOpenId] = useState<string | null>('faq-1');
 
@@ -133,4 +133,5 @@ export const FAQSection: React.FC = () => {
       </div>
     </section>
   );
-};
+});
+FAQSection.displayName = 'FAQSection';

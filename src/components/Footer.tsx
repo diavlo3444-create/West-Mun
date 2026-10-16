@@ -7,7 +7,7 @@ interface FooterProps {
   onOpenAdminPortal?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onReplayIntro, onOpenAdminPortal }) => {
+export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro, onOpenAdminPortal }) => {
   const { ref, isInView } = useInView<HTMLElement>({ threshold: 0.05 });
   const currentYear = 2027;
 
@@ -79,7 +79,7 @@ export const Footer: React.FC<FooterProps> = ({ onReplayIntro, onOpenAdminPortal
                 <a href="#faq" className="hover:text-white transition-colors">Delegate FAQ</a>
               </li>
               <li>
-                <a href="#register" className="hover:text-[#d4af37] transition-colors">Registration Portal</a>
+                <a href="#register" className="hover:text-[#d4af37] transition-colors">Registration (TBA)</a>
               </li>
             </ul>
           </div>
@@ -160,4 +160,5 @@ export const Footer: React.FC<FooterProps> = ({ onReplayIntro, onOpenAdminPortal
       </div>
     </footer>
   );
-};
+});
+Footer.displayName = 'Footer';

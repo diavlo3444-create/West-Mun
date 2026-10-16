@@ -13,7 +13,7 @@ interface TeamMember {
   appointmentNumber: string;
 }
 
-export const SecretariatSection: React.FC = () => {
+export const SecretariatSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
 
   const secretariat: TeamMember[] = [
@@ -175,4 +175,5 @@ export const SecretariatSection: React.FC = () => {
       </div>
     </section>
   );
-};
+});
+SecretariatSection.displayName = 'SecretariatSection';

@@ -14,41 +14,7 @@ import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
 import { AdminPortalModal } from './components/AdminPortalModal';
 
-// Preserved custom typewriter hook
-function useTypewriter(
-  text: string,
-  speed: number = 38,
-  startDelay: number = 600
-) {
-  const [displayed, setDisplayed] = useState('');
-  const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    let index = 0;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let interval: ReturnType<typeof setInterval> | null = null;
-
-    timer = setTimeout(() => {
-      interval = setInterval(() => {
-        index++;
-        if (index <= text.length) {
-          setDisplayed(text.slice(0, index));
-        }
-        if (index >= text.length) {
-          if (interval) clearInterval(interval);
-          setDone(true);
-        }
-      }, speed);
-    }, startDelay);
-
-    return () => {
-      if (timer) clearTimeout(timer);
-      if (interval) clearInterval(interval);
-    };
-  }, [text, speed, startDelay]);
-
-  return { displayed, done };
-}
 
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -97,11 +63,6 @@ export default function App() {
     setIntroKey((prev) => prev + 1);
   }, []);
 
-  // Diplomatic dispatch text using preserved typewriter animation
-  const typewriterText =
-    'The floor is open for debate. Good diplomacy unites divided nations. What global crisis will your delegation solve?';
-  const { displayed, done } = useTypewriter(typewriterText, 36, 500);
-
   // Track scroll position for navbar styling with RAF throttling
   useEffect(() => {
     let ticking = false;
@@ -140,10 +101,7 @@ export default function App() {
       />
 
       {/* B. Scroll-Controlled Cinematic Hero Section */}
-      <Hero
-        displayedText={displayed}
-        isDoneTyping={done}
-      />
+      <Hero />
 
       {/* C. Conference Introduction */}
       <ConferenceIntro />

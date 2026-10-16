@@ -3,7 +3,7 @@ import { Mail, Instagram, Share2, MapPin, Send, CheckCircle2, AlertCircle, Loade
 import { useInView } from '../hooks/useInView';
 import { submitInquiry } from '../lib/api';
 
-export const ContactSection: React.FC = () => {
+export const ContactSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
   const [formData, setFormData] = useState({
     name: '',
@@ -295,4 +295,5 @@ export const ContactSection: React.FC = () => {
       </div>
     </section>
   );
-};
+});
+ContactSection.displayName = 'ContactSection';
