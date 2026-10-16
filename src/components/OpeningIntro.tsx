@@ -629,7 +629,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
 
           {/* Soft Golden Chamber Backlight Halo */}
           <div
-            className={`absolute inset-0 rounded-full pointer-events-none transition-all duration-700 ease-out ${
+            className={`absolute inset-0 rounded-full pointer-events-none transition-[opacity,transform] duration-700 ease-out ${
               isFlying
                 ? 'opacity-0 scale-95'
                 : isRevealed
@@ -640,7 +640,7 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
 
           {/* OFFICIAL WEST MUN EMBLEM CONTAINER */}
           <div
-            className={`relative w-full h-full rounded-full overflow-hidden bg-[#141414] flex items-center justify-center transition-[border-color,box-shadow,opacity,transform] duration-700 ease-out ${
+            className={`relative w-full h-full rounded-full overflow-hidden bg-[#141414] flex items-center justify-center transition-[border-color,opacity] duration-500 ease-out ${
               isFlying
                 ? 'border border-[#d4af37]/50 shadow-[0_0_15px_rgba(212,175,55,0.2)]'
                 : isRevealed
