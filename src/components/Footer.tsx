@@ -1,12 +1,13 @@
 import React from 'react';
-import { ArrowUp, Shield, Instagram } from 'lucide-react';
+import { ArrowUp, Shield, Instagram, Lock } from 'lucide-react';
 import { useInView } from '../hooks/useInView';
 
 interface FooterProps {
   onReplayIntro?: () => void;
+  onOpenAdminPortal?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onReplayIntro }) => {
+export const Footer: React.FC<FooterProps> = ({ onReplayIntro, onOpenAdminPortal }) => {
   const { ref, isInView } = useInView<HTMLElement>({ threshold: 0.05 });
   const currentYear = 2027;
 
@@ -119,6 +120,17 @@ export const Footer: React.FC<FooterProps> = ({ onReplayIntro }) => {
           <p>© {currentYear} WEST MUN (Model United Nations). All rights reserved.</p>
           <div className="flex items-center gap-6">
             <span className="text-[11px] font-mono text-neutral-600 hidden sm:inline">Diplomatic Summit Portal</span>
+            {onOpenAdminPortal && (
+              <button
+                type="button"
+                onClick={onOpenAdminPortal}
+                className="inline-flex items-center gap-1.5 text-neutral-500 hover:text-[#d4af37] transition-colors text-xs font-mono cursor-pointer"
+                title="Secretariat Organizer Portal"
+              >
+                <Lock className="w-3 h-3 text-[#d4af37]" />
+                <span>Secretariat Portal</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={scrollToTop}

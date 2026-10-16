@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Mail, Instagram, Share2, MapPin, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Mail, Instagram, Share2, MapPin, Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { useInView } from '../hooks/useInView';
+import { submitInquiry } from '../lib/api';
 
 export const ContactSection: React.FC = () => {
   const { ref, isInView } = useInView<HTMLElement>();
@@ -12,30 +13,74 @@ export const ContactSection: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [sent, setSent] = useState<boolean>(false);
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!formData.name.trim()) errs.name = 'Please provide your name.';
-    if (!formData.email.trim()) {
-      errs.email = 'Email address is required.';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errs.email = 'Please provide a valid email format.';
+    const trimmedName = formData.name.trim();
+    const trimmedEmail = formData.email.trim();
+    const trimmedSubject = formData.subject.trim();
+    const trimmedMessage = formData.message.trim();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      errs.name = 'Please provide your full name (at least 2 characters).';
+    } else if (trimmedName.length > 100) {
+      errs.name = 'Name must be under 100 characters.';
     }
-    if (!formData.subject.trim()) errs.subject = 'Subject line is required.';
-    if (!formData.message.trim()) errs.message = 'Please provide your message.';
+
+    if (!trimmedEmail) {
+      errs.email = 'Email address is required.';
+    } else if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(trimmedEmail)) {
+      errs.email = 'Please provide a valid email format (e.g. delegate@domain.com).';
+    }
+
+    if (!trimmedSubject || trimmedSubject.length < 2) {
+      errs.subject = 'Subject line is required.';
+    } else if (trimmedSubject.length > 150) {
+      errs.subject = 'Subject must be under 150 characters.';
+    }
+
+    if (!trimmedMessage || trimmedMessage.length < 5) {
+      errs.message = 'Please provide your message (at least 5 characters).';
+    } else if (trimmedMessage.length > 3000) {
+      errs.message = 'Message must be under 3000 characters.';
+    }
+
     return errs;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
+
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
     setErrors({});
-    setSent(true);
+    setIsSubmitting(true);
+
+    try {
+      const res = await submitInquiry({
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        subject: formData.subject.trim(),
+        message: formData.message.trim(),
+      });
+
+      if (!res.success) {
+        throw new Error(res.error || 'Unable to transmit inquiry.');
+      }
+      setSent(true);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred while transmitting your inquiry.';
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -213,13 +258,33 @@ export const ContactSection: React.FC = () => {
                     {errors.message && <p className="text-[11px] text-red-400 mt-1">{errors.message}</p>}
                   </div>
 
+                  {submitError && (
+                    <div className="p-3 bg-red-950/40 border border-red-500/40 rounded-sm flex items-start gap-2.5 text-xs text-red-300">
+                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold block text-red-200">Transmission Error</span>
+                        <span>{submitError}</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="pt-2">
                     <button
                       type="submit"
-                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-6 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-98 transition-all cursor-pointer"
+                      disabled={isSubmitting}
+                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-6 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-98 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
                     >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Transmit Message</span>
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
+                          <span>Securing Transmission...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Transmit Message</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </form>

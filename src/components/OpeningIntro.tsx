@@ -659,15 +659,25 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
 
         {/* Centered Diplomatic Tagline: Placed directly below the emblem */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl px-4 sm:px-6 text-center pointer-events-none will-change-[opacity,transform]"
+          className="absolute inset-x-0 mx-auto w-full max-w-xl flex flex-col items-center justify-center text-center pointer-events-none will-change-[opacity,transform]"
           style={{
             top: `calc(50% + ${diameter / 2 + (isMobile ? 16 : 24)}px)`,
+            left: 0,
+            right: 0,
+            width: '100%',
+            maxWidth: '36rem',
+            marginLeft: 'auto',
+            marginRight: 'auto',
+            boxSizing: 'border-box',
+            paddingLeft: isMobile ? '24px' : '32px',
+            paddingRight: isMobile ? '24px' : '32px',
+            textAlign: 'center',
             opacity: isTaglineVisible && !isFlying ? 1 : 0,
             transform: isTaglineVisible && !isFlying
-              ? 'translate3d(-50%, 0px, 0)'
+              ? 'translate3d(0, 0px, 0)'
               : isFlying
-              ? 'translate3d(-50%, -10px, 0)'
-              : 'translate3d(-50%, 14px, 0)',
+              ? 'translate3d(0, -10px, 0)'
+              : 'translate3d(0, 14px, 0)',
             transition: isFlying
               ? 'opacity 250ms ease-in, transform 250ms ease-in'
               : isTaglineVisible
@@ -676,29 +686,50 @@ export const OpeningIntro: React.FC<OpeningIntroProps> = ({ onComplete, onFlight
           }}
         >
           {/* Diplomatic Kicker */}
-          <div className="inline-flex items-center justify-center gap-2.5 mb-1.5 sm:mb-2">
-            <span className="w-6 sm:w-10 h-[1px] bg-gradient-to-r from-transparent via-[#d4af37]/60 to-[#d4af37]/90" />
-            <span className="text-[9px] sm:text-[11px] font-mono tracking-[0.25em] sm:tracking-[0.3em] uppercase text-[#d4af37] font-medium">
+          <div
+            className="w-full flex items-center justify-center gap-2 sm:gap-2.5 mb-1.5 sm:mb-2 text-center"
+            style={{ textAlign: 'center', justifyContent: 'center' }}
+          >
+            <span className="w-5 sm:w-10 h-[1px] bg-gradient-to-r from-transparent via-[#d4af37]/60 to-[#d4af37]/90 shrink-0" />
+            <span className="text-[10px] sm:text-[11px] font-mono tracking-[0.2em] sm:tracking-[0.3em] uppercase text-[#d4af37] font-medium text-center">
               WEST MUN 2027
             </span>
-            <span className="w-6 sm:w-10 h-[1px] bg-gradient-to-l from-transparent via-[#d4af37]/60 to-[#d4af37]/90" />
+            <span className="w-5 sm:w-10 h-[1px] bg-gradient-to-l from-transparent via-[#d4af37]/60 to-[#d4af37]/90 shrink-0" />
           </div>
 
           {/* Golden Shimmer Tagline */}
           <h1
-            className="text-xl sm:text-2xl md:text-3xl font-serif font-normal tracking-wide leading-snug sm:leading-tight mb-1.5 sm:mb-2 shimmer-gold"
-            style={{ fontFamily: 'var(--font-heading)' }}
+            className="w-full text-center text-xl sm:text-2xl md:text-3xl font-serif font-normal tracking-wide leading-snug sm:leading-tight mb-1.5 sm:mb-2 shimmer-gold mx-auto"
+            style={{
+              fontFamily: 'var(--font-heading)',
+              textAlign: 'center',
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              maxWidth: '100%',
+              wordBreak: 'break-word',
+            }}
           >
             Where Diplomacy Meets Leadership
           </h1>
 
           {/* Conference Dossier Line */}
-          <p className="text-[9px] sm:text-xs text-neutral-400 font-light tracking-[0.18em] sm:tracking-[0.22em] uppercase">
+          <p
+            className="w-full text-center text-[9px] sm:text-xs text-neutral-400 font-light tracking-[0.16em] sm:tracking-[0.22em] uppercase mx-auto"
+            style={{
+              textAlign: 'center',
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              maxWidth: '100%',
+            }}
+          >
             Western Model United Nations Conference
           </p>
 
           {/* Diplomatic Diamond Motif */}
-          <div className="mt-2.5 sm:mt-3 flex items-center justify-center gap-2 opacity-60">
+          <div
+            className="w-full mt-2.5 sm:mt-3 flex items-center justify-center gap-2 opacity-60 text-center"
+            style={{ textAlign: 'center', justifyContent: 'center' }}
+          >
             <span className="w-1.5 h-1.5 rotate-45 border border-[#d4af37]/80 bg-[#d4af37]/25" />
           </div>
         </div>

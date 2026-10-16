@@ -12,6 +12,7 @@ import { RegistrationSection } from './components/RegistrationSection';
 import { FAQSection } from './components/FAQSection';
 import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
+import { AdminPortalModal } from './components/AdminPortalModal';
 
 // Preserved custom typewriter hook
 function useTypewriter(
@@ -52,6 +53,7 @@ function useTypewriter(
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [adminPortalOpen, setAdminPortalOpen] = useState(false);
 
   // Intro animation playback state:
   // Shows on first visit or when triggered by Replay Intro
@@ -171,7 +173,16 @@ export default function App() {
       <ContactSection />
 
       {/* L. Conference Footer */}
-      <Footer onReplayIntro={handleReplayIntro} />
+      <Footer
+        onReplayIntro={handleReplayIntro}
+        onOpenAdminPortal={() => setAdminPortalOpen(true)}
+      />
+
+      {/* Secretariat Diplomatic Admin Portal Modal */}
+      <AdminPortalModal
+        isOpen={adminPortalOpen}
+        onClose={() => setAdminPortalOpen(false)}
+      />
     </div>
   );
 }
