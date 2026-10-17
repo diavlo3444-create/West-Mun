@@ -68,6 +68,206 @@ const TypewriterDispatch = memo(({
 });
 TypewriterDispatch.displayName = 'TypewriterDispatch';
 
+/**
+ * Velocity-Based Inertia Helper:
+ * Dynamically computes scroll-triggered video playback speed based on real-time scroll velocity
+ * and applies a physics-modeled friction decay (inertia) to gently decelerate the video to a halt
+ * when scrolling stops, rather than pausing abruptly.
+ */
+interface VelocityInertiaConfig {
+  minPlaybackRate?: number; // Base rate during slow scroll (e.g., 0.85)
+  maxPlaybackRate?: number; // Upper limit during rapid scroll (e.g., 1.75)
+  velocityMultiplier?: number; // Sensitivity mapping from px/ms to playback speed (e.g., 0.45)
+  friction?: number; // Per-frame damping coefficient (0.91 - 0.94)
+  idleThresholdMs?: number; // Duration without scroll input before inertia takes full control (e.g., 80ms)
+  minHaltRate?: number; // Lower threshold to trigger clean pause (e.g., 0.12)
+}
+
+class VelocityInertiaHelper {
+  private videoRef: React.RefObject<HTMLVideoElement | null>;
+  private isVisibleRef: React.RefObject<boolean>;
+  private lastScrollY: number = 0;
+  private lastScrollTime: number = 0;
+  private smoothedVelocity: number = 0;
+  private currentPlaybackRate: number = 1.0;
+  private targetPlaybackRate: number = 1.0;
+  private lastFrameTime: number = 0;
+  private lastScrollTimestamp: number = 0;
+  private rafId: number | null = null;
+  private direction: number = 1; // 1 = forward (downward scroll), -1 = reverse (upward scroll)
+
+  private minPlaybackRate: number;
+  private maxPlaybackRate: number;
+  private velocityMultiplier: number;
+  private friction: number;
+  private idleThresholdMs: number;
+  private minHaltRate: number;
+
+  constructor(
+    videoRef: React.RefObject<HTMLVideoElement | null>,
+    isVisibleRef: React.RefObject<boolean>,
+    config?: VelocityInertiaConfig
+  ) {
+    this.videoRef = videoRef;
+    this.isVisibleRef = isVisibleRef;
+    this.lastScrollY = typeof window !== 'undefined' ? window.scrollY || 0 : 0;
+    this.minPlaybackRate = config?.minPlaybackRate ?? 0.85;
+    this.maxPlaybackRate = config?.maxPlaybackRate ?? 1.75;
+    this.velocityMultiplier = config?.velocityMultiplier ?? 0.45;
+    this.friction = config?.friction ?? 0.92;
+    this.idleThresholdMs = config?.idleThresholdMs ?? 80;
+    this.minHaltRate = config?.minHaltRate ?? 0.12;
+  }
+
+  /**
+   * Called on each scroll update to register displacement, determine scroll direction, and update momentum
+   */
+  public onScroll(scrollY: number): void {
+    const video = this.videoRef.current;
+    if (!video || !this.isVisibleRef.current) return;
+
+    const now = performance.now();
+    const dt = now - this.lastScrollTime;
+    const dy = scrollY - this.lastScrollY;
+    const absDy = Math.abs(dy);
+
+    // Filter minor micro-jitter (< 1.5px) from erratic trackpad noise
+    if (absDy >= 1.5) {
+      this.direction = dy > 0 ? 1 : -1;
+    }
+
+    this.lastScrollY = scrollY;
+    this.lastScrollTime = now;
+    this.lastScrollTimestamp = now;
+
+    // Filter anomalous deltas (e.g., tab switch or first scroll after pause)
+    if (dt > 4 && dt < 250) {
+      const instantVelocity = absDy / dt; // pixels per millisecond
+      // Exponential moving average for smooth, organic speed response
+      this.smoothedVelocity = this.smoothedVelocity * 0.35 + instantVelocity * 0.65;
+    } else {
+      this.smoothedVelocity = Math.max(0.2, this.smoothedVelocity * 0.5);
+    }
+
+    // Map velocity to target playback rate
+    this.targetPlaybackRate = Math.min(
+      this.maxPlaybackRate,
+      Math.max(
+        this.minPlaybackRate,
+        this.minPlaybackRate + this.smoothedVelocity * this.velocityMultiplier
+      )
+    );
+
+    // If scrolling downward (forward) and video is paused, start forward playback
+    if (this.direction === 1) {
+      if (video.paused) {
+        video.play().catch(() => {});
+      }
+    } else {
+      // If scrolling upward (reverse), pause native forward playback so we can step backward cleanly
+      if (!video.paused) {
+        video.pause();
+      }
+    }
+
+    // Start or wake up the inertia update loop
+    if (this.rafId === null) {
+      this.lastFrameTime = now;
+      this.rafId = requestAnimationFrame(this.tick);
+    }
+  }
+
+  /**
+   * Continuous animation frame loop:
+   * During active scroll, lerps playbackRate towards target velocity in the current scroll direction.
+   * When idle, applies physical friction decay until cleanly resting.
+   */
+  private tick = (now: number): void => {
+    const video = this.videoRef.current;
+    if (!video || !this.isVisibleRef.current) {
+      this.stop();
+      return;
+    }
+
+    const deltaFrame = Math.min(50, now - this.lastFrameTime);
+    this.lastFrameTime = now;
+    const timeSinceLastScroll = now - this.lastScrollTimestamp;
+
+    if (timeSinceLastScroll > this.idleThresholdMs) {
+      // User has stopped scrolling: apply continuous inertia friction decay
+      const frameRatio = deltaFrame / 16.67;
+      const decayFactor = Math.pow(this.friction, frameRatio);
+      this.currentPlaybackRate *= decayFactor;
+      this.smoothedVelocity *= decayFactor;
+
+      if (this.currentPlaybackRate <= this.minHaltRate) {
+        // Complete gentle stop
+        this.stop();
+        return;
+      }
+    } else {
+      // User is actively scrolling: smooth lerp to target velocity
+      const lerpSpeed = Math.min(1, 0.25 * (deltaFrame / 16.67));
+      this.currentPlaybackRate += (this.targetPlaybackRate - this.currentPlaybackRate) * lerpSpeed;
+    }
+
+    const effectiveRate = Math.max(0.1, this.currentPlaybackRate);
+
+    if (this.direction === 1) {
+      // Forward playback: ensure video is playing and set playbackRate
+      if (video.paused) {
+        video.play().catch(() => {});
+      }
+      try {
+        video.playbackRate = effectiveRate;
+      } catch {}
+    } else {
+      // Reverse playback: ensure forward playback is paused and step currentTime backward
+      if (!video.paused) {
+        video.pause();
+      }
+      const dtSeconds = (deltaFrame / 1000) * effectiveRate;
+      const newTime = video.currentTime - dtSeconds;
+
+      if (newTime <= 0.02) {
+        // Reached the start of the video: pause gently at the first frame
+        try {
+          video.currentTime = 0;
+        } catch {}
+        this.stop();
+        return;
+      } else {
+        try {
+          video.currentTime = newTime;
+        } catch {}
+      }
+    }
+
+    this.rafId = requestAnimationFrame(this.tick);
+  };
+
+  /**
+   * Immediately halts playback and resets inertia state
+   */
+  public stop(): void {
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    const video = this.videoRef.current;
+    if (video) {
+      if (!video.paused) {
+        video.pause();
+      }
+      try {
+        video.playbackRate = 1.0;
+      } catch {}
+    }
+    this.currentPlaybackRate = 1.0;
+    this.smoothedVelocity = 0;
+  }
+}
+
 export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) => {
   const heroTrackRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -92,11 +292,18 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
   const scrollRafIdRef = useRef<number | null>(null);
   const resizeRafIdRef = useRef<number | null>(null);
 
-  // Kinetic scroll playback & gentle deceleration engine
-  const lastScrollYRef = useRef<number>(0);
-  const lastScrollTimeRef = useRef<number>(0);
-  const scrollStopTimerRef = useRef<number | null>(null);
-  const decelerationRafRef = useRef<number | null>(null);
+  // Dedicated velocity-based inertia helper for scroll-triggered playback and gentle deceleration
+  const inertiaHelperRef = useRef<VelocityInertiaHelper | null>(null);
+  if (!inertiaHelperRef.current) {
+    inertiaHelperRef.current = new VelocityInertiaHelper(videoRef, isHeroVisibleRef, {
+      minPlaybackRate: 0.85,
+      maxPlaybackRate: 1.75,
+      velocityMultiplier: 0.45,
+      friction: 0.92,
+      idleThresholdMs: 80,
+      minHaltRate: 0.12,
+    });
+  }
 
   // Cached layout metrics to completely eliminate getBoundingClientRect on scroll
   const trackHeightRef = useRef<number>(0);
@@ -299,52 +506,6 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     }
   }, []);
 
-  // Kinetic Video Playback & Deceleration Engine:
-  // Decoupled from frame-seeking to eliminate all decoder stalls. When the user scrolls,
-  // the video streams smoothly forward at native display refresh rate, scaling speed with scroll velocity.
-  // When scrolling stops, the video smoothly glides to a resting halt over ~400ms.
-  const triggerDeceleration = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || video.paused) return;
-
-    if (decelerationRafRef.current !== null) {
-      cancelAnimationFrame(decelerationRafRef.current);
-      decelerationRafRef.current = null;
-    }
-
-    const startRate = video.playbackRate;
-    const startTime = performance.now();
-    const duration = 400; // 400ms smooth deceleration curve
-
-    const stepDeceleration = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(1, elapsed / duration);
-
-      // Cubic ease-out factor
-      const easeFactor = 1 - Math.pow(1 - progress, 3);
-      const newRate = startRate * (1 - easeFactor);
-
-      if (progress < 1 && newRate > 0.15) {
-        const v = videoRef.current;
-        if (v && !v.paused) {
-          try {
-            v.playbackRate = Math.max(0.1, newRate);
-          } catch {}
-          decelerationRafRef.current = requestAnimationFrame(stepDeceleration);
-        }
-      } else {
-        const v = videoRef.current;
-        if (v) {
-          v.pause();
-          v.playbackRate = 1.0;
-        }
-        decelerationRafRef.current = null;
-      }
-    };
-
-    decelerationRafRef.current = requestAnimationFrame(stepDeceleration);
-  }, []);
-
   const handleVideoReady = useCallback((video: HTMLVideoElement) => {
     if (!isNaN(video.duration) && isFinite(video.duration) && video.duration > 0) {
       videoDurationRef.current = video.duration;
@@ -376,47 +537,15 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
       videoParallaxRef.current.style.transform = `translate3d(0, ${parallaxY.toFixed(1)}px, 0)`;
     }
 
-    // Interactive scroll-driven video playback with dynamic velocity scaling
-    const video = videoRef.current;
+    // Velocity-based inertia helper: calculates real-time scroll speed and applies gentle friction deceleration on stop
     if (
-      video &&
       isHeroVisibleRef.current &&
       currentScroll >= -viewportHeightRef.current &&
       currentScroll <= scrollableDistance + viewportHeightRef.current
     ) {
-      // Cancel any active deceleration loop if the user is scrolling again
-      if (decelerationRafRef.current !== null) {
-        cancelAnimationFrame(decelerationRafRef.current);
-        decelerationRafRef.current = null;
-      }
-
-      const now = performance.now();
-      const dt = now - lastScrollTimeRef.current;
-      const dy = Math.abs(scrollY - lastScrollYRef.current);
-      lastScrollYRef.current = scrollY;
-      lastScrollTimeRef.current = now;
-
-      // Dynamic playback speed: scales gracefully between 0.9x and 1.5x with scroll velocity
-      const velocity = dt > 0 && dt < 200 ? dy / dt : 0;
-      const dynamicRate = Math.min(1.5, Math.max(0.9, 0.9 + velocity * 0.35));
-
-      try {
-        video.playbackRate = dynamicRate;
-      } catch {}
-
-      if (video.paused) {
-        video.play().catch(() => {});
-      }
-
-      // Schedule gentle deceleration once scrolling stops (120ms idle threshold)
-      if (scrollStopTimerRef.current !== null) {
-        clearTimeout(scrollStopTimerRef.current);
-      }
-      scrollStopTimerRef.current = window.setTimeout(() => {
-        triggerDeceleration();
-      }, 120);
+      inertiaHelperRef.current?.onScroll(scrollY);
     }
-  }, [applyVisuals, triggerDeceleration]);
+  }, [applyVisuals]);
 
   // RAF-coalesced scroll handler: coalesces high-frequency scroll events to exactly one calculation per frame
   const handleScroll = useCallback(() => {
@@ -472,21 +601,10 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
         (entries) => {
           const entry = entries[0];
           isHeroVisibleRef.current = entry.isIntersecting;
-          const currentVideo = videoRef.current;
           if (entry.isIntersecting) {
             updateOnScroll();
           } else {
-            if (currentVideo && !currentVideo.paused) {
-              currentVideo.pause();
-            }
-            if (scrollStopTimerRef.current !== null) {
-              clearTimeout(scrollStopTimerRef.current);
-              scrollStopTimerRef.current = null;
-            }
-            if (decelerationRafRef.current !== null) {
-              cancelAnimationFrame(decelerationRafRef.current);
-              decelerationRafRef.current = null;
-            }
+            inertiaHelperRef.current?.stop();
           }
         },
         { rootMargin: '100px 0px 100px 0px' }
@@ -496,20 +614,9 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
 
     // Visibility change listener (pauses playback and RAF when browser tab is inactive)
     const handleVisibilityChange = () => {
-      const currentVideo = videoRef.current;
       if (document.hidden) {
         isHeroVisibleRef.current = false;
-        if (currentVideo && !currentVideo.paused) {
-          currentVideo.pause();
-        }
-        if (scrollStopTimerRef.current !== null) {
-          clearTimeout(scrollStopTimerRef.current);
-          scrollStopTimerRef.current = null;
-        }
-        if (decelerationRafRef.current !== null) {
-          cancelAnimationFrame(decelerationRafRef.current);
-          decelerationRafRef.current = null;
-        }
+        inertiaHelperRef.current?.stop();
         if (scrollRafIdRef.current !== null) {
           cancelAnimationFrame(scrollRafIdRef.current);
           scrollRafIdRef.current = null;
@@ -532,14 +639,7 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (observer) observer.disconnect();
-      if (scrollStopTimerRef.current !== null) {
-        clearTimeout(scrollStopTimerRef.current);
-        scrollStopTimerRef.current = null;
-      }
-      if (decelerationRafRef.current !== null) {
-        cancelAnimationFrame(decelerationRafRef.current);
-        decelerationRafRef.current = null;
-      }
+      inertiaHelperRef.current?.stop();
       if (scrollRafIdRef.current !== null) {
         cancelAnimationFrame(scrollRafIdRef.current);
         scrollRafIdRef.current = null;

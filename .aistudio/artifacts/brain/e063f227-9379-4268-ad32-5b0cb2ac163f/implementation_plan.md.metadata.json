@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for scroll-triggered interactive video playback with gentle deceleration. Converts the background video into an interactive experience that plays forward when the user scrolls and smoothly decelerates to a stop when scrolling pauses, eliminating all decoder seek stutter while restoring responsive user interactivity.",
-  "updatedAt": "2026-10-17T10:15:59.005392347Z",
+  "summary": "Implementation plan for bidirectional scroll-controlled video playback with reverse inertia. Adds seamless reverse playback when scrolling upward, preserving velocity scaling and gentle friction deceleration to a halt, with gentle resting when reaching the first frame.",
+  "updatedAt": "2026-10-17T10:27:46.685989511Z",
   "requestFeedback": true,
   "userFacing": true
 }

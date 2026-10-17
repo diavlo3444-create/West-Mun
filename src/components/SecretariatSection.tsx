@@ -12,6 +12,7 @@ interface TeamMember {
   fallbackImage?: string;
   isConfirmed: boolean;
   appointmentNumber: string;
+  imagePosition?: string;
 }
 
 export const SecretariatSection: React.FC = React.memo(() => {
@@ -24,6 +25,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
       department: 'Executive Leadership',
       bio: 'Overseeing conference proceedings, guiding delegates, and maintaining parliamentary decorum. Dedicated to ensuring an exceptional, collaborative MUN experience for all delegations.',
       image: '/rakan-almerbad.jpg',
+      imagePosition: 'object-center',
       isConfirmed: true,
       appointmentNumber: '01',
     },
@@ -33,6 +35,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
       department: 'Executive Secretariat',
       bio: 'Experienced debater with a deep passion for global diplomacy and constructive dialogue. Committed to youth empowerment, collaborative problem-solving, and delivering an unforgettable conference.',
       image: '/yousef.jpg',
+      imagePosition: 'object-top',
       isConfirmed: true,
       appointmentNumber: '02',
     },
@@ -42,6 +45,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
       department: 'Executive Secretariat',
       bio: 'Directing substantive committee operations, delegate services, and institutional logistics. Dedicated to fostering high-level multilateral debate and diplomatic excellence.',
       image: '/fahad.jpg',
+      imagePosition: 'object-center',
       fallbackImage: 'https://i.ibb.co/mrYKgTYc/Whats-App-Image-2026-10-15-at-1-36-37-PM.jpg',
       isConfirmed: true,
       appointmentNumber: '03',
@@ -52,6 +56,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
       department: 'Advisory Board',
       bio: 'Hi im Muaz Elamir My job is to guide the team, share advice, and help make sure the conference runs smoothly so you all have a great MUN experience!',
       image: '/muaz.jpg',
+      imagePosition: 'object-center',
       fallbackImage: 'https://i.ibb.co/4wCsnP6Q/Whats-App-Image-2026-10-15-at-11-07-35-PM.jpg',
       isConfirmed: true,
       appointmentNumber: '04',
@@ -123,7 +128,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
                   <img
                     src={member.image}
                     alt={member.name}
-                    className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${member.imagePosition || 'object-center'}`}
                     loading="lazy"
                     onError={(e) => {
                       if (member.fallbackImage && e.currentTarget.src !== member.fallbackImage) {
