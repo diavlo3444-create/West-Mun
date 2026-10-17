@@ -71,6 +71,7 @@ TypewriterDispatch.displayName = 'TypewriterDispatch';
 export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) => {
   const heroTrackRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoParallaxRef = useRef<HTMLDivElement>(null);
 
   // Direct DOM element refs to eliminate React re-renders on scroll
   const stage1Ref = useRef<HTMLDivElement>(null);
@@ -82,16 +83,20 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
   const scrubSecRef = useRef<HTMLSpanElement>(null);
 
   // Animation and progress trackers
-  const targetProgressRef = useRef<number>(0);
-  const smoothProgressRef = useRef<number>(0);
-  const pendingTimeRef = useRef<number | null>(null);
+  const isMobileRef = useRef<boolean>(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+  const currentProgressRef = useRef<number>(0);
   const videoDurationRef = useRef<number>(8);
-  const isSeekingRef = useRef<boolean>(false);
-  const lastSeekTimeMsRef = useRef<number>(0);
-  const lastDispatchedTimeRef = useRef<number>(-1);
-  const rafIdRef = useRef<number | null>(null);
-  const isLoopRunningRef = useRef<boolean>(false);
   const isHeroVisibleRef = useRef<boolean>(true);
+  const scrollRafIdRef = useRef<number | null>(null);
+  const resizeRafIdRef = useRef<number | null>(null);
+
+  // Kinetic scroll playback & gentle deceleration engine
+  const lastScrollYRef = useRef<number>(0);
+  const lastScrollTimeRef = useRef<number>(0);
+  const scrollStopTimerRef = useRef<number | null>(null);
+  const decelerationRafRef = useRef<number | null>(null);
 
   // Cached layout metrics to completely eliminate getBoundingClientRect on scroll
   const trackHeightRef = useRef<number>(0);
@@ -120,10 +125,35 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     scrubScale: -1,
   });
 
-  const [videoSrc, setVideoSrc] = useState<string>('/background.mp4');
-
   const fallbackVideo =
     'https://flow-content.google/video/fa4bbb59-43c8-4a80-adf5-56331769e37f?Expires=1792033962&KeyName=labs-flow-prod-cdn-key&Signature=tdvKzLhOlfu06BKzGLvNYhyymI8';
+
+  const [videoSrc, setVideoSrc] = useState<string>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return '/background_mobile.mp4';
+    }
+    return '/background.mp4';
+  });
+
+  // Responsively select optimal video source without resetting scroll progress or causing layout shifts
+  useEffect(() => {
+    const handleViewportChange = () => {
+      const isMobile = window.innerWidth < 768;
+      isMobileRef.current = isMobile;
+      const targetSrc = isMobile ? '/background_mobile.mp4' : '/background.mp4';
+      setVideoSrc((prev) => {
+        if (prev === fallbackVideo) return prev;
+        return prev !== targetSrc ? targetSrc : prev;
+      });
+    };
+
+    window.addEventListener('resize', handleViewportChange, { passive: true });
+    window.addEventListener('orientationchange', handleViewportChange, { passive: true });
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('orientationchange', handleViewportChange);
+    };
+  }, [fallbackVideo]);
 
   // Apply visual updates directly to GPU-accelerated CSS properties with change deadbands
   const applyVisuals = useCallback((p: number) => {
@@ -269,113 +299,62 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     }
   }, []);
 
-  // Efficient request-coalescing seek manager with frame deadband and watchdog recovery:
-  // Decoupled from artificial setTimeout timers. Discards obsolete seeks while keeping the video
-  // frame synchronized cleanly in both directions at native hardware decoder throughput.
-  const dispatchVideoSeek = useCallback((desiredTime: number) => {
+  // Kinetic Video Playback & Deceleration Engine:
+  // Decoupled from frame-seeking to eliminate all decoder stalls. When the user scrolls,
+  // the video streams smoothly forward at native display refresh rate, scaling speed with scroll velocity.
+  // When scrolling stops, the video smoothly glides to a resting halt over ~400ms.
+  const triggerDeceleration = useCallback(() => {
     const video = videoRef.current;
-    if (!video || !isFinite(video.duration) || video.duration <= 0) return;
+    if (!video || video.paused) return;
 
-    const targetTime = Math.max(0, Math.min(desiredTime, video.duration));
-
-    // Avoid seek if timestamp delta is less than half a 24fps frame (~20ms)
-    if (
-      Math.abs(video.currentTime - targetTime) < 0.02 &&
-      Math.abs(lastDispatchedTimeRef.current - targetTime) < 0.02
-    ) {
-      return;
+    if (decelerationRafRef.current !== null) {
+      cancelAnimationFrame(decelerationRafRef.current);
+      decelerationRafRef.current = null;
     }
 
-    const now = performance.now();
-    // Safety watchdog recovery: if isSeeking has been held for >200ms without a seeked event, reset
-    if (isSeekingRef.current && now - lastSeekTimeMsRef.current > 200) {
-      isSeekingRef.current = false;
-    }
+    const startRate = video.playbackRate;
+    const startTime = performance.now();
+    const duration = 400; // 400ms smooth deceleration curve
 
-    if (video.seeking || isSeekingRef.current) {
-      // Coalesce: continuously store the single newest target timestamp
-      pendingTimeRef.current = targetTime;
-    } else {
-      try {
-        isSeekingRef.current = true;
-        lastSeekTimeMsRef.current = now;
-        lastDispatchedTimeRef.current = targetTime;
-        video.currentTime = targetTime;
-      } catch {
-        isSeekingRef.current = false;
-      }
-    }
-  }, []);
+    const stepDeceleration = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(1, elapsed / duration);
 
-  // Frame tick animation loop with responsive LERP interpolation
-  const tickAnimation = useCallback(() => {
-    if (!isHeroVisibleRef.current) {
-      isLoopRunningRef.current = false;
-      return;
-    }
+      // Cubic ease-out factor
+      const easeFactor = 1 - Math.pow(1 - progress, 3);
+      const newRate = startRate * (1 - easeFactor);
 
-    const targetP = targetProgressRef.current;
-    let currentP = smoothProgressRef.current;
-
-    // Responsive LERP (0.22) for smooth, jitter-free glide and crisp settling
-    const delta = targetP - currentP;
-    if (Math.abs(delta) < 0.0006) {
-      currentP = targetP;
-      smoothProgressRef.current = targetP;
-    } else {
-      currentP += delta * 0.22;
-      smoothProgressRef.current = currentP;
-    }
-
-    // Apply visual transforms directly to DOM nodes
-    applyVisuals(currentP);
-
-    // Update video frame
-    const desiredTime = currentP * videoDurationRef.current;
-    dispatchVideoSeek(desiredTime);
-
-    // Continue loop until animation has cleanly settled
-    const deltaRemaining = Math.abs(targetProgressRef.current - smoothProgressRef.current);
-    if (deltaRemaining > 0.0006) {
-      rafIdRef.current = requestAnimationFrame(tickAnimation);
-      isLoopRunningRef.current = true;
-    } else {
-      isLoopRunningRef.current = false;
-    }
-  }, [applyVisuals, dispatchVideoSeek]);
-
-  // Ensure loop is running when scroll changes
-  const startAnimationLoop = useCallback(() => {
-    if (!isLoopRunningRef.current && isHeroVisibleRef.current) {
-      isLoopRunningRef.current = true;
-      rafIdRef.current = requestAnimationFrame(tickAnimation);
-    }
-  }, [tickAnimation]);
-
-  const handleSeeked = useCallback(() => {
-    isSeekingRef.current = false;
-    const pending = pendingTimeRef.current;
-    if (pending !== null) {
-      pendingTimeRef.current = null;
-      const video = videoRef.current;
-      if (video && Math.abs(video.currentTime - pending) >= 0.02) {
-        try {
-          isSeekingRef.current = true;
-          lastSeekTimeMsRef.current = performance.now();
-          lastDispatchedTimeRef.current = pending;
-          video.currentTime = pending;
-        } catch {
-          isSeekingRef.current = false;
+      if (progress < 1 && newRate > 0.15) {
+        const v = videoRef.current;
+        if (v && !v.paused) {
+          try {
+            v.playbackRate = Math.max(0.1, newRate);
+          } catch {}
+          decelerationRafRef.current = requestAnimationFrame(stepDeceleration);
         }
+      } else {
+        const v = videoRef.current;
+        if (v) {
+          v.pause();
+          v.playbackRate = 1.0;
+        }
+        decelerationRafRef.current = null;
       }
-    }
+    };
+
+    decelerationRafRef.current = requestAnimationFrame(stepDeceleration);
   }, []);
 
-  const scrollRafIdRef = useRef<number | null>(null);
-  const resizeRafIdRef = useRef<number | null>(null);
+  const handleVideoReady = useCallback((video: HTMLVideoElement) => {
+    if (!isNaN(video.duration) && isFinite(video.duration) && video.duration > 0) {
+      videoDurationRef.current = video.duration;
+    }
+    // Paused by default until scroll interaction starts
+    video.pause();
+  }, []);
 
   // Read scroll position with cached layout offset — NO getBoundingClientRect on scroll
-  const computeScrollProgress = useCallback(() => {
+  const updateOnScroll = useCallback(() => {
     const scrollableDistance = trackHeightRef.current - viewportHeightRef.current;
     if (scrollableDistance <= 0) return;
 
@@ -386,21 +365,69 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     const rawProgress = currentScroll / scrollableDistance;
     const clamped = currentScroll <= 0 ? 0 : currentScroll >= scrollableDistance ? 1 : rawProgress;
 
-    // Only update progress and wake the animation loop if progress genuinely changed
-    if (Math.abs(clamped - targetProgressRef.current) > 0.0001) {
-      targetProgressRef.current = clamped;
-      startAnimationLoop();
+    currentProgressRef.current = clamped;
+
+    // Direct, hardware-accelerated updates to DOM elements (stages, indicators, scrub pill)
+    applyVisuals(clamped);
+
+    // Subtle GPU-accelerated scroll parallax on the background video layer
+    if (videoParallaxRef.current) {
+      const parallaxY = -(clamped * 45); // 45px vertical translation creates depth
+      videoParallaxRef.current.style.transform = `translate3d(0, ${parallaxY.toFixed(1)}px, 0)`;
     }
-  }, [startAnimationLoop]);
+
+    // Interactive scroll-driven video playback with dynamic velocity scaling
+    const video = videoRef.current;
+    if (
+      video &&
+      isHeroVisibleRef.current &&
+      currentScroll >= -viewportHeightRef.current &&
+      currentScroll <= scrollableDistance + viewportHeightRef.current
+    ) {
+      // Cancel any active deceleration loop if the user is scrolling again
+      if (decelerationRafRef.current !== null) {
+        cancelAnimationFrame(decelerationRafRef.current);
+        decelerationRafRef.current = null;
+      }
+
+      const now = performance.now();
+      const dt = now - lastScrollTimeRef.current;
+      const dy = Math.abs(scrollY - lastScrollYRef.current);
+      lastScrollYRef.current = scrollY;
+      lastScrollTimeRef.current = now;
+
+      // Dynamic playback speed: scales gracefully between 0.9x and 1.5x with scroll velocity
+      const velocity = dt > 0 && dt < 200 ? dy / dt : 0;
+      const dynamicRate = Math.min(1.5, Math.max(0.9, 0.9 + velocity * 0.35));
+
+      try {
+        video.playbackRate = dynamicRate;
+      } catch {}
+
+      if (video.paused) {
+        video.play().catch(() => {});
+      }
+
+      // Schedule gentle deceleration once scrolling stops (120ms idle threshold)
+      if (scrollStopTimerRef.current !== null) {
+        clearTimeout(scrollStopTimerRef.current);
+      }
+      scrollStopTimerRef.current = window.setTimeout(() => {
+        triggerDeceleration();
+      }, 120);
+    }
+  }, [applyVisuals, triggerDeceleration]);
 
   // RAF-coalesced scroll handler: coalesces high-frequency scroll events to exactly one calculation per frame
   const handleScroll = useCallback(() => {
     if (scrollRafIdRef.current !== null) return;
     scrollRafIdRef.current = requestAnimationFrame(() => {
       scrollRafIdRef.current = null;
-      computeScrollProgress();
+      if (isHeroVisibleRef.current) {
+        updateOnScroll();
+      }
     });
-  }, [computeScrollProgress]);
+  }, [updateOnScroll]);
 
   // Measure and cache layout metrics on mount and resize ONLY
   const updateLayoutMetrics = useCallback(() => {
@@ -414,8 +441,8 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
       trackTopRef.current = 0;
     }
     viewportHeightRef.current = currentInnerHeight;
-    computeScrollProgress();
-  }, [computeScrollProgress]);
+    updateOnScroll();
+  }, [updateOnScroll]);
 
   // RAF-coalesced resize handler to avoid layout thrashing during dynamic address bar changes
   const handleResize = useCallback(() => {
@@ -430,7 +457,14 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
   useEffect(() => {
     updateLayoutMetrics();
 
-    // IntersectionObserver to pause loop when Hero is completely off-screen
+    const video = videoRef.current;
+    if (video) {
+      if (video.readyState >= 1 && !isNaN(video.duration) && isFinite(video.duration) && video.duration > 0) {
+        videoDurationRef.current = video.duration;
+      }
+    }
+
+    // IntersectionObserver to pause video playback and RAF processing when Hero is completely off-screen
     const track = heroTrackRef.current;
     let observer: IntersectionObserver | null = null;
     if (track && 'IntersectionObserver' in window) {
@@ -438,14 +472,21 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
         (entries) => {
           const entry = entries[0];
           isHeroVisibleRef.current = entry.isIntersecting;
+          const currentVideo = videoRef.current;
           if (entry.isIntersecting) {
-            startAnimationLoop();
+            updateOnScroll();
           } else {
-            if (rafIdRef.current !== null) {
-              cancelAnimationFrame(rafIdRef.current);
-              rafIdRef.current = null;
+            if (currentVideo && !currentVideo.paused) {
+              currentVideo.pause();
             }
-            isLoopRunningRef.current = false;
+            if (scrollStopTimerRef.current !== null) {
+              clearTimeout(scrollStopTimerRef.current);
+              scrollStopTimerRef.current = null;
+            }
+            if (decelerationRafRef.current !== null) {
+              cancelAnimationFrame(decelerationRafRef.current);
+              decelerationRafRef.current = null;
+            }
           }
         },
         { rootMargin: '100px 0px 100px 0px' }
@@ -453,34 +494,35 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
       observer.observe(track);
     }
 
-    // Visibility change listener (pauses RAF when browser tab is inactive)
+    // Visibility change listener (pauses playback and RAF when browser tab is inactive)
     const handleVisibilityChange = () => {
+      const currentVideo = videoRef.current;
       if (document.hidden) {
         isHeroVisibleRef.current = false;
-        if (rafIdRef.current !== null) {
-          cancelAnimationFrame(rafIdRef.current);
-          rafIdRef.current = null;
+        if (currentVideo && !currentVideo.paused) {
+          currentVideo.pause();
         }
-        isLoopRunningRef.current = false;
+        if (scrollStopTimerRef.current !== null) {
+          clearTimeout(scrollStopTimerRef.current);
+          scrollStopTimerRef.current = null;
+        }
+        if (decelerationRafRef.current !== null) {
+          cancelAnimationFrame(decelerationRafRef.current);
+          decelerationRafRef.current = null;
+        }
+        if (scrollRafIdRef.current !== null) {
+          cancelAnimationFrame(scrollRafIdRef.current);
+          scrollRafIdRef.current = null;
+        }
       } else {
         isHeroVisibleRef.current = true;
         updateLayoutMetrics();
-        startAnimationLoop();
       }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', handleResize, { passive: true });
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Initial video setup
-    const video = videoRef.current;
-    if (video) {
-      video.pause();
-      if (video.readyState >= 1 && !isNaN(video.duration) && isFinite(video.duration) && video.duration > 0) {
-        videoDurationRef.current = video.duration;
-      }
-    }
 
     // Set initial layout values
     applyVisuals(0);
@@ -490,6 +532,14 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (observer) observer.disconnect();
+      if (scrollStopTimerRef.current !== null) {
+        clearTimeout(scrollStopTimerRef.current);
+        scrollStopTimerRef.current = null;
+      }
+      if (decelerationRafRef.current !== null) {
+        cancelAnimationFrame(decelerationRafRef.current);
+        decelerationRafRef.current = null;
+      }
       if (scrollRafIdRef.current !== null) {
         cancelAnimationFrame(scrollRafIdRef.current);
         scrollRafIdRef.current = null;
@@ -498,12 +548,8 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
         cancelAnimationFrame(resizeRafIdRef.current);
         resizeRafIdRef.current = null;
       }
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
     };
-  }, [applyVisuals, handleResize, handleScroll, startAnimationLoop, updateLayoutMetrics]);
+  }, [applyVisuals, handleResize, handleScroll, updateLayoutMetrics, updateOnScroll]);
 
   return (
     <section
@@ -512,48 +558,35 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
       className="relative w-full h-[320vh] bg-[#070707]"
     >
       {/* Pinned Sticky Full-Screen Viewport Container */}
-      <div className="sticky top-0 h-screen w-full overflow-hidden">
-        {/* Background Video — Controlled purely by vertical scroll position */}
-        <video
-          ref={videoRef}
-          src={videoSrc}
-          onError={() => {
-            isSeekingRef.current = false;
-            pendingTimeRef.current = null;
-            if (videoSrc !== fallbackVideo) {
-              setVideoSrc(fallbackVideo);
-            }
-          }}
-          onSeeking={() => {
-            isSeekingRef.current = true;
-          }}
-          muted
-          playsInline
-          disablePictureInPicture
-          disableRemotePlayback
-          preload="auto"
-          onSeeked={handleSeeked}
-          onLoadedMetadata={(e) => {
-            const video = e.currentTarget;
-            video.pause();
-            if (!isNaN(video.duration) && isFinite(video.duration) && video.duration > 0) {
-              videoDurationRef.current = video.duration;
-            }
-            startAnimationLoop();
-          }}
-          onCanPlay={(e) => {
-            const video = e.currentTarget;
-            video.pause();
-            if (!isNaN(video.duration) && isFinite(video.duration) && video.duration > 0) {
-              videoDurationRef.current = video.duration;
-            }
-            startAnimationLoop();
-          }}
-          className="absolute inset-0 h-full w-full object-cover pointer-events-none select-none opacity-85"
-          style={{
-            objectPosition: '70% center',
-          }}
-        />
+      <div className="sticky top-0 h-screen w-full overflow-hidden isolate">
+        {/* Background Video Layer — Kinetic scroll-triggered playback with GPU parallax */}
+        <div
+          ref={videoParallaxRef}
+          className="absolute -top-[7%] inset-x-0 h-[114%] w-full pointer-events-none select-none will-change-transform"
+          style={{ transform: 'translate3d(0, 0px, 0)' }}
+        >
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            loop
+            muted
+            playsInline
+            disablePictureInPicture
+            disableRemotePlayback
+            preload="auto"
+            onError={() => {
+              if (videoSrc !== fallbackVideo) {
+                setVideoSrc(fallbackVideo);
+              }
+            }}
+            onLoadedMetadata={(e) => handleVideoReady(e.currentTarget)}
+            onCanPlay={(e) => handleVideoReady(e.currentTarget)}
+            className="absolute inset-0 h-full w-full object-cover pointer-events-none select-none opacity-85"
+            style={{
+              objectPosition: '70% center',
+            }}
+          />
+        </div>
 
         {/* Cinematic Scrims for Flawless Text Readability without GPU-heavy blur */}
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-[#070707] via-[#070707]/60 to-transparent" />
