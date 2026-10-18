@@ -451,6 +451,19 @@ app.post('/api/admin/login', (req: Request, res: Response) => {
 });
 
 /**
+ * IT Super Admin Endpoint (Exclusive to diavlo3444@gmail.com verified in public.admins)
+ */
+app.all('/api/super-admin*', async (req: Request, res: Response) => {
+  try {
+    const { default: handler } = await import('./api/super-admin.ts');
+    await handler(req, res);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Internal Server Error';
+    res.status(500).json({ error: msg });
+  }
+});
+
+/**
  * Organizer Admin Data Retrieval Endpoint (Requires valid Bearer token)
  */
 app.get('/api/admin/data', (req: Request, res: Response) => {

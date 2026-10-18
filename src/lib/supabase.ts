@@ -13,8 +13,13 @@ if (rawUrl && !rawUrl.startsWith('https://') && /^[a-z0-9-]+$/.test(rawUrl)) {
 } else if ((!rawUrl || !rawUrl.startsWith('https://')) && rawKey && rawKey.startsWith('eyJ')) {
   try {
     const part = rawKey.split('.')[1];
-    const decoded = typeof atob === 'function' ? atob(part) : Buffer.from(part, 'base64').toString('utf-8');
-    const payload = JSON.parse(decoded);
+    const decoded =
+      typeof atob === 'function'
+        ? atob(part)
+        : typeof (globalThis as unknown as { Buffer?: { from: (s: string, e: string) => { toString: (e: string) => string } } }).Buffer !== 'undefined'
+          ? (globalThis as unknown as { Buffer: { from: (s: string, e: string) => { toString: (e: string) => string } } }).Buffer.from(part, 'base64').toString('utf-8')
+          : '';
+    const payload = decoded ? JSON.parse(decoded) : null;
     if (payload?.ref) {
       rawUrl = `https://${payload.ref}.supabase.co`;
     }

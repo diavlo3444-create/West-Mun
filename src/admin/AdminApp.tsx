@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Layers,
   ChevronRight,
+  ShieldCheck,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '../lib/supabase';
@@ -25,6 +26,7 @@ import { DashboardOverview } from './DashboardOverview';
 import { RegistrationsManager } from './RegistrationsManager';
 import { TeamManagement } from './TeamManagement';
 import { StatisticsReports } from './StatisticsReports';
+import { SuperAdminManager, SUPER_ADMIN_EMAIL } from './SuperAdminManager';
 import { btnGold, cardCls, inputCls, labelCls, type Row } from './ui';
 
 const IDLE_MS = 30 * 60 * 1000; // Sign out after 30 minutes of inactivity
@@ -34,6 +36,7 @@ export type NavigationPage =
   | 'registrations'
   | 'teams'
   | 'reports'
+  | 'super-admin'
   | 'messages'
   | 'settings'
   | `section:${string}`;
@@ -481,6 +484,16 @@ export default function AdminApp() {
               </nav>
             </div>
 
+            {/* IT Super Administration */}
+            <div>
+              <span className="block text-[10px] font-mono uppercase tracking-widest text-[#d4af37] mb-2 px-3">
+                Security & Systems
+              </span>
+              <nav className="space-y-1">
+                {navItem('super-admin', 'IT Super Admin', <ShieldCheck className="w-4 h-4 text-[#d4af37]" />)}
+              </nav>
+            </div>
+
             {/* Inquiries & Settings */}
             <div>
               <span className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2 px-3">
@@ -545,6 +558,17 @@ export default function AdminApp() {
               delegates={delegates}
               teamRegistrations={teamRegistrations}
               settings={settings}
+            />
+          )}
+
+          {page === 'super-admin' && (
+            <SuperAdminManager
+              session={session}
+              isSuperAdmin={Boolean(
+                isAdmin &&
+                  session?.user &&
+                  session.user.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()
+              )}
             />
           )}
 

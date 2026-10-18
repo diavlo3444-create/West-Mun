@@ -214,3 +214,167 @@ export function isDepartmentKey(val: unknown): val is DepartmentKey {
 export function isSectionKey(val: unknown): val is SectionKey {
   return val === 'male' || val === 'female';
 }
+
+export interface HeadAssignment {
+  department: DepartmentKey;
+  section?: SectionKey | null;
+  headName?: string | null;
+  roleTitle?: string | null;
+}
+
+export type HeadLookupResult =
+  | { status: 'success'; assignment: HeadAssignment }
+  | { status: 'not_found' }
+  | { status: 'permission_denied'; code?: string; message: string }
+  | { status: 'network_error'; message: string }
+  | { status: 'invalid_assignment'; message: string };
+
+/**
+ * Generates the canonical URL for a department dashboard.
+ */
+export function getDepartmentDashboardUrl(
+  department: DepartmentKey,
+  section?: SectionKey | null
+): string {
+  if (isGenderSeparated(department) && section) {
+    return `/head/${department}/${section}`;
+  }
+  return `/head/${department}`;
+}
+
+/**
+ * Look up verified department assignment for authenticated user UID.
+ * Queries public.department_heads using `user_id = session.user.id`.
+ * Selects only the real database columns: `department, section`.
+ * Distinguishes between success, not found, permission denied (RLS), and network errors.
+ */
+export async function lookupHeadAssignment(userId: string): Promise<HeadLookupResult> {
+  const { supabase, supabaseConfigured } = await import('../lib/supabase');
+  if (!supabaseConfigured || !supabase) {
+    return {
+      status: 'network_error',
+      message: 'Database connection is not configured.',
+    };
+  }
+
+  try {
+    // Query public.department_heads using `user_id = session.user.id`
+    // Selects only the actual existing columns: department, section
+    const { data, error } = await supabase
+      .from('department_heads')
+      .select('department, section')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      // Safe diagnostic logging (no passwords, tokens, or personal info)
+      console.error('[Head Authorization] Query failed:', {
+        code: error.code,
+        message: error.message,
+      });
+
+      // Distinguish RLS / permission denial
+      const isPermission =
+        error.code === '42501' ||
+        error.code === 'PGRST301' ||
+        error.message?.toLowerCase().includes('permission') ||
+        error.message?.toLowerCase().includes('policy') ||
+        error.message?.toLowerCase().includes('row-level security');
+
+      if (isPermission) {
+        return {
+          status: 'permission_denied',
+          code: error.code,
+          message: error.message || 'Row Level Security policy blocked reading department_heads.',
+        };
+      }
+
+      // Distinguish network / connection errors
+      const isNetwork =
+        error.message?.toLowerCase().includes('failed to fetch') ||
+        error.message?.toLowerCase().includes('network') ||
+        error.message?.toLowerCase().includes('timeout');
+
+      if (isNetwork) {
+        return {
+          status: 'network_error',
+          message: error.message || 'Network connection failed.',
+        };
+      }
+
+      return {
+        status: 'permission_denied',
+        code: error.code,
+        message: error.message || 'Database error occurred during authorization lookup.',
+      };
+    }
+
+    // Query ran cleanly: check if an assignment row exists
+    if (!data) {
+      return { status: 'not_found' };
+    }
+
+    // Validate department
+    let deptStr = String(data.department || '').trim().toLowerCase();
+    if (deptStr === 'media') deptStr = 'media_press';
+
+    if (!isDepartmentKey(deptStr)) {
+      return {
+        status: 'invalid_assignment',
+        message: `Unknown department "${data.department}" assigned in database.`,
+      };
+    }
+
+    const dept = deptStr as DepartmentKey;
+
+    // Validate section for gender-separated departments
+    let section: SectionKey | null = null;
+    if (isGenderSeparated(dept)) {
+      const rawSec = data.section ? String(data.section).trim().toLowerCase() : '';
+      if (rawSec !== 'male' && rawSec !== 'female') {
+        return {
+          status: 'invalid_assignment',
+          message: `Department "${dept}" requires division to be "male" or "female". Found "${data.section || 'null'}".`,
+        };
+      }
+      section = rawSec as SectionKey;
+    }
+
+    // Associate head name and role title from official roster
+    const rosterHead = AUTHORIZED_HEADS.find((h) => {
+      if (h.department !== dept) return false;
+      if (isGenderSeparated(dept)) {
+        return h.section === section;
+      }
+      return true;
+    });
+
+    return {
+      status: 'success',
+      assignment: {
+        department: dept,
+        section,
+        headName: rosterHead?.name || null,
+        roleTitle: rosterHead?.roleTitle || null,
+      },
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown exception during authorization';
+    console.error('[Head Authorization] Unexpected lookup exception:', msg);
+    return {
+      status: 'network_error',
+      message: msg,
+    };
+  }
+}
+
+/**
+ * Backward-compatible helper returning HeadAssignment | null
+ */
+export async function fetchHeadAssignment(userId: string): Promise<HeadAssignment | null> {
+  const result = await lookupHeadAssignment(userId);
+  if (result.status === 'success') {
+    return result.assignment;
+  }
+  return null;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   Shield,
   Loader2,
@@ -6,21 +6,15 @@ import {
   KeyRound,
   AlertCircle,
 } from 'lucide-react';
-import { supabase, supabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import {
-  isDepartmentKey,
-  isSectionKey,
-  isGenderSeparated,
-  type DepartmentKey,
-  type SectionKey,
+  fetchHeadAssignment,
+  getDepartmentDashboardUrl,
+  type HeadAssignment,
 } from './departments';
 import { AccessDenied } from './AccessDenied';
 
-export interface HeadAssignment {
-  department: DepartmentKey;
-  section?: SectionKey | null;
-  headName?: string | null;
-}
+export { type HeadAssignment };
 
 export interface HeadLoginProps {
   onSuccess?: (assignment: HeadAssignment) => void;
@@ -31,7 +25,6 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState(authError || '');
   const [accessDeniedInfo, setAccessDeniedInfo] = useState<{
     email?: string;
@@ -39,127 +32,19 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
   } | null>(null);
 
   /**
-   * Look up user ID in public.department_heads.
-   * Reads department, section ('male' | 'female' | null), and optional head_name.
-   * Supports both 'id' and 'user_id' schemas.
-   */
-  const lookupAssignment = useCallback(async (userId: string): Promise<HeadAssignment | null> => {
-    if (!supabase) return null;
-
-    try {
-      // 1. Try lookup by 'id'
-      const { data: recordById, error: errById } = await supabase
-        .from('department_heads')
-        .select('department, section, head_name, active')
-        .eq('id', userId)
-        .maybeSingle();
-
-      let record = !errById && recordById ? recordById : null;
-
-      // 2. Try lookup by 'user_id' as fallback
-      if (!record) {
-        const { data: recordByUserId, error: errByUserId } = await supabase
-          .from('department_heads')
-          .select('department, section, head_name, active')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        if (!errByUserId && recordByUserId) {
-          record = recordByUserId;
-        }
-      }
-
-      if (record && record.active !== false && isDepartmentKey(record.department)) {
-        const dept = record.department as DepartmentKey;
-        const rawSec = record.section;
-        const section: SectionKey | null = isSectionKey(rawSec) ? rawSec : null;
-
-        // If department requires gender section but assignment has none, or vice-versa, handle strictly
-        if (isGenderSeparated(dept) && !section) {
-          console.warn(`Department ${dept} requires a male or female section assignment.`);
-        }
-
-        return {
-          department: dept,
-          section,
-          headName: record.head_name || null,
-        };
-      }
-    } catch (err) {
-      console.error('Error querying department_heads:', err);
-    }
-
-    return null;
-  }, []);
-
-  /**
    * Redirect user to their specific department and section dashboard
    */
-  const navigateToDashboard = useCallback(
-    (assignment: HeadAssignment) => {
-      if (onSuccess) {
-        onSuccess(assignment);
-        return;
-      }
+  const navigateToDashboard = (assignment: HeadAssignment) => {
+    if (onSuccess) {
+      onSuccess(assignment);
+      return;
+    }
 
-      const targetUrl = assignment.section
-        ? `/head/${assignment.department}/${assignment.section}`
-        : `/head/${assignment.department}`;
-
-      if (window.location.pathname !== targetUrl) {
-        window.location.assign(targetUrl);
-      }
-    },
-    [onSuccess]
-  );
-
-  /**
-   * Check for an existing verified Supabase session on initial mount
-   */
-  useEffect(() => {
-    let active = true;
-
-    const checkExistingSession = async () => {
-      if (!supabaseConfigured || !supabase) {
-        setCheckingSession(false);
-        return;
-      }
-
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (!active) return;
-
-        if (sessionError || !session?.user) {
-          setCheckingSession(false);
-          return;
-        }
-
-        const assignment = await lookupAssignment(session.user.id);
-        if (!active) return;
-
-        if (assignment) {
-          navigateToDashboard(assignment);
-        } else {
-          // Authenticated but not a registered department head
-          setAccessDeniedInfo({
-            email: session.user.email,
-            userId: session.user.id,
-          });
-          setCheckingSession(false);
-        }
-      } catch (e) {
-        console.error('Failed checking head session:', e);
-        if (active) setCheckingSession(false);
-      }
-    };
-
-    checkExistingSession();
-
-    return () => {
-      active = false;
-    };
-  }, [lookupAssignment, navigateToDashboard]);
+    const targetUrl = getDepartmentDashboardUrl(assignment.department, assignment.section);
+    if (window.location.pathname !== targetUrl) {
+      window.location.assign(targetUrl);
+    }
+  };
 
   /**
    * Handle credential submission
@@ -177,6 +62,7 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
     const cleanEmail = email.trim().toLowerCase();
 
     try {
+      // 1. Authenticate with Supabase Auth
       const { data, error: authErr } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password,
@@ -191,18 +77,23 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
         return;
       }
 
-      // Check role and section in public.department_heads
-      const assignment = await lookupAssignment(data.user.id);
+      // 2. Get the authenticated user's actual UID from the Supabase session
+      const authUserId = data.user.id;
+
+      // 3. Query public.department_heads for that exact user_id
+      const assignment = await fetchHeadAssignment(authUserId);
+
+      setBusy(false);
 
       if (assignment) {
-        setBusy(false);
+        // Valid assignment exists -> automatically redirect to their assigned department dashboard
         navigateToDashboard(assignment);
       } else {
-        // Authenticated user is not an authorized department head
-        setBusy(false);
+        // Authenticated in Supabase, but no active assignment in public.department_heads
+        // Display clear message that the account is not authorized and provide a sign-out option.
         setAccessDeniedInfo({
-          email: data.user.email,
-          userId: data.user.id,
+          email: data.user.email || cleanEmail,
+          userId: authUserId,
         });
       }
     } catch (err: unknown) {
@@ -225,7 +116,7 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
     setError('');
   };
 
-  // If user is authenticated but not authorized as a department head
+  // If user has authenticated via login but has no assignment in public.department_heads
   if (accessDeniedInfo) {
     return (
       <AccessDenied
@@ -233,23 +124,6 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
         userId={accessDeniedInfo.userId}
         onSignOut={handleSignOut}
       />
-    );
-  }
-
-  // Loading screen while checking initial session
-  if (checkingSession) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-[#070709] text-white">
-        <div className="flex flex-col items-center gap-4 p-8 bg-[#0c0c10] border border-[#d4af37]/30 rounded-sm shadow-2xl">
-          <div className="w-12 h-12 rounded-full bg-[#121217] border border-[#d4af37]/60 flex items-center justify-center text-[#d4af37] shadow-[0_0_20px_rgba(212,175,55,0.2)]">
-            <Shield className="w-6 h-6 animate-pulse" />
-          </div>
-          <div className="flex items-center gap-2 text-xs font-mono tracking-widest uppercase text-neutral-400">
-            <Loader2 className="w-4 h-4 animate-spin text-[#d4af37]" />
-            <span>Verifying Head Credentials…</span>
-          </div>
-        </div>
-      </div>
     );
   }
 

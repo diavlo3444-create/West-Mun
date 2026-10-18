@@ -1,25 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '../lib/supabase';
-import { HeadLogin, type HeadAssignment } from './HeadLogin';
+import { HeadLogin } from './HeadLogin';
 import { DepartmentDashboard } from './DepartmentDashboard';
 import { AccessDenied } from './AccessDenied';
 import {
-  isDepartmentKey,
-  isSectionKey,
   isGenderSeparated,
-  type DepartmentKey,
-  type SectionKey,
+  fetchHeadAssignment,
+  getDepartmentDashboardUrl,
+  type HeadAssignment,
 } from './departments';
 import { Loader2, Shield } from 'lucide-react';
+
+interface AccessDeniedState {
+  reason: 'no_assignment' | 'department_mismatch';
+  email?: string;
+  userId?: string;
+  requestedDept?: string;
+  requestedSec?: string;
+}
 
 export default function HeadPortal() {
   const [session, setSession] = useState<Session | null>(null);
   const [assignment, setAssignment] = useState<HeadAssignment | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [accessDenied, setAccessDenied] = useState(false);
+  const [accessDeniedState, setAccessDeniedState] = useState<AccessDeniedState | null>(null);
 
-  // Extract path: e.g. /head, /head/design, or /head/security/male
+  // Extract path: e.g. /head, /head/design, or /head/volunteers/female
   const currentPath =
     typeof window !== 'undefined'
       ? window.location.pathname.replace(/\/+$/, '') || '/head'
@@ -27,74 +33,22 @@ export default function HeadPortal() {
 
   const segments = currentPath.split('/').filter(Boolean);
   // segments[0] === 'head'
+  const isBaseHead = segments.length <= 1; // i.e. /head or /
   const requestedDeptSlug = segments[1];
   const requestedSectionSlug = segments[2];
 
-  /**
-   * Look up department and section assignment for authenticated user
-   */
-  const fetchUserAssignment = useCallback(
-    async (userId: string): Promise<HeadAssignment | null> => {
-      if (!supabase) return null;
-
-      try {
-        // 1. Try by id
-        const { data: recordById } = await supabase
-          .from('department_heads')
-          .select('department, section, head_name, active')
-          .eq('id', userId)
-          .maybeSingle();
-
-        let record = recordById;
-
-        // 2. Try by user_id
-        if (!record) {
-          const { data: recordByUserId } = await supabase
-            .from('department_heads')
-            .select('department, section, head_name, active')
-            .eq('user_id', userId)
-            .maybeSingle();
-          record = recordByUserId;
-        }
-
-        if (record && record.active !== false && isDepartmentKey(record.department)) {
-          const dept = record.department as DepartmentKey;
-          const rawSec = record.section;
-          const section: SectionKey | null = isSectionKey(rawSec) ? rawSec : null;
-
-          return {
-            department: dept,
-            section,
-            headName: record.head_name || null,
-          };
-        }
-      } catch (err) {
-        console.error('Failed to query department_heads:', err);
-      }
-
-      return null;
-    },
-    []
-  );
+  // For /head route, loading starts as false so login form displays immediately
+  const [loading, setLoading] = useState(!isBaseHead);
 
   /**
-   * Calculate the canonical URL for a given assignment
-   */
-  const getCanonicalUrl = useCallback((assign: HeadAssignment): string => {
-    if (assign.section) {
-      return `/head/${assign.department}/${assign.section}`;
-    }
-    return `/head/${assign.department}`;
-  }, []);
-
-  /**
-   * Verify session & permissions on mount
+   * Handle session verification and route authorization
    */
   useEffect(() => {
     let active = true;
 
-    const initAuth = async () => {
+    const verifyAccess = async () => {
       if (!supabaseConfigured || !supabase) {
+        if (!active) return;
         setLoading(false);
         return;
       }
@@ -106,98 +60,132 @@ export default function HeadPortal() {
 
         if (!active) return;
 
-        if (!s?.user) {
-          setSession(null);
-          setAssignment(null);
+        // -------------------------------------------------------------
+        // Case A: User is on the base Head Portal route (/head)
+        // -------------------------------------------------------------
+        if (isBaseHead) {
+          // If an authorized head is already signed in, auto-redirect to their dashboard
+          if (s?.user) {
+            const userAssign = await fetchHeadAssignment(s.user.id);
+            if (!active) return;
+
+            if (userAssign) {
+              setSession(s);
+              setAssignment(userAssign);
+              const targetUrl = getDepartmentDashboardUrl(userAssign.department, userAssign.section);
+              window.location.replace(targetUrl);
+              return;
+            }
+          }
+          // If signed out or unassigned: Display the login form immediately
+          // NEVER display "Access Denied" or require an assignment just to view /head
           setLoading(false);
           return;
         }
 
-        setSession(s);
-        const userAssign = await fetchUserAssignment(s.user.id);
+        // -------------------------------------------------------------
+        // Case B: User requested a protected department URL (/head/:dept)
+        // -------------------------------------------------------------
+        // 1. Signed-out visitor entering a department URL -> redirect to /head
+        if (!s?.user) {
+          window.location.replace('/head');
+          return;
+        }
 
+        setSession(s);
+
+        // 2. Query public.department_heads for the authenticated user's actual UID
+        const userAssign = await fetchHeadAssignment(s.user.id);
         if (!active) return;
 
-        if (userAssign) {
-          setAssignment(userAssign);
-          setAccessDenied(false);
-
-          const canonicalUrl = getCanonicalUrl(userAssign);
-
-          // If currently at /head, redirect to canonical dashboard
-          if (currentPath === '/head') {
-            window.location.replace(canonicalUrl);
-            return;
-          }
-
-          // Strict authorization: URL tampering prevention.
-          // If the user's assignment is security/male and they try to visit /head/security/female,
-          // or /head/volunteers, redirect immediately back to their canonical authorized URL.
-          const isDeptMismatch = requestedDeptSlug !== userAssign.department;
-          const isSectionMismatch =
-            isGenderSeparated(userAssign.department) &&
-            requestedSectionSlug !== userAssign.section;
-
-          if (isDeptMismatch || isSectionMismatch) {
-            window.location.replace(canonicalUrl);
-            return;
-          }
-        } else {
-          setAccessDenied(true);
+        // 3. Authenticated user has NO assignment in public.department_heads
+        if (!userAssign) {
+          setAccessDeniedState({
+            reason: 'no_assignment',
+            email: s.user.email,
+            userId: s.user.id,
+          });
+          setLoading(false);
+          return;
         }
+
+        setAssignment(userAssign);
+
+        // 4. Verify department and gender section match assignment
+        const deptMismatch = requestedDeptSlug !== userAssign.department;
+        const sectionMismatch =
+          isGenderSeparated(userAssign.department) &&
+          requestedSectionSlug !== userAssign.section;
+
+        // Missing section on gender-separated department -> redirect to exact section
+        if (
+          !deptMismatch &&
+          isGenderSeparated(userAssign.department) &&
+          !requestedSectionSlug &&
+          userAssign.section
+        ) {
+          window.location.replace(
+            getDepartmentDashboardUrl(userAssign.department, userAssign.section)
+          );
+          return;
+        }
+
+        // Mismatch: Deny access if head attempts to open another department or gender section
+        if (deptMismatch || sectionMismatch) {
+          setAccessDeniedState({
+            reason: 'department_mismatch',
+            email: s.user.email,
+            userId: s.user.id,
+            requestedDept: requestedDeptSlug,
+            requestedSec: requestedSectionSlug,
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Exact match authorized
+        setAccessDeniedState(null);
+        setLoading(false);
       } catch (err) {
-        console.error('Error during Head Portal initialization:', err);
-      } finally {
+        console.error('Error during Head Portal route verification:', err);
         if (active) setLoading(false);
       }
     };
 
-    initAuth();
-
-    // Listen to Supabase auth changes
-    const { data: authListener } =
-      supabase?.auth.onAuthStateChange(async (_event, newSession) => {
-        if (!active) return;
-        if (!newSession?.user) {
-          setSession(null);
-          setAssignment(null);
-          setAccessDenied(false);
-        } else {
-          setSession(newSession);
-          const assign = await fetchUserAssignment(newSession.user.id);
-          if (!active) return;
-          if (assign) {
-            setAssignment(assign);
-            setAccessDenied(false);
-          } else {
-            setAccessDenied(true);
-          }
-        }
-      }) || { data: { subscription: { unsubscribe: () => {} } } };
+    verifyAccess();
 
     return () => {
       active = false;
-      authListener?.subscription?.unsubscribe();
     };
-  }, [
-    currentPath,
-    requestedDeptSlug,
-    requestedSectionSlug,
-    fetchUserAssignment,
-    getCanonicalUrl,
-  ]);
+  }, [isBaseHead, requestedDeptSlug, requestedSectionSlug]);
 
-  const handleSignOut = async () => {
+  /**
+   * Complete sign-out helper
+   */
+  const handleSignOut = useCallback(async () => {
     if (supabase) {
       await supabase.auth.signOut();
     }
     setSession(null);
     setAssignment(null);
-    setAccessDenied(false);
+    setAccessDeniedState(null);
     window.location.assign('/head');
-  };
+  }, []);
 
-  // 1. Loading screen
+  // 1. When visiting /head: Always display Head Portal sign-in form immediately
+  if (isBaseHead) {
+    return (
+      <HeadLogin
+        onSuccess={(newAssign) => {
+          setAssignment(newAssign);
+          const target = getDepartmentDashboardUrl(newAssign.department, newAssign.section);
+          window.location.assign(target);
+        }}
+      />
+    );
+  }
+
+  // 2. Loading state for protected department routes
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-[#070709] text-white">
@@ -207,38 +195,54 @@ export default function HeadPortal() {
           </div>
           <div className="flex items-center gap-2 text-xs font-mono tracking-widest uppercase text-neutral-400">
             <Loader2 className="w-4 h-4 animate-spin text-[#d4af37]" />
-            <span>Loading Department Portal…</span>
+            <span>Verifying Department Authorization…</span>
           </div>
         </div>
       </div>
     );
   }
 
-  // 2. Access Denied (Authenticated in Supabase, but not authorized in public.department_heads)
-  if (accessDenied && session?.user) {
+  // 3. Access Denied (either unassigned account or department/section mismatch)
+  if (accessDeniedState) {
     return (
       <AccessDenied
-        email={session.user.email}
-        userId={session.user.id}
+        reason={accessDeniedState.reason}
+        email={accessDeniedState.email}
+        userId={accessDeniedState.userId}
+        authorizedDepartment={assignment?.department}
+        authorizedSection={assignment?.section}
+        requestedDepartment={accessDeniedState.requestedDept}
+        requestedSection={accessDeniedState.requestedSec}
+        onGoToAuthorizedDashboard={
+          assignment
+            ? () => {
+                const canonical = getDepartmentDashboardUrl(
+                  assignment.department,
+                  assignment.section
+                );
+                window.location.assign(canonical);
+              }
+            : undefined
+        }
         onSignOut={handleSignOut}
       />
     );
   }
 
-  // 3. Not logged in -> Show shared Head Login page
+  // 4. Not logged in on protected route -> fallback to HeadLogin
   if (!session || !assignment) {
     return (
       <HeadLogin
         onSuccess={(newAssign) => {
           setAssignment(newAssign);
-          const target = getCanonicalUrl(newAssign);
+          const target = getDepartmentDashboardUrl(newAssign.department, newAssign.section);
           window.location.assign(target);
         }}
       />
     );
   }
 
-  // 4. Authorized department head -> Render Department Dashboard with exact section
+  // 5. Authorized department head -> Render Department Dashboard
   return (
     <DepartmentDashboard
       department={assignment.department}
