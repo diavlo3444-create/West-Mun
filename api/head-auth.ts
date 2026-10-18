@@ -1,4 +1,4 @@
-import { HeadStore } from '../src/server/headStore';
+import { HeadStore } from '../src/server/headStore.ts';
 
 async function parseJsonBody(req: any): Promise<any> {
   if (req.body && typeof req.body === 'object') {

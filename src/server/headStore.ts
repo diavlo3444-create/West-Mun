@@ -250,6 +250,7 @@ export const HeadStore = {
   },
 
   create(params: {
+    id?: string;
     fullName: string;
     email: string;
     password: string;
@@ -274,7 +275,7 @@ export const HeadStore = {
     const now = new Date().toISOString();
 
     const newHead: HeadAccountRecord = {
-      id: crypto.randomUUID(),
+      id: params.id || crypto.randomUUID(),
       email: cleanEmail,
       head_name: cleanName,
       department: cleanDept,
@@ -532,7 +533,7 @@ export const HeadStore = {
 };
 
 // Periodically prune expired sessions
-setInterval(() => {
+const pruneTimer = setInterval(() => {
   const now = Date.now();
   for (const [token, session] of activeSessions.entries()) {
     if (session.expiresAt <= now) {
@@ -540,3 +541,4 @@ setInterval(() => {
     }
   }
 }, 15 * 60 * 1000);
+pruneTimer.unref();

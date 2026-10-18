@@ -19,6 +19,13 @@ export default defineConfig(() => {
               targetFilePath = path.resolve(process.cwd(), 'api/super-admin.ts');
             } else if (req.url.startsWith('/api/head-auth')) {
               targetFilePath = path.resolve(process.cwd(), 'api/head-auth.ts');
+            } else if (
+              req.url.startsWith('/api/admin') ||
+              req.url.startsWith('/api/contact') ||
+              req.url.startsWith('/api/register') ||
+              req.url.startsWith('/api/health')
+            ) {
+              targetFilePath = path.resolve(process.cwd(), 'api/local-routes.ts');
             }
 
             if (targetFilePath) {

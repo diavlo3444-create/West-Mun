@@ -5,7 +5,7 @@ import {
   handleUpdateHead,
   handleResetPassword,
   handleDeleteHead,
-} from '../src/server/superAdminHandler';
+} from '../src/server/superAdminHandler.ts';
 
 // Robust body parser for serverless Node/Vercel environments
 async function parseJsonBody(req: any): Promise<any> {

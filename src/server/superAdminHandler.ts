@@ -6,7 +6,7 @@ import {
   type DepartmentKey,
   type SectionKey,
   type HeadAccountRecord,
-} from './headStore';
+} from './headStore.ts';
 
 // Authorized IT Super Admin Email (strictly enforced on server)
 export const SUPER_ADMIN_EMAIL = 'diavlo3444@gmail.com';
