@@ -6,10 +6,12 @@ import {
   isGenderSeparated,
   getDepartmentDashboardUrl,
   getRoleTitle,
+  lookupHeadAssignment,
   type HeadAssignment,
   type DepartmentKey,
   type SectionKey,
 } from './departments';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 import { Loader2, Shield } from 'lucide-react';
 
 interface AccessDeniedState {
@@ -47,134 +49,127 @@ export default function HeadPortal() {
   const [loading, setLoading] = useState(!isBaseHead);
 
   /**
-   * Handle session verification and route authorization via /api/head-auth
+   * Handle session verification and route authorization via Supabase Auth & /api/head-auth
    */
   useEffect(() => {
     let active = true;
 
     const verifyAccess = async () => {
-      const token = typeof window !== 'undefined' ? sessionStorage.getItem('westmun_head_session') : null;
+      // 1. Check Supabase Auth Session first
+      let resolvedHead: any = null;
+      let resolvedAssignment: HeadAssignment | null = null;
 
-      // -------------------------------------------------------------
-      // Case A: User is on the base Head Portal route (/head)
-      // -------------------------------------------------------------
-      if (isBaseHead) {
-        if (!token) {
-          if (active) setLoading(false);
-          return;
+      if (supabase && supabaseConfigured) {
+        try {
+          const { data: supaSessionData } = await supabase.auth.getSession();
+          const supaUser = supaSessionData?.session?.user;
+          if (supaUser) {
+            const lookup = await lookupHeadAssignment(supaUser.id);
+            if (lookup.status === 'success' && lookup.assignment) {
+              resolvedAssignment = lookup.assignment;
+              resolvedHead = {
+                id: supaUser.id,
+                email: supaUser.email || '',
+                headName: lookup.assignment.headName || supaUser.user_metadata?.full_name || '',
+                department: lookup.assignment.department,
+                section: lookup.assignment.section,
+              };
+            }
+          }
+        } catch (err) {
+          console.warn('[Head Portal] Supabase session check error:', err);
         }
+      }
 
+      // 2. Fallback to /api/head-auth session token
+      const token = typeof window !== 'undefined' ? sessionStorage.getItem('westmun_head_session') : null;
+      if (!resolvedHead && token) {
         try {
           const resp = await fetch('/api/head-auth?action=session', {
             headers: { Authorization: `Bearer ${token}` },
           });
-
-          if (!active) return;
 
           if (resp.ok) {
             const data = await resp.json();
             if (data.authorized && data.head) {
               const dept = data.head.department as DepartmentKey;
               const sec = data.head.section as SectionKey | null;
-              const assign: HeadAssignment = {
+              resolvedAssignment = {
                 department: dept,
                 section: sec,
                 headName: data.head.headName || null,
                 roleTitle: getRoleTitle(dept, sec),
               };
-
-              setHeadUser(data.head);
-              setAssignment(assign);
-
-              const targetUrl = getDepartmentDashboardUrl(dept, sec);
-              window.location.replace(targetUrl);
-              return;
+              resolvedHead = data.head;
             }
           } else {
-            // Invalid/expired token
             sessionStorage.removeItem('westmun_head_session');
           }
         } catch (err) {
-          console.error('[Head Portal] Error verifying session:', err);
+          console.error('[Head Portal] Head session check error:', err);
+        }
+      }
+
+      if (!active) return;
+
+      // -------------------------------------------------------------
+      // Case A: User is on the base Head Portal route (/head)
+      // -------------------------------------------------------------
+      if (isBaseHead) {
+        if (!resolvedHead || !resolvedAssignment) {
+          if (active) setLoading(false);
+          return;
         }
 
-        if (active) setLoading(false);
+        setHeadUser(resolvedHead);
+        setAssignment(resolvedAssignment);
+        const targetUrl = getDepartmentDashboardUrl(resolvedAssignment.department, resolvedAssignment.section);
+        window.location.replace(targetUrl);
         return;
       }
 
       // -------------------------------------------------------------
       // Case B: User requested a protected department URL (/head/:dept)
       // -------------------------------------------------------------
-      if (!token) {
+      if (!resolvedHead || !resolvedAssignment) {
         window.location.replace('/head');
         return;
       }
 
-      try {
-        const resp = await fetch('/api/head-auth?action=session', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      const dept = resolvedAssignment.department;
+      const sec = resolvedAssignment.section;
 
-        if (!active) return;
+      setHeadUser(resolvedHead);
+      setAssignment(resolvedAssignment);
 
-        if (!resp.ok) {
-          sessionStorage.removeItem('westmun_head_session');
-          window.location.replace('/head');
-          return;
-        }
+      // Check department & section authorization
+      const deptMismatch = requestedDeptSlug !== dept;
+      const sectionMismatch =
+        isGenderSeparated(dept) &&
+        requestedSectionSlug !== sec;
 
-        const data = await resp.json();
-        if (!data.authorized || !data.head) {
-          sessionStorage.removeItem('westmun_head_session');
-          window.location.replace('/head');
-          return;
-        }
-
-        const dept = data.head.department as DepartmentKey;
-        const sec = data.head.section as SectionKey | null;
-
-        const assign: HeadAssignment = {
-          department: dept,
-          section: sec,
-          headName: data.head.headName || null,
-          roleTitle: getRoleTitle(dept, sec),
-        };
-
-        setHeadUser(data.head);
-        setAssignment(assign);
-
-        // Check department & section authorization
-        const deptMismatch = requestedDeptSlug !== dept;
-        const sectionMismatch =
-          isGenderSeparated(dept) &&
-          requestedSectionSlug !== sec;
-
-        // Missing section on gender-separated department -> redirect to exact section
-        if (!deptMismatch && isGenderSeparated(dept) && !requestedSectionSlug && sec) {
-          window.location.replace(getDepartmentDashboardUrl(dept, sec));
-          return;
-        }
-
-        // Mismatch: Deny access if head attempts to open another department or gender section
-        if (deptMismatch || sectionMismatch) {
-          setAccessDeniedState({
-            reason: 'department_mismatch',
-            email: data.head.email,
-            userId: data.head.id,
-            requestedDept: requestedDeptSlug,
-            requestedSec: requestedSectionSlug,
-          });
-          setLoading(false);
-          return;
-        }
-
-        // Exact match authorized
-        setAccessDeniedState(null);
-        setLoading(false);
-      } catch (err) {
-        console.error('[Head Portal] Error during route verification:', err);
-        if (active) setLoading(false);
+      // Missing section on gender-separated department -> redirect to exact section
+      if (!deptMismatch && isGenderSeparated(dept) && !requestedSectionSlug && sec) {
+        window.location.replace(getDepartmentDashboardUrl(dept, sec));
+        return;
       }
+
+      // Mismatch: Deny access if head attempts to open another department or gender section
+      if (deptMismatch || sectionMismatch) {
+        setAccessDeniedState({
+          reason: 'department_mismatch',
+          email: resolvedHead.email,
+          userId: resolvedHead.id,
+          requestedDept: requestedDeptSlug,
+          requestedSec: requestedSectionSlug,
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Exact match authorized
+      setAccessDeniedState(null);
+      setLoading(false);
     };
 
     verifyAccess();
@@ -188,6 +183,11 @@ export default function HeadPortal() {
    * Complete sign-out helper
    */
   const handleSignOut = useCallback(async () => {
+    if (supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+    }
     const token = typeof window !== 'undefined' ? sessionStorage.getItem('westmun_head_session') : null;
     if (token) {
       try {

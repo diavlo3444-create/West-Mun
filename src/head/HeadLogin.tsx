@@ -11,10 +11,12 @@ import {
 import {
   getDepartmentDashboardUrl,
   getRoleTitle,
+  lookupHeadAssignment,
   type HeadAssignment,
   type DepartmentKey,
   type SectionKey,
 } from './departments';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 import { AccessDenied } from './AccessDenied';
 
 export { type HeadAssignment };
@@ -34,20 +36,49 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
     userId?: string;
   } | null>(null);
 
-  // Invitation / Password Reset Link support via ?resetToken=...
+  // Invitation / Password Reset Link support via Supabase Auth or ?resetToken=...
   const [resetToken, setResetToken] = useState<string | null>(null);
+  const [isSupabaseRecovery, setIsSupabaseRecovery] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resettingPassword, setResettingPassword] = useState(false);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
 
   useEffect(() => {
+    // 1. Check for token in URL query params
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tokenParam = params.get('resetToken') || params.get('token');
       if (tokenParam) {
         setResetToken(tokenParam);
       }
+
+      // Check for Supabase Auth invitation or recovery links in hash or search
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (
+        hash.includes('type=invite') ||
+        hash.includes('type=recovery') ||
+        search.includes('type=invite') ||
+        search.includes('type=recovery')
+      ) {
+        setIsSupabaseRecovery(true);
+        setResetToken('supabase_auth_recovery');
+      }
+    }
+
+    // 2. Listen to Supabase Auth state changes for recovery events
+    if (supabase) {
+      const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsSupabaseRecovery(true);
+          setResetToken('supabase_auth_recovery');
+        }
+      });
+
+      return () => {
+        authListener?.subscription?.unsubscribe();
+      };
     }
   }, []);
 
@@ -67,7 +98,7 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
   };
 
   /**
-   * Handle credential submission via server-side /api/head-auth
+   * Handle credential submission via Supabase Auth with fallback to server-side /api/head-auth
    */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +107,39 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
 
     const cleanEmail = email.trim().toLowerCase();
 
+    // 1. Try Supabase Auth first if configured
+    if (supabase && supabaseConfigured) {
+      try {
+        const { data: supaData, error: supaErr } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+
+        if (!supaErr && supaData?.user) {
+          const lookup = await lookupHeadAssignment(supaData.user.id);
+          if (lookup.status === 'success' && lookup.assignment) {
+            setBusy(false);
+            navigateToDashboard(lookup.assignment);
+            return;
+          } else if (lookup.status === 'permission_denied') {
+            setBusy(false);
+            setError(lookup.message || 'Row Level Security policy blocked reading department assignment.');
+            return;
+          } else {
+            setBusy(false);
+            setAccessDeniedInfo({
+              email: cleanEmail,
+              userId: supaData.user.id,
+            });
+            return;
+          }
+        }
+      } catch {
+        // Fall back to head-auth endpoint below
+      }
+    }
+
+    // 2. Fallback to /api/head-auth endpoint
     try {
       const response = await fetch('/api/head-auth?action=login', {
         method: 'POST',
@@ -88,7 +152,13 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
         }),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { error: `Server error (${response.status})` };
+      }
       setBusy(false);
 
       if (!response.ok || !data.success || !data.token) {
@@ -122,7 +192,7 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
   };
 
   /**
-   * Handle Password Reset / Account Invitation Completion
+   * Handle Password Reset / Account Invitation Completion via Supabase Auth or token
    */
   const handleCompleteReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,6 +210,40 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
 
     setResettingPassword(true);
 
+    // 1. If this is a Supabase Auth invitation or recovery link
+    if (isSupabaseRecovery && supabase) {
+      try {
+        const { data: updateData, error: updateErr } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+
+        setResettingPassword(false);
+
+        if (updateErr) {
+          throw new Error(updateErr.message);
+        }
+
+        setResetSuccess('Password successfully configured in Supabase! You can now access your dashboard.');
+        setResetToken(null);
+        setIsSupabaseRecovery(false);
+
+        if (updateData?.user) {
+          const lookup = await lookupHeadAssignment(updateData.user.id);
+          if (lookup.status === 'success' && lookup.assignment) {
+            setTimeout(() => navigateToDashboard(lookup.assignment!), 1200);
+            return;
+          }
+        }
+        return;
+      } catch (supaErr: unknown) {
+        setResettingPassword(false);
+        const msg = supaErr instanceof Error ? supaErr.message : 'Failed to update password with Supabase Auth.';
+        setError(msg);
+        return;
+      }
+    }
+
+    // 2. Fallback to /api/head-auth token reset
     try {
       const response = await fetch('/api/head-auth?action=reset-password', {
         method: 'POST',
@@ -152,7 +256,13 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
         }),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { error: `Server error (${response.status})` };
+      }
       setResettingPassword(false);
 
       if (!response.ok || !data.success) {

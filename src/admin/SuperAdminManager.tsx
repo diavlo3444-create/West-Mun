@@ -116,30 +116,55 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
   const currentUserEmail = session?.user?.email?.toLowerCase().trim() || '';
   const isAuthorizedCaller = isSuperAdmin && currentUserEmail === SUPER_ADMIN_EMAIL.toLowerCase();
 
+  // Helper: Resilient fetch that never throws JSON parse syntax errors on server HTML/text errors
+  const safeJsonFetch = async (
+    url: string,
+    options?: RequestInit
+  ): Promise<{ ok: boolean; status: number; data: any }> => {
+    try {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = {
+          error: res.ok
+            ? 'Server returned non-JSON response.'
+            : `Server returned error (${res.status}): ${
+                text.length > 200 ? text.slice(0, 200) + '…' : text || 'Empty response'
+              }`,
+        };
+      }
+      return { ok: res.ok, status: res.status, data };
+    } catch (netErr: any) {
+      return {
+        ok: false,
+        status: 0,
+        data: {
+          error: `Network request failed: ${netErr?.message || 'Unable to communicate with server.'}`,
+        },
+      };
+    }
+  };
+
   // Load department heads list from authoritative server endpoint
   const loadHeads = useCallback(async () => {
     if (!isAuthorizedCaller || !session) return;
     setRefreshing(true);
 
     try {
-      const response = await fetch('/api/super-admin', {
+      const { ok, data } = await safeJsonFetch('/api/super-admin', {
         headers: {
           Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
           'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
         },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.heads) {
-          setHeads(data.heads);
-          setLoading(false);
-          setRefreshing(false);
-          return;
-        }
+      if (ok && data?.heads) {
+        setHeads(data.heads);
       } else {
-        const errJson = await response.json().catch(() => null);
-        console.error('Failed to load heads from server:', errJson?.error);
+        console.error('Failed to load heads from server:', data?.error);
       }
     } catch (err) {
       console.error('Failed to load department heads:', err);
@@ -184,7 +209,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
     const cleanPassword = isInvite ? '' : formPassword.trim();
 
     try {
-      const response = await fetch('/api/super-admin', {
+      const { ok, data: result } = await safeJsonFetch('/api/super-admin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -202,10 +227,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         }),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to create department head account.');
+      if (!ok) {
+        throw new Error(result?.error || 'Failed to create department head account.');
       }
 
       setFormSuccess(result.message || 'Department head account created successfully.');
@@ -255,7 +278,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
     const sec = isGenderSeparated(editDept) ? editSection : null;
 
     try {
-      const response = await fetch(`/api/super-admin?action=update&id=${headId}`, {
+      const { ok, data: result } = await safeJsonFetch(`/api/super-admin?action=update&id=${headId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -270,10 +293,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         }),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update department head assignment.');
+      if (!ok) {
+        throw new Error(result?.error || 'Failed to update department head assignment.');
       }
 
       setEditingHead(null);
@@ -293,7 +314,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
     const newStatus = !head.active;
 
     try {
-      const response = await fetch(`/api/super-admin?action=update&id=${headId}`, {
+      const { ok, data: result } = await safeJsonFetch(`/api/super-admin?action=update&id=${headId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -305,9 +326,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         }),
       });
 
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || 'Failed to change account status.');
+      if (!ok) {
+        throw new Error(result?.error || 'Failed to change account status.');
       }
 
       await loadHeads();
@@ -326,7 +346,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
     const headId = resetTarget.id || resetTarget.user_id;
 
     try {
-      const response = await fetch(`/api/super-admin?action=reset-password&id=${headId}`, {
+      const { ok, data: result } = await safeJsonFetch(`/api/super-admin?action=reset-password&id=${headId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -340,10 +360,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         }),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Password reset failed.');
+      if (!ok) {
+        throw new Error(result?.error || 'Password reset failed.');
       }
 
       setResetResult({
@@ -368,7 +386,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
     const headId = deletingHead.id || deletingHead.user_id;
 
     try {
-      const response = await fetch(`/api/super-admin?action=delete&id=${headId}`, {
+      const { ok, data: result } = await safeJsonFetch(`/api/super-admin?action=delete&id=${headId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
@@ -376,10 +394,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         },
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to remove head assignment.');
+      if (!ok) {
+        throw new Error(result?.error || 'Failed to remove head assignment.');
       }
 
       setDeletingHead(null);
