@@ -15,7 +15,7 @@
 1. **Supabase:** create a project. SQL Editor → New query → run, in this order: `supabase/schema.sql`, `supabase/seed.sql`.
 2. **Authentication → Users → Add user** (email + password, tick *Auto Confirm User*). Then put that email into `supabase/make_admin.sql` and run it.
 3. **Authentication → Sign In / Providers:** turn **off** "Allow new users to sign up". Turn on MFA if your plan offers it.
-4. **Vercel → Project → Settings → Environment Variables:** `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Supabase → Project Settings → API; use the **anon** key, never `service_role`). Redeploy.
+4. **Vercel → Project → Settings → Environment Variables:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (public, used by the browser) and `SUPABASE_SERVICE_ROLE_KEY` (server-only, used by the IT Super Admin API to create head accounts). Use the **anon** key for `VITE_SUPABASE_ANON_KEY`, never `service_role`. Then redeploy and run `supabase/migration_department_heads_repair.sql` if `department_heads` predates this change.
 5. Open `https://YOUR-SITE/admin`, sign in, go to **Settings** and fill in: organiser name, governing country, contact email, legal version.
 6. **Have a lawyer read `/terms` and `/privacy`** before real registrations. Paste the final text into Settings → Legal (no redeploy needed) and change the legal version date.
 
@@ -33,15 +33,17 @@ Local development: copy `.env.example` to `.env.local`, fill both values, `npm i
 - **Team Management Migration:** If you are using team registrations for the first time, run `supabase/migration_team_management.sql` in Supabase > SQL Editor > New query.
 - Add/remove organisers: add a user in Supabase, run `make_admin.sql` with their email. Remove: `delete from public.admins where lower(email)=lower('their@email');`
 - **IT Super Admin Dashboard (`/admin` → IT Super Admin):**
-  - Dedicated master console strictly reserved for `diavlo3444@gmail.com`.
-  - Self-contained server-side Head Account Management without requiring Supabase Auth migrations or `SUPABASE_SERVICE_ROLE_KEY`.
-  - Enables direct provisioning of Department Head accounts with secure salted scrypt password hashing, department and division assignment (`male`/`female` strictly enforced for Media & Press, Security, and Volunteers), instant portal access suspension/reactivation, role editing, and one-click password reset invitation generation.
-  - Pre-seeded with the 17 official department heads from the official roster.
-  - Head Portal (`/head`) authenticates directly with `/api/head-auth`, issuing 256-bit cryptographically secure session tokens and routing authorized heads to their respective dashboards while strictly isolating departments.
+  - Dedicated console strictly reserved for `diavlo3444@gmail.com`, verified server-side from the Supabase Auth access token and a row in `public.admins`.
+  - Head Account Management uses the server-only `SUPABASE_SERVICE_ROLE_KEY` to create/invite real Supabase Auth users and write `public.department_heads`. It never runs in the browser.
+  - Department and division assignment (`male`/`female` strictly enforced for Media & Press, Security, and Volunteers), instant portal suspension/reactivation, role editing, and password reset/invitation links.
+  - If the Auth user is created but the database assignment fails, the real error and the Auth UID are shown. "Retry department assignment" reuses that UID; it never creates a second Auth user.
+  - Head Portal (`/head`) authenticates with genuine Supabase Auth passwords. `.env.local` / Vercel values: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and the server-only `SUPABASE_SERVICE_ROLE_KEY`. The old file-backed `HeadStore` and `/api/head-auth` login are local-development fallbacks only and are disabled on Vercel.
+  - If you already ran an older `department_heads` migration, run `supabase/migration_department_heads_repair.sql` once. It only adds missing columns, backfills `user_id`, and keeps RLS enabled.
 
 ## Weak points you still own
 
 - **Public sign-ups off** (step 3). Strong unique password + MFA: there is no login rate limit beyond Supabase's own.
+- **Admin identity is server-verified** on every request: a Supabase access token is checked with Supabase Auth and the caller must exist in `public.admins`. No email header, localStorage flag or password-shaped bearer token is accepted. The only super admin is the address in `SUPER_ADMIN_EMAIL` (server code).
 - **Spam:** forms have a honeypot, DB length limits and a flood cap (20 registrations / 10 messages per minute site-wide). If spam appears, add Cloudflare Turnstile.
 - **Deletes are permanent.** No audit log. Download the CSV regularly. Supabase free plan has no downloadable backups and pauses after about a week of inactivity.
 - **Settings and published content are public.** Never put secrets or private notes there. Internal notes on applications/messages are private.

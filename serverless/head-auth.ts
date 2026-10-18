@@ -96,6 +96,16 @@ export default async function handler(req: any, res: any) {
 
     // 2. Department Head Login endpoint
     if (action === 'login' || (method === 'POST' && action === 'login')) {
+      // Hosted deployments authenticate department heads exclusively through
+      // Supabase Auth. The file-backed store is a local-development fallback.
+      if (process.env.VERCEL || process.env.VERCEL_ENV) {
+        return res.status(503).json({
+          success: false,
+          code: 'USE_SUPABASE_AUTH',
+          error: 'Department head sign-in is handled by Supabase Auth on this deployment.',
+        });
+      }
+
       const body = await parseJsonBody(req);
       const { email, password } = body || {};
 
@@ -124,6 +134,14 @@ export default async function handler(req: any, res: any) {
 
     // 4. Complete Password Reset via Token
     if (action === 'reset-password' || (method === 'POST' && action === 'reset-password')) {
+      if (process.env.VERCEL || process.env.VERCEL_ENV) {
+        return res.status(503).json({
+          success: false,
+          code: 'USE_SUPABASE_AUTH',
+          error: 'Password setup is handled by Supabase Auth invitation links on this deployment.',
+        });
+      }
+
       const body = await parseJsonBody(req);
       const { token, newPassword } = body || {};
 

@@ -19,133 +19,121 @@ function assert(condition: boolean, testName: string, failureDetails?: string) {
   }
 }
 
-// 1. Audit .env.example
-const envExamplePath = path.resolve(process.cwd(), '.env.example');
-const envExampleContent = fs.existsSync(envExamplePath) ? fs.readFileSync(envExamplePath, 'utf8') : '';
-
-assert(
-  !envExampleContent.includes('service_role') &&
-  !envExampleContent.includes('secret') &&
-  !envExampleContent.includes('eyJh') &&
-  !envExampleContent.includes('SUPABASE'),
-  'Security: .env.example contains no secret keys, JWT tokens, or external DB credentials'
-);
-
-assert(
-  envExampleContent.includes('ADMIN_PASSWORD='),
-  'Configuration: .env.example documents ADMIN_PASSWORD without default secret values'
-);
-
-// 2. Audit .gitignore
-const gitignorePath = path.resolve(process.cwd(), '.gitignore');
-const gitignoreContent = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf8') : '';
-
-assert(
-  gitignoreContent.includes('.env*') &&
-  gitignoreContent.includes('!.env.example') &&
-  gitignoreContent.includes('data/'),
-  'Git Hygiene: .gitignore excludes all .env files and local data/ store while preserving .env.example'
-);
-
-// 3. Audit Client Code for Secret Leakage and External DB Dependencies
-const clientFiles = [
-  'src/lib/api.ts',
-  'src/components/RegistrationModal.tsx',
-  'src/components/ContactSection.tsx',
-  'src/components/AdminPortalModal.tsx',
-  'src/App.tsx',
-];
-
-let secretLeakDetected = false;
-let supabaseDetected = false;
-
-for (const file of clientFiles) {
+function read(file: string): string {
   const fullPath = path.resolve(process.cwd(), file);
-  if (fs.existsSync(fullPath)) {
-    const content = fs.readFileSync(fullPath, 'utf8');
-    if (
-      content.includes('service_role') ||
-      content.includes('process.env.ADMIN_PASSWORD') ||
-      content.includes('westmun2027secretariat')
-    ) {
-      secretLeakDetected = true;
-    }
-    if (content.includes('@supabase') || content.includes('supabase.from')) {
-      supabaseDetected = true;
-    }
-  }
+  return fs.existsSync(fullPath) ? fs.readFileSync(fullPath, 'utf8') : '';
 }
 
+// 1. Environment documentation and secret hygiene
+const envExample = read('.env.example');
 assert(
-  !secretLeakDetected,
-  'Secret Protection: Browser client bundle contains no passwords, private credentials, or secrets'
+  envExample.includes('VITE_SUPABASE_URL=') &&
+    envExample.includes('VITE_SUPABASE_ANON_KEY=') &&
+    envExample.includes('SUPABASE_SERVICE_ROLE_KEY='),
+  'Configuration: .env.example documents the public anon key and the server-only service role key'
+);
+assert(
+  !/eyJ[A-Za-z0-9_-]{20,}/.test(envExample) && !/sb_secret_[A-Za-z0-9_-]{10,}/.test(envExample),
+  'Secret Protection: .env.example contains no JWT/token values'
 );
 
+const gitignore = read('.gitignore');
 assert(
-  !supabaseDetected,
-  'Architecture: Codebase operates without Supabase or external database dependencies'
+  gitignore.includes('.env*') && gitignore.includes('!.env.example') && gitignore.includes('data/'),
+  'Git Hygiene: .gitignore excludes .env files and local data while preserving .env.example'
 );
 
-// 4. Audit Server Security Implementation (server.ts)
-const serverPath = path.resolve(process.cwd(), 'server.ts');
-const serverContent = fs.existsSync(serverPath) ? fs.readFileSync(serverPath, 'utf8') : '';
+// 2. Client bundle must never reference the service-role key or trust headers
+const clientFiles = [
+  'src/admin/AdminApp.tsx',
+  'src/admin/SuperAdminManager.tsx',
+  'src/head/HeadLogin.tsx',
+  'src/head/departments.ts',
+  'src/lib/supabase.ts',
+];
+const clientSource = clientFiles.map(read).join('\n');
 
 assert(
-  serverContent.includes('X-Content-Type-Options') &&
-  serverContent.includes('Content-Security-Policy') &&
-  serverContent.includes('Referrer-Policy') &&
-  serverContent.includes('Permissions-Policy'),
-  'Security Headers: Server enforces CSP, X-Content-Type-Options, Referrer-Policy, and Permissions-Policy'
+  !clientSource.includes('SERVICE_ROLE_KEY') &&
+    !/process\.env\.SUPABASE_(SERVICE|SECRET)/.test(clientSource),
+  'Secret Protection: Browser sources never read the service-role key'
 );
-
 assert(
-  serverContent.includes('checkRateLimit') &&
-  serverContent.includes('429'),
-  'Abuse Prevention: Server implements in-memory rate limiting against spam and brute-force attacks'
+  !clientSource.includes('x-admin-email') && !clientSource.includes('x-user-email'),
+  'Identity: Browser code does not send self-declared admin identity headers'
 );
-
 assert(
-  serverContent.includes('timingSafeEqual'),
-  'Authentication Hardening: Constant-time string comparison protects organizer authentication from timing attacks'
+  !clientSource.includes('masterkey') &&
+    !/Authorization:\s*`Bearer \$\{password/.test(clientSource),
+  'Authentication: No password-as-token fallback or default master password in the client'
 );
-
-assert(
-  serverContent.includes("app.use('/data'"),
-  'Access Control: Private data folder is explicitly forbidden from HTTP static file exposure'
-);
-
-assert(
-  serverContent.includes("express.json({ limit: '16kb' })"),
-  'DoS Mitigation: Request body size strictly constrained to 16kb'
-);
-
-// 5. Input Validation & Sanitization Verification
-const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,64}$/;
-assert(
-  emailRegex.test('delegate@westmun.org') &&
-  emailRegex.test('head.delegate@university.edu') &&
-  !emailRegex.test('plainaddress') &&
-  !emailRegex.test('<script>@domain.com') &&
-  !emailRegex.test('user@domain'),
-  'Data Sanitization: Strict RFC email validation blocks malformed, truncated, or hostile strings'
-);
-
-function sanitizeTest(str: string): string {
-  return str.replace(/[<>'"&]/g, (char) => {
-    switch (char) {
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '&': return '&amp;';
-      case '"': return '&quot;';
-      case "'": return '&#39;';
-      default: return char;
-    }
-  });
+{
+  const adminApp = read('src/admin/AdminApp.tsx');
+  assert(
+    adminApp.includes('signInWithPassword') && adminApp.includes('action=session'),
+    'Authentication: Admin login uses Supabase Auth and a server-side session check'
+  );
+  assert(
+    !adminApp.includes('super-admin?action=verify'),
+    'Authentication: The old email-header verification path is gone from AdminApp'
+  );
 }
 
+// 3. Server-side authorization invariants
+const serverHandler = read('src/server/superAdminHandler.ts');
 assert(
-  sanitizeTest('<script>alert("xss")</script>') === '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;',
-  'Injection Defense: HTML entities are neutralized prior to data storage'
+  serverHandler.includes('auth/v1/user') && serverHandler.includes('isRegisteredAdmin'),
+  'Authorization: Bearer tokens are verified with Supabase Auth and public.admins'
+);
+assert(
+  !serverHandler.includes("customHeaders?.['x-admin-email']") &&
+    !serverHandler.includes('isMasterKeyMatch'),
+  'Authorization: No client-supplied email or master-key authorization path remains'
+);
+assert(
+  !serverHandler.includes("process.env.ADMIN_PASSWORD || 'masterkey'"),
+  'Authorization: No hardcoded fallback admin password'
+);
+assert(
+  serverHandler.includes('onConflict: \'user_id\'') && serverHandler.includes('writeHeadAssignment'),
+  'Head Provisioning: Assignments are idempotent upserts keyed on the Auth user_id'
+);
+
+const headAuth = read('serverless/head-auth.ts');
+assert(
+  headAuth.includes('USE_SUPABASE_AUTH') && headAuth.includes('VERCEL'),
+  'Head Authentication: File-backed login is disabled on hosted deployments'
+);
+
+const headStore = read('src/server/headStore.ts');
+assert(
+  !headStore.includes('WestMun2027!'),
+  'Head Authentication: Seed records no longer use predictable default passwords'
+);
+
+// 4. Deployment configuration
+const vercelConfig = read('vercel.json');
+assert(
+  vercelConfig.includes('Content-Security-Policy') &&
+    vercelConfig.includes('X-Content-Type-Options') &&
+    vercelConfig.includes('Referrer-Policy') &&
+    vercelConfig.includes('Permissions-Policy'),
+  'Security Headers: Vercel enforces CSP, nosniff, Referrer-Policy and Permissions-Policy'
+);
+assert(
+  !vercelConfig.includes('includeFiles'),
+  'Deployment: Handlers are bundled instead of relying on cross-directory includeFiles'
+);
+
+// 5. Local API input validation (legacy local-only routes)
+const localRoutes = read('api/local-routes.ts');
+assert(
+  localRoutes.includes('isValidEmail') && localRoutes.includes('sanitizeInput'),
+  'Input Validation: Local routes validate emails and sanitize text input'
+);
+assert(
+  localRoutes.includes('timingSafeEqual'),
+  'Authentication Hardening: Local password comparison is constant-time'
 );
 
 console.log('====================================================');

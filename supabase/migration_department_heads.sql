@@ -6,6 +6,11 @@
 -- and administrators to manage department head assignments.
 --
 -- Run this in Supabase > SQL Editor > New query.
+--
+-- NOTE (2026): this file creates the original `id`-keyed table. The current
+-- application keys on `user_id`. If this file was ever run, also run
+-- supabase/migration_department_heads_repair.sql, which adds/backfills the
+-- missing columns without deleting data.
 -- =====================================================================
 
 -- 1. Create department_heads table

@@ -26,7 +26,7 @@ import { DashboardOverview } from './DashboardOverview';
 import { RegistrationsManager } from './RegistrationsManager';
 import { TeamManagement } from './TeamManagement';
 import { StatisticsReports } from './StatisticsReports';
-import { SuperAdminManager, SUPER_ADMIN_EMAIL } from './SuperAdminManager';
+import { SuperAdminManager } from './SuperAdminManager';
 import { btnGold, cardCls, inputCls, labelCls, type Row } from './ui';
 
 const IDLE_MS = 30 * 60 * 1000; // Sign out after 30 minutes of inactivity
@@ -44,6 +44,7 @@ export type NavigationPage =
 export default function AdminApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [booting, setBooting] = useState(true);
   const [page, setPage] = useState<NavigationPage>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -73,18 +74,43 @@ export default function AdminApp() {
     return () => meta.remove();
   }, []);
 
-  const checkAdmin = useCallback(async (s: Session | null) => {
-    if (!supabase || !s) {
+  /**
+   * Trusted server-side gate. The browser never decides admin status from an
+   * email string, localStorage flag or client-supplied user ID: the API
+   * verifies the Supabase access token and the caller's public.admins row.
+   */
+  const checkAdmin = useCallback(async (s: Session | null): Promise<string | null> => {
+    if (!s?.access_token) {
       setIsAdmin(null);
-      return;
+      setIsSuperAdmin(false);
+      return 'You are not signed in.';
     }
-    const { data, error: err } = await supabase
-      .from('admins')
-      .select('user_id')
-      .eq('user_id', s.user.id)
-      .maybeSingle();
 
-    setIsAdmin(!err && Boolean(data));
+    try {
+      const response = await fetch('/api/super-admin?action=session', {
+        headers: { Authorization: `Bearer ${s.access_token}` },
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data?.authorized) {
+        setIsAdmin(true);
+        setIsSuperAdmin(Boolean(data.isSuperAdmin));
+        return null;
+      }
+
+      setIsAdmin(false);
+      setIsSuperAdmin(false);
+      return (
+        data?.error ||
+        (response.status === 503
+          ? 'Server authentication is not configured.'
+          : 'This account does not have organiser permissions.')
+      );
+    } catch {
+      setIsAdmin(false);
+      setIsSuperAdmin(false);
+      return 'Could not reach the authorization server. Please try again.';
+    }
   }, []);
 
   // Fetch real records from Supabase
@@ -129,7 +155,10 @@ export default function AdminApp() {
   }, []);
 
   useEffect(() => {
-    if (!supabase) {
+    if (!supabase || !supabaseConfigured) {
+      setError(
+        'Supabase Auth is not configured on this deployment. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the hosting environment and redeploy.'
+      );
       setBooting(false);
       return;
     }
@@ -137,13 +166,19 @@ export default function AdminApp() {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!alive) return;
       setSession(data.session);
-      await checkAdmin(data.session);
-      if (alive) setBooting(false);
+      const authErr = await checkAdmin(data.session);
+      if (alive) {
+        if (authErr) setError(authErr);
+        setBooting(false);
+      }
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
-      if (!s) setIsAdmin(null);
+      if (!s) {
+        setIsAdmin(null);
+        setIsSuperAdmin(false);
+      }
     });
 
     return () => {
@@ -160,9 +195,15 @@ export default function AdminApp() {
   }, [isAdmin, loadData]);
 
   const signOut = useCallback(async () => {
-    await supabase?.auth.signOut();
+    try {
+      // Revoke the refresh token on Supabase's side, not just locally.
+      await supabase?.auth.signOut({ scope: 'global' });
+    } catch {
+      await supabase?.auth.signOut().catch(() => null);
+    }
     setSession(null);
     setIsAdmin(null);
+    setIsSuperAdmin(false);
     setPassword('');
     setDelegates([]);
     setTeamRegistrations([]);
@@ -192,79 +233,45 @@ export default function AdminApp() {
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setBusy(true);
+
+    if (!supabase || !supabaseConfigured) {
+      setError(
+        'Supabase Auth is not configured on this deployment. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the hosting environment and redeploy.'
+      );
+      return;
+    }
 
     const cleanEmail = email.trim().toLowerCase();
+    setBusy(true);
 
-    // 1. Try Supabase Auth first if configured
-    if (supabase) {
-      try {
-        const { data, error: err } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password,
-        });
+    try {
+      // Genuine Supabase Auth password verification. There is deliberately no
+      // fallback, demo login, master key or email-only path.
+      const { data, error: err } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
 
-        if (!err && data?.session) {
-          const { data: row } = await supabase
-            .from('admins')
-            .select('user_id')
-            .eq('user_id', data.session.user.id)
-            .maybeSingle();
-
-          if (row || cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
-            setBusy(false);
-            setPassword('');
-            setSession(data.session);
-            setIsAdmin(true);
-            return;
-          }
-        }
-      } catch {
-        // Fallback to direct IT Super Admin check below
+      if (err || !data?.session) {
+        setError('Incorrect email or password.');
+        return;
       }
-    }
 
-    // 2. Direct IT Super Admin & Secretariat Authentication
-    // Strictly protects diavlo3444@gmail.com without requiring external database setup
-    if (cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase() || !supabaseConfigured) {
-      try {
-        const verifyResp = await fetch('/api/super-admin?action=verify', {
-          headers: {
-            Authorization: `Bearer ${password.trim()}`,
-            'x-admin-email': cleanEmail,
-          },
-        });
-
-        if (verifyResp.ok) {
-          const verifyData = await verifyResp.json();
-          if (verifyData.authorized) {
-            setBusy(false);
-            setPassword('');
-            setSession({
-              access_token: password.trim(),
-              token_type: 'bearer',
-              expires_in: 86400,
-              refresh_token: '',
-              user: {
-                id: verifyData.user?.id || 'super-admin-root',
-                app_metadata: {},
-                user_metadata: {},
-                aud: 'authenticated',
-                created_at: new Date().toISOString(),
-                email: cleanEmail,
-              },
-            } as Session);
-            setIsAdmin(true);
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn('Super Admin verification check error:', err);
+      const authErr = await checkAdmin(data.session);
+      if (authErr) {
+        await supabase.auth.signOut({ scope: 'global' }).catch(() => null);
+        setPassword('');
+        setError(authErr);
+        return;
       }
-    }
 
-    setBusy(false);
-    setError('Sign-in failed. Please verify your organiser email and authorization password.');
+      setSession(data.session);
+      setPassword('');
+    } catch {
+      setError('Sign-in failed. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   // Update a single setting in Supabase
@@ -589,14 +596,7 @@ export default function AdminApp() {
           )}
 
           {page === 'super-admin' && (
-            <SuperAdminManager
-              session={session}
-              isSuperAdmin={Boolean(
-                isAdmin &&
-                  session?.user &&
-                  session.user.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()
-              )}
-            />
+            <SuperAdminManager session={session} isSuperAdmin={Boolean(isAdmin && isSuperAdmin)} />
           )}
 
           {page === 'messages' && <InquiriesManager />}

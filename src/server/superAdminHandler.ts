@@ -15,10 +15,13 @@ export interface VerificationResult {
   authorized: boolean;
   statusCode: number;
   error?: string;
+  code?: string;
   user?: {
     id: string;
     email?: string;
   };
+  isAdmin?: boolean;
+  isSuperAdmin?: boolean;
 }
 
 /**
@@ -60,19 +63,137 @@ export function getSupabaseAdmin(): SupabaseClient | null {
 }
 
 /**
- * Strict Server-Side Identity & Authorization Verification:
- * Protects all privileged operations on the server.
- * Only diavlo3444@gmail.com is authorized to manage department heads.
+ * Server-side Supabase endpoint + public anon key, used only to verify a
+ * caller's access token with Supabase Auth and to read the caller's own
+ * public.admins row under RLS. The anon key is public by design; the
+ * service-role key is never required for identity verification.
  */
-export async function verifySuperAdminCaller(
-  authHeader?: string | null,
-  customHeaders?: Record<string, string | string[] | undefined>
+function getSupabasePublicConfig(): { url: string; anonKey: string } | null {
+  const rawUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+  const url = rawUrl.replace(/\/+$/, '');
+  const anonKey = (
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    ''
+  ).trim();
+
+  if (!/^https:\/\/[a-z0-9.-]+$/i.test(url) || !anonKey) return null;
+  return { url, anonKey };
+}
+
+/**
+ * Verifies an access token with Supabase Auth itself. A random password, a
+ * self-made JWT or a client-supplied email header can never pass this check.
+ */
+async function getSupabaseUserFromToken(
+  token: string
+): Promise<{ user: { id: string; email: string } | null; misconfigured: boolean }> {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  if (supabaseAdmin) {
+    try {
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && data?.user?.id && data.user.email) {
+        return {
+          user: {
+            id: data.user.id,
+            email: data.user.email.trim().toLowerCase(),
+          },
+          misconfigured: false,
+        };
+      }
+      return { user: null, misconfigured: false };
+    } catch {
+      return { user: null, misconfigured: false };
+    }
+  }
+
+  const config = getSupabasePublicConfig();
+  if (!config) return { user: null, misconfigured: true };
+
+  try {
+    const response = await fetch(`${config.url}/auth/v1/user`, {
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) return { user: null, misconfigured: false };
+
+    const payload = (await response.json()) as { id?: string; email?: string };
+    if (!payload?.id) return { user: null, misconfigured: false };
+
+    return {
+      user: { id: payload.id, email: String(payload.email || '').trim().toLowerCase() },
+      misconfigured: false,
+    };
+  } catch {
+    return { user: null, misconfigured: false };
+  }
+}
+
+/**
+ * Returns true only when the authenticated user has a row in public.admins.
+ * With a service-role key this is a direct query. Without one, the caller's
+ * own access token is used against PostgREST, so the existing
+ * "admins read self" RLS policy is what decides the answer.
+ */
+async function isRegisteredAdmin(userId: string, accessToken: string): Promise<boolean> {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  if (supabaseAdmin) {
+    const { data, error } = await supabaseAdmin
+      .from('admins')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return !error && Boolean(data);
+  }
+
+  const config = getSupabasePublicConfig();
+  if (!config) return false;
+
+  try {
+    const response = await fetch(
+      `${config.url}/rest/v1/admins?select=user_id&user_id=eq.${encodeURIComponent(userId)}`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!response.ok) return false;
+    const rows = (await response.json()) as Array<{ user_id?: string }>;
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Strict Server-Side Identity & Authorization Verification:
+ * 1. The bearer token MUST be a live Supabase Auth access token.
+ * 2. The user MUST have a row in public.admins.
+ * 3. The IT Super Admin console additionally requires the allow-listed email.
+ *
+ * Client-supplied headers (x-admin-email), localStorage flags, email strings
+ * and password-shaped bearer tokens are never treated as proof of identity.
+ */
+export async function verifyAdminCaller(
+  authHeader?: string | null
 ): Promise<VerificationResult> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return {
       authorized: false,
       statusCode: 401,
-      error: 'Authentication required. Missing or malformed Bearer authorization header.',
+      code: 'MISSING_TOKEN',
+      error: 'Authentication required. Sign in with Supabase Auth first.',
     };
   }
 
@@ -81,82 +202,183 @@ export async function verifySuperAdminCaller(
     return {
       authorized: false,
       statusCode: 401,
+      code: 'EMPTY_TOKEN',
       error: 'Empty authentication token provided.',
     };
   }
 
-  let callerEmail: string | null = null;
-  let callerId: string = 'super-admin-root';
+  const verified = await getSupabaseUserFromToken(token);
 
-  // 1. Check with Supabase Auth if service role is available
-  const supabaseAdmin = getSupabaseAdmin();
-  if (supabaseAdmin && token.length > 30) {
-    try {
-      const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
-      if (!userErr && userData?.user?.email) {
-        callerEmail = userData.user.email.trim().toLowerCase();
-        callerId = userData.user.id;
-      }
-    } catch {
-      // Fallback to JWT inspection below
-    }
+  if (verified.misconfigured) {
+    return {
+      authorized: false,
+      statusCode: 503,
+      code: 'AUTH_NOT_CONFIGURED',
+      error:
+        'Server authentication is not configured. Set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_ANON_KEY (or VITE_SUPABASE_ANON_KEY) in the hosting environment.',
+    };
   }
 
-  // 2. Fallback: Parse Supabase JWT claims directly if token is a standard JWT
-  if (!callerEmail && token.includes('.')) {
-    try {
-      const parts = token.split('.');
-      if (parts.length >= 2) {
-        const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
-        const payload = JSON.parse(payloadJson);
-        if (payload?.email) {
-          callerEmail = String(payload.email).trim().toLowerCase();
-        }
-        if (payload?.sub) {
-          callerId = String(payload.sub);
-        }
-      }
-    } catch {
-      // Not a standard JWT, continue to alternative checks
-    }
+  if (!verified.user) {
+    return {
+      authorized: false,
+      statusCode: 401,
+      code: 'INVALID_TOKEN',
+      error: 'Your session is invalid or has expired. Please sign in again.',
+    };
   }
 
-  // 3. Fallback: Check if token matches Secretariat Admin password or Super Admin Key
-  const adminPassword = (process.env.ADMIN_PASSWORD || 'masterkey').trim();
-  const superAdminKey = (process.env.SUPER_ADMIN_KEY || '').trim();
-
-  const isMasterKeyMatch =
-    (token === adminPassword && adminPassword.length > 0) ||
-    (superAdminKey && token === superAdminKey);
-
-  // 4. Session context header check
-  const forwardedEmail = customHeaders?.['x-admin-email'] || customHeaders?.['x-user-email'];
-  if (!callerEmail && typeof forwardedEmail === 'string') {
-    callerEmail = forwardedEmail.trim().toLowerCase();
-  }
-
-  // If caller logged in with verified master key, attribute to SUPER_ADMIN_EMAIL
-  if (isMasterKeyMatch && !callerEmail) {
-    callerEmail = SUPER_ADMIN_EMAIL.toLowerCase();
-  }
-
-  // 5. Strict enforcement of Super Admin Identity
-  if (!callerEmail || callerEmail !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+  const isAdmin = await isRegisteredAdmin(verified.user.id, token);
+  if (!isAdmin) {
     return {
       authorized: false,
       statusCode: 403,
-      error: `Access Denied: Only ${SUPER_ADMIN_EMAIL} is authorized to access the IT Super Admin dashboard. Caller (${callerEmail || 'unauthenticated'}) is not permitted.`,
+      code: 'NOT_ADMIN',
+      error: `Access denied: ${verified.user.email || 'this account'} is not registered as an organiser in public.admins.`,
+      user: verified.user,
     };
   }
 
   return {
     authorized: true,
     statusCode: 200,
-    user: {
-      id: callerId,
-      email: callerEmail,
-    },
+    user: verified.user,
+    isAdmin: true,
+    isSuperAdmin: verified.user.email === SUPER_ADMIN_EMAIL.toLowerCase(),
   };
+}
+
+/**
+ * Only the verified IT Super Admin (diavlo3444@gmail.com, present in
+ * public.admins) may manage department-head accounts.
+ */
+export async function verifySuperAdminCaller(
+  authHeader?: string | null
+): Promise<VerificationResult> {
+  const caller = await verifyAdminCaller(authHeader);
+  if (!caller.authorized) return caller;
+
+  if (!caller.isSuperAdmin) {
+    return {
+      authorized: false,
+      statusCode: 403,
+      code: 'NOT_SUPER_ADMIN',
+      error: `Access Denied: Only ${SUPER_ADMIN_EMAIL} is authorized to manage department head accounts.`,
+      user: caller.user,
+      isAdmin: true,
+      isSuperAdmin: false,
+    };
+  }
+
+  return caller;
+}
+
+const HOSTED_ENV = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+interface HeadAssignmentInput {
+  userId: string;
+  email: string;
+  headName: string;
+  department: DepartmentKey;
+  section: SectionKey | null;
+  active: boolean;
+}
+
+interface HeadAssignmentResult {
+  ok: boolean;
+  code?: string;
+  message: string;
+}
+
+function explainAssignmentError(error: { code?: string; message?: string; details?: string | null }): {
+  code: string;
+  message: string;
+} {
+  const raw = error.message || 'Unknown database error.';
+
+  // PostgREST schema-cache error: a column used by the code is not on the
+  // table that the Data API can see (or the cache is stale).
+  if (error.code === 'PGRST204' || raw.includes('schema cache')) {
+    const missing = raw.match(/'([^']+)' column/)?.[1];
+    return {
+      code: 'SCHEMA_MISMATCH',
+      message: `public.department_heads is missing ${missing ? `the "${missing}" column` : 'a required column'} (${raw}). Run supabase/migration_department_heads_repair.sql in the Supabase SQL Editor, then retry the assignment. The Auth account is kept and will not be duplicated.`,
+    };
+  }
+
+  if (error.code === '23505' || raw.toLowerCase().includes('duplicate key')) {
+    return {
+      code: 'SLOT_TAKEN',
+      message: `${raw} Another head may already hold this department/division. Choose a different division, edit the existing head, or remove the conflicting assignment first.`,
+    };
+  }
+
+  if (error.code === '23503') {
+    return {
+      code: 'AUTH_USER_MISSING',
+      message: `${raw} The Supabase Auth user for this assignment no longer exists.`,
+    };
+  }
+
+  return { code: error.code || 'ASSIGNMENT_FAILED', message: raw };
+}
+
+/**
+ * Single source of truth for writing a head assignment. Upserts on user_id so
+ * re-running the operation is idempotent and cannot create a second row or a
+ * second Auth user.
+ */
+async function writeHeadAssignment(
+  supabaseAdmin: SupabaseClient,
+  input: HeadAssignmentInput
+): Promise<HeadAssignmentResult> {
+  const { error } = await supabaseAdmin.from('department_heads').upsert(
+    {
+      id: input.userId,
+      user_id: input.userId,
+      email: input.email,
+      head_name: input.headName,
+      department: input.department,
+      section: input.section,
+      active: input.active,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id' }
+  );
+
+  if (error) {
+    return { ok: false, ...explainAssignmentError(error) };
+  }
+
+  // Read the row back so a silent no-op can never be reported as success.
+  const { data, error: verifyErr } = await supabaseAdmin
+    .from('department_heads')
+    .select('user_id, department, section, active')
+    .eq('user_id', input.userId)
+    .maybeSingle();
+
+  if (verifyErr) {
+    return { ok: false, ...explainAssignmentError(verifyErr) };
+  }
+
+  if (!data) {
+    return {
+      ok: false,
+      code: 'ASSIGNMENT_NOT_PERSISTED',
+      message: 'The database accepted the request but no department_heads row with this user_id could be read back.',
+    };
+  }
+
+  if (data.department !== input.department || (data.section || null) !== input.section) {
+    return {
+      ok: false,
+      code: 'ASSIGNMENT_MISMATCH',
+      message: `Stored assignment (${data.department}/${data.section || 'none'}) does not match the requested one (${input.department}/${input.section || 'none'}).`,
+    };
+  }
+
+  return { ok: true, message: 'Assignment stored.' };
 }
 
 /**
@@ -175,12 +397,12 @@ export async function handleCreateHeadAccount(
     active?: boolean;
     inviteOnly?: boolean;
   },
-  headers?: Record<string, string | string[] | undefined>,
+  _headers?: Record<string, string | string[] | undefined>,
   origin: string = 'https://west-mun.vercel.app'
 ) {
-  const auth = await verifySuperAdminCaller(authHeader, headers);
+  const auth = await verifySuperAdminCaller(authHeader);
   if (!auth.authorized || !auth.user) {
-    return { statusCode: auth.statusCode, body: { success: false, error: auth.error } };
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
   }
 
   const { fullName, email, password, department, section, active = true, inviteOnly } = body || {};
@@ -260,7 +482,7 @@ export async function handleCreateHeadAccount(
           invitationLink = linkData.properties?.action_link;
         } else if (linkErr && linkErr.message?.toLowerCase().includes('already')) {
           // If user already exists in auth.users, find their UID and generate a password recovery link
-          const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+          const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
           const existing = listData?.users?.find(
             (u) => u.email?.toLowerCase().trim() === cleanEmail
           );
@@ -311,7 +533,7 @@ export async function handleCreateHeadAccount(
         if (createErr) {
           if (createErr.message?.toLowerCase().includes('already')) {
             // User already registered in Supabase Auth: update their password and metadata
-            const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+            const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
             const existing = listData?.users?.find(
               (u) => u.email?.toLowerCase().trim() === cleanEmail
             );
@@ -338,80 +560,52 @@ export async function handleCreateHeadAccount(
 
       const userId = authUser.id;
 
-      // 2. Upsert assignment into public.department_heads table
-      // Handles both schema variants (id vs user_id as primary key)
-      let dbError: string | null = null;
+      // 2. Upsert assignment into public.department_heads table.
+      // The canonical schema (see supabase/migration_department_heads_repair.sql)
+      // keys on user_id and stores email/head_name/department/section/active.
+      const assignment = await writeHeadAssignment(supabaseAdmin, {
+        userId,
+        email: cleanEmail,
+        headName: cleanName,
+        department: cleanDept,
+        section: cleanSec,
+        active,
+      });
 
-      // Attempt 1: Full columns (user_id and id, head_name, email, department, section, active)
-      const { error: err1 } = await supabaseAdmin.from('department_heads').upsert(
-        {
-          id: userId,
-          user_id: userId,
-          email: cleanEmail,
-          head_name: cleanName,
-          department: cleanDept,
-          section: cleanSec,
-          active,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      );
-
-      if (err1) {
-        // Attempt 2: Minimal columns on user_id
-        const { error: err2 } = await supabaseAdmin.from('department_heads').upsert(
-          {
-            user_id: userId,
-            department: cleanDept,
-            section: cleanSec,
-          },
-          { onConflict: 'user_id' }
-        );
-
-        if (err2) {
-          // Attempt 3: Primary key is id
-          const { error: err3 } = await supabaseAdmin.from('department_heads').upsert(
-            {
-              id: userId,
-              email: cleanEmail,
-              department: cleanDept,
-              section: cleanSec,
-              active,
-            },
-            { onConflict: 'id' }
-          );
-
-          if (err3) {
-            dbError = err3.message || err2.message || err1.message;
-          }
-        }
-      }
-
-      if (dbError) {
-        console.error('[Supabase DB Error] department_heads upsert failed:', dbError);
+      if (!assignment.ok) {
+        console.error('[Supabase DB Error] department_heads upsert failed:', assignment.message);
+        // The Supabase Auth user was created (or already existed) and is NOT
+        // duplicated on retry: action=assign reuses this userId.
         return {
           statusCode: 400,
           body: {
             success: false,
-            error: `Supabase Auth account created (UID: ${userId}), but updating public.department_heads failed: ${dbError}. Please ensure migration_department_heads.sql or migration_head_authorization_fix.sql was executed in Supabase SQL editor.`,
+            retryable: true,
             userId,
+            invitationLink,
+            code: assignment.code,
+            error: `Supabase Auth account ready (UID: ${userId}), but the department assignment failed: ${assignment.message}`,
           },
         };
       }
 
-      // Keep local in-memory fallback store in sync
-      try {
-        HeadStore.create({
-          id: userId,
-          fullName: cleanName,
-          email: cleanEmail,
-          password: cleanPassword || `WestMun2027!${cleanDept}!Auth`,
-          department: cleanDept,
-          section: cleanSec,
-          active,
-        });
-      } catch {
-        // Non-critical local sync failure
+      // Keep the local development store in sync. Never on hosted deployments
+      // (Supabase Auth is the only production authentication path) and never
+      // with a predictable fallback password.
+      if (!HOSTED_ENV) {
+        try {
+          HeadStore.create({
+            id: userId,
+            fullName: cleanName,
+            email: cleanEmail,
+            password: cleanPassword || globalThis.crypto.randomUUID(),
+            department: cleanDept,
+            section: cleanSec,
+            active,
+          });
+        } catch {
+          // Non-critical local sync failure
+        }
       }
 
       return {
@@ -445,8 +639,7 @@ export async function handleCreateHeadAccount(
   // ---------------------------------------------------------------------------
   // Case B: Supabase Admin Client Missing (SUPABASE_SERVICE_ROLE_KEY Not Set)
   // ---------------------------------------------------------------------------
-  const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
-  if (isVercel) {
+  if (HOSTED_ENV) {
     return {
       statusCode: 503,
       body: {
@@ -463,7 +656,7 @@ export async function handleCreateHeadAccount(
     const { head } = HeadStore.create({
       fullName: cleanName,
       email: cleanEmail,
-      password: cleanPassword || `WestMun2027!${cleanDept}!Auth`,
+      password: cleanPassword || globalThis.crypto.randomUUID(),
       department: cleanDept,
       section: cleanSec,
       active,
@@ -494,15 +687,163 @@ export async function handleCreateHeadAccount(
 }
 
 /**
+ * Recoverable assignment step. If Auth user creation succeeded but the
+ * department_heads write failed, the IT Super Admin retries here with the SAME
+ * userId. No Auth user is created, updated or duplicated.
+ */
+export async function handleAssignHead(
+  authHeader: string | null,
+  body: {
+    userId?: string;
+    email?: string;
+    fullName?: string;
+    department?: string;
+    section?: string | null;
+    active?: boolean;
+  }
+) {
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user) {
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) {
+    return {
+      statusCode: 503,
+      body: {
+        success: false,
+        code: 'MISSING_SERVICE_ROLE_KEY',
+        error:
+          'SUPABASE_SERVICE_ROLE_KEY is not configured, so department assignments cannot be written. Add it in the hosting environment variables.',
+      },
+    };
+  }
+
+  const requestedId = (body.userId || '').trim();
+  const requestedEmail = (body.email || '').trim().toLowerCase();
+
+  if (!requestedId && !requestedEmail) {
+    return {
+      statusCode: 400,
+      body: { success: false, code: 'MISSING_TARGET', error: 'Provide the Auth user ID (preferred) or email of the head to assign.' },
+    };
+  }
+
+  // Resolve the existing Supabase Auth user. Never create one here.
+  let authUser: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null = null;
+
+  if (requestedId) {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(requestedId);
+    if (error || !data?.user) {
+      return {
+        statusCode: 404,
+        body: {
+          success: false,
+          code: 'AUTH_USER_NOT_FOUND',
+          error: `No Supabase Auth user exists with ID ${requestedId}. Create the head account first.`,
+        },
+      };
+    }
+    authUser = data.user;
+  } else {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (error) {
+      return { statusCode: 400, body: { success: false, code: 'AUTH_LOOKUP_FAILED', error: error.message } };
+    }
+    authUser = (data?.users || []).find((u) => u.email?.trim().toLowerCase() === requestedEmail) || null;
+    if (!authUser) {
+      return {
+        statusCode: 404,
+        body: {
+          success: false,
+          code: 'AUTH_USER_NOT_FOUND',
+          error: `No Supabase Auth user exists with email ${requestedEmail}. Create the head account first.`,
+        },
+      };
+    }
+  }
+
+  const cleanName = (body.fullName || String(authUser.user_metadata?.full_name || '')).trim();
+  const cleanDept = (body.department || '').trim().toLowerCase() as DepartmentKey;
+  const cleanSec = body.section ? (body.section.trim().toLowerCase() as SectionKey) : null;
+  const active = body.active !== false;
+
+  if (!VALID_DEPARTMENTS.includes(cleanDept)) {
+    return {
+      statusCode: 400,
+      body: { success: false, code: 'INVALID_DEPARTMENT', error: `Invalid department. Must be one of: ${VALID_DEPARTMENTS.join(', ')}.` },
+    };
+  }
+
+  if (isGenderSeparatedDepartment(cleanDept)) {
+    if (cleanSec !== 'male' && cleanSec !== 'female') {
+      return {
+        statusCode: 400,
+        body: { success: false, code: 'SECTION_REQUIRED', error: `Department "${cleanDept}" requires division to be either "male" or "female".` },
+      };
+    }
+  } else if (cleanSec !== null) {
+    return {
+      statusCode: 400,
+      body: { success: false, code: 'INVALID_SECTION', error: `Department "${cleanDept}" does not use gender divisions; section must be None.` },
+    };
+  }
+
+  if (!authUser.email) {
+    return {
+      statusCode: 400,
+      body: { success: false, code: 'AUTH_USER_EMAIL_MISSING', error: 'The Supabase Auth user has no email address, so it cannot be assigned as a department head.' },
+    };
+  }
+
+  const assignment = await writeHeadAssignment(supabaseAdmin, {
+    userId: authUser.id,
+    email: authUser.email.trim().toLowerCase(),
+    headName: cleanName || authUser.email,
+    department: cleanDept,
+    section: cleanSec,
+    active,
+  });
+
+  if (!assignment.ok) {
+    return {
+      statusCode: 400,
+      body: {
+        success: false,
+        retryable: true,
+        userId: authUser.id,
+        code: assignment.code,
+        error: assignment.message,
+      },
+    };
+  }
+
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      message: `Department assignment saved for ${authUser.email}. Existing Auth user reused (no duplicate created).`,
+      head: {
+        id: authUser.id,
+        user_id: authUser.id,
+        email: authUser.email,
+        head_name: cleanName || authUser.email,
+        department: cleanDept,
+        section: cleanSec,
+        active,
+      },
+    },
+  };
+}
+
+/**
  * Server-side list of all department heads
  */
-export async function handleListHeads(
-  authHeader: string | null,
-  headers?: Record<string, string | string[] | undefined>
-) {
-  const auth = await verifySuperAdminCaller(authHeader, headers);
+export async function handleListHeads(authHeader: string | null) {
+  const auth = await verifySuperAdminCaller(authHeader);
   if (!auth.authorized || !auth.user) {
-    return { statusCode: auth.statusCode, body: { success: false, error: auth.error } };
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
   }
 
   const supabaseAdmin = getSupabaseAdmin();
@@ -520,7 +861,7 @@ export async function handleListHeads(
       }
 
       // 2. Fetch auth.users to supplement email & last_sign_in_at
-      const { data: userData } = await supabaseAdmin.auth.admin.listUsers();
+      const { data: userData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const authUsersMap = new Map<string, any>();
       (userData?.users || []).forEach((u) => {
         authUsersMap.set(u.id, u);
@@ -546,9 +887,27 @@ export async function handleListHeads(
 
       return { statusCode: 200, body: { success: true, heads: merged } };
     } catch (err: unknown) {
-      console.warn('[Supabase List Heads Failed]:', err);
-      // Fallback to local HeadStore roster if database query fails
+      const message = err instanceof Error ? err.message : 'Failed to read department_heads.';
+      console.error('[Supabase List Heads Failed]:', message);
+      if (HOSTED_ENV) {
+        return {
+          statusCode: 503,
+          body: { success: false, code: 'HEADS_QUERY_FAILED', error: message },
+        };
+      }
+      // Local development without a reachable database: fall back to HeadStore.
     }
+  }
+
+  if (HOSTED_ENV) {
+    return {
+      statusCode: 503,
+      body: {
+        success: false,
+        code: 'MISSING_SERVICE_ROLE_KEY',
+        error: 'SUPABASE_SERVICE_ROLE_KEY is not configured, so the department head registry cannot be read.',
+      },
+    };
   }
 
   const heads = HeadStore.getAll().map(sanitizeHeadRecord);
@@ -566,38 +925,92 @@ export async function handleUpdateHead(
     department?: string;
     section?: string | null;
     active?: boolean;
-  },
-  headers?: Record<string, string | string[] | undefined>
+  }
 ) {
-  const auth = await verifySuperAdminCaller(authHeader, headers);
+  const auth = await verifySuperAdminCaller(authHeader);
   if (!auth.authorized || !auth.user) {
-    return { statusCode: auth.statusCode, body: { success: false, error: auth.error } };
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
   }
 
-  if (!headId) {
-    return { statusCode: 400, body: { success: false, error: 'Target head ID is required.' } };
+  if (!headId || !UUID_REGEX.test(headId)) {
+    return { statusCode: 400, body: { success: false, code: 'INVALID_HEAD_ID', error: 'A valid head user UUID is required.' } };
   }
 
   const supabaseAdmin = getSupabaseAdmin();
 
   if (supabaseAdmin) {
     try {
+      const { data: current, error: currentErr } = await supabaseAdmin
+        .from('department_heads')
+        .select('department, section, head_name')
+        .eq('user_id', headId)
+        .maybeSingle();
+
+      if (currentErr) {
+        return {
+          statusCode: 400,
+          body: { success: false, code: currentErr.code, error: explainAssignmentError(currentErr).message },
+        };
+      }
+
+      if (!current) {
+        return {
+          statusCode: 404,
+          body: { success: false, code: 'HEAD_NOT_FOUND', error: 'No department_heads row exists for this user.' },
+        };
+      }
+
+      const nextDept = ((body.department || current.department) as string).trim().toLowerCase() as DepartmentKey;
+      if (!VALID_DEPARTMENTS.includes(nextDept)) {
+        return {
+          statusCode: 400,
+          body: { success: false, code: 'INVALID_DEPARTMENT', error: `Invalid department. Must be one of: ${VALID_DEPARTMENTS.join(', ')}.` },
+        };
+      }
+
+      const requestedSection =
+        body.section !== undefined
+          ? (body.section ? String(body.section).trim().toLowerCase() as SectionKey : null)
+          : ((current.section || null) as SectionKey | null);
+
+      let nextSection: SectionKey | null = null;
+      if (isGenderSeparatedDepartment(nextDept)) {
+        if (requestedSection !== 'male' && requestedSection !== 'female') {
+          return {
+            statusCode: 400,
+            body: { success: false, code: 'SECTION_REQUIRED', error: `Department "${nextDept}" requires division to be either "male" or "female".` },
+          };
+        }
+        nextSection = requestedSection;
+      }
+
       const updateData: Record<string, any> = {
+        department: nextDept,
+        section: nextSection,
         updated_at: new Date().toISOString(),
       };
-      if (body.department) updateData.department = body.department;
-      if (body.section !== undefined) updateData.section = body.section;
       if (body.active !== undefined) updateData.active = body.active;
-      if (body.fullName) updateData.head_name = body.fullName;
+      if (typeof body.fullName === 'string' && body.fullName.trim()) updateData.head_name = body.fullName.trim();
 
-      // Update row in department_heads
-      const { error: updateErr } = await supabaseAdmin
+      // Canonical rows are keyed by the Auth UUID in user_id.
+      const { data: updatedRows, error: updateErr } = await supabaseAdmin
         .from('department_heads')
         .update(updateData)
-        .or(`id.eq.${headId},user_id.eq.${headId}`);
+        .eq('user_id', headId)
+        .select('user_id');
 
       if (updateErr) {
-        console.warn('[Supabase Update Head Warning]:', updateErr.message);
+        return {
+          statusCode: 400,
+          body: { success: false, code: updateErr.code, error: explainAssignmentError(updateErr).message },
+        };
+      }
+
+      if (!updatedRows || updatedRows.length === 0) {
+        return {
+          statusCode: 404,
+          body: { success: false, code: 'HEAD_NOT_FOUND', error: 'No department_heads row exists for this user.' },
+        };
       }
 
       // Update Supabase Auth user metadata / ban duration if active status changed
@@ -611,22 +1024,25 @@ export async function handleUpdateHead(
         });
       }
 
-      if (body.fullName || body.department) {
-        await supabaseAdmin.auth.admin.updateUserById(headId, {
+      if (body.fullName !== undefined || body.department !== undefined) {
+        const { error: metaErr } = await supabaseAdmin.auth.admin.updateUserById(headId, {
           user_metadata: {
-            full_name: body.fullName,
-            department: body.department,
-            section: body.section,
+            full_name: updateData.head_name ?? current.head_name,
+            department: nextDept,
+            section: nextSection,
           },
         });
+        if (metaErr) {
+          console.warn('[Supabase Update Head Metadata Warning]:', metaErr.message);
+        }
       }
 
       // Update local HeadStore if present
       try {
         HeadStore.update(headId, {
           fullName: body.fullName,
-          department: body.department as DepartmentKey,
-          section: body.section as SectionKey | null,
+          department: nextDept,
+          section: nextSection,
           active: body.active,
         });
       } catch {}
@@ -636,6 +1052,12 @@ export async function handleUpdateHead(
         body: {
           success: true,
           message: 'Department head assignment updated successfully in Supabase.',
+          head: {
+            user_id: headId,
+            department: nextDept,
+            section: nextSection,
+            active: body.active !== undefined ? body.active : undefined,
+          },
         },
       };
     } catch (err: unknown) {
@@ -644,7 +1066,18 @@ export async function handleUpdateHead(
     }
   }
 
-  // Fallback
+  if (HOSTED_ENV) {
+    return {
+      statusCode: 503,
+      body: {
+        success: false,
+        code: 'MISSING_SERVICE_ROLE_KEY',
+        error: 'SUPABASE_SERVICE_ROLE_KEY is not configured, so head assignments cannot be updated.',
+      },
+    };
+  }
+
+  // Local development fallback
   try {
     const updated = HeadStore.update(headId, {
       fullName: body.fullName,
@@ -678,19 +1111,27 @@ export async function handleResetPassword(
     generateLink?: boolean;
     email?: string;
   },
-  headers?: Record<string, string | string[] | undefined>,
+  _headers?: Record<string, string | string[] | undefined>,
   origin: string = 'https://west-mun.vercel.app'
 ) {
-  const auth = await verifySuperAdminCaller(authHeader, headers);
+  const auth = await verifySuperAdminCaller(authHeader);
   if (!auth.authorized || !auth.user) {
-    return { statusCode: auth.statusCode, body: { success: false, error: auth.error } };
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
   }
 
-  if (!headId) {
-    return { statusCode: 400, body: { success: false, error: 'Head ID is required.' } };
+  if (!headId || !UUID_REGEX.test(headId)) {
+    return { statusCode: 400, body: { success: false, code: 'INVALID_HEAD_ID', error: 'A valid head user UUID is required.' } };
   }
 
   const { newPassword, generateLink, email } = body || {};
+
+  if (typeof newPassword === 'string' && newPassword.trim().length > 0 && newPassword.trim().length < 8) {
+    return {
+      statusCode: 400,
+      body: { success: false, code: 'WEAK_PASSWORD', error: 'Password must be at least 8 characters in length.' },
+    };
+  }
+
   const supabaseAdmin = getSupabaseAdmin();
 
   if (supabaseAdmin) {
@@ -751,7 +1192,18 @@ export async function handleResetPassword(
     }
   }
 
-  // Fallback
+  if (HOSTED_ENV) {
+    return {
+      statusCode: 503,
+      body: {
+        success: false,
+        code: 'MISSING_SERVICE_ROLE_KEY',
+        error: 'SUPABASE_SERVICE_ROLE_KEY is not configured, so passwords cannot be reset.',
+      },
+    };
+  }
+
+  // Local development fallback
   try {
     if (newPassword && newPassword.trim().length > 0) {
       HeadStore.setPassword(headId, newPassword.trim());
@@ -793,16 +1245,15 @@ export async function handleResetPassword(
  */
 export async function handleDeleteHead(
   authHeader: string | null,
-  headId: string,
-  headers?: Record<string, string | string[] | undefined>
+  headId: string
 ) {
-  const auth = await verifySuperAdminCaller(authHeader, headers);
+  const auth = await verifySuperAdminCaller(authHeader);
   if (!auth.authorized || !auth.user) {
-    return { statusCode: auth.statusCode, body: { success: false, error: auth.error } };
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
   }
 
-  if (!headId) {
-    return { statusCode: 400, body: { success: false, error: 'Head ID is required.' } };
+  if (!headId || !UUID_REGEX.test(headId)) {
+    return { statusCode: 400, body: { success: false, code: 'INVALID_HEAD_ID', error: 'A valid head user UUID is required.' } };
   }
 
   const supabaseAdmin = getSupabaseAdmin();
@@ -810,10 +1261,17 @@ export async function handleDeleteHead(
   if (supabaseAdmin) {
     try {
       // 1. Delete assignment from department_heads
-      await supabaseAdmin
+      const { error: deleteErr } = await supabaseAdmin
         .from('department_heads')
         .delete()
-        .or(`id.eq.${headId},user_id.eq.${headId}`);
+        .eq('user_id', headId);
+
+      if (deleteErr) {
+        return {
+          statusCode: 400,
+          body: { success: false, code: deleteErr.code, error: explainAssignmentError(deleteErr).message },
+        };
+      }
 
       // 2. Disable user in Supabase Auth (or delete)
       await supabaseAdmin.auth.admin.updateUserById(headId, {
@@ -835,6 +1293,17 @@ export async function handleDeleteHead(
       const msg = err instanceof Error ? err.message : 'Failed to delete head record in Supabase.';
       return { statusCode: 400, body: { success: false, error: msg } };
     }
+  }
+
+  if (HOSTED_ENV) {
+    return {
+      statusCode: 503,
+      body: {
+        success: false,
+        code: 'MISSING_SERVICE_ROLE_KEY',
+        error: 'SUPABASE_SERVICE_ROLE_KEY is not configured, so head assignments cannot be removed.',
+      },
+    };
   }
 
   try {

@@ -53,12 +53,13 @@ function readJsonFile<T>(filePath: string, fallback: T): T {
   }
 }
 
-function getTargetAdminPassword(): string {
+function getTargetAdminPassword(): string | null {
   const envKey = process.env.ADMIN_PASSWORD;
   if (typeof envKey === 'string' && envKey.trim().length > 0) {
     return envKey.trim().replace(/^["']|["']$/g, '');
   }
-  return 'masterkey';
+  // No hardcoded fallback: an unset key disables this legacy local endpoint.
+  return null;
 }
 
 interface Session {
@@ -289,6 +290,11 @@ export default async function handler(req: any, res: any) {
     }
 
     const targetPassword = getTargetAdminPassword();
+    if (!targetPassword) {
+      return res.status(503).json({
+        error: 'Local admin password authentication is disabled. Configure ADMIN_PASSWORD for local development, or use Supabase Auth.',
+      });
+    }
     const targetHash = crypto.createHash('sha256').update(targetPassword).digest();
     const trimmedInputHash = crypto.createHash('sha256').update(trimmedInput).digest();
     const rawInputHash = crypto.createHash('sha256').update(rawInput).digest();

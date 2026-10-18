@@ -79,6 +79,19 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
+  // If Supabase Auth succeeds but the department_heads write fails, keep the
+  // resulting Auth user so the assignment can be retried without duplicating it.
+  const [failedAssignment, setFailedAssignment] = useState<{
+    userId: string;
+    name: string;
+    email: string;
+    department: DepartmentKey;
+    section: SectionKey | null;
+    active: boolean;
+    invitationLink?: string;
+  } | null>(null);
+  const [retryingAssignment, setRetryingAssignment] = useState(false);
+
   // Recently created credentials card
   const [recentCredentials, setRecentCredentials] = useState<{
     name: string;
@@ -114,7 +127,9 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
   const [deleteError, setDeleteError] = useState('');
 
   const currentUserEmail = session?.user?.email?.toLowerCase().trim() || '';
-  const isAuthorizedCaller = isSuperAdmin && currentUserEmail === SUPER_ADMIN_EMAIL.toLowerCase();
+  // Server-verified flag only. The email is displayed for context, never used
+  // as proof of authorization, and every API call is re-verified server-side.
+  const isAuthorizedCaller = isSuperAdmin;
 
   // Helper: Resilient fetch that never throws JSON parse syntax errors on server HTML/text errors
   const safeJsonFetch = async (
@@ -156,8 +171,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
     try {
       const { ok, data } = await safeJsonFetch('/api/super-admin', {
         headers: {
-          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
-          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -200,6 +214,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
 
     setFormError('');
     setFormSuccess(null);
+    setFailedAssignment(null);
     setCreating(true);
 
     const cleanEmail = formEmail.trim().toLowerCase();
@@ -213,8 +228,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
-          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           fullName: cleanName,
@@ -228,7 +242,19 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
       });
 
       if (!ok) {
-        throw new Error(result?.error || 'Failed to create department head account.');
+        if (result?.retryable && result?.userId) {
+          setFailedAssignment({
+            userId: result.userId,
+            name: cleanName,
+            email: cleanEmail,
+            department: formDept,
+            section: sec,
+            active: formActive,
+            invitationLink: result.invitationLink,
+          });
+        }
+        setFormError(result?.error || 'Failed to create department head account.');
+        return;
       }
 
       setFormSuccess(result.message || 'Department head account created successfully.');
@@ -258,6 +284,59 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
     }
   };
 
+  // Retry ONLY the department assignment for the Auth user that already exists.
+  const handleRetryAssignment = async () => {
+    if (!failedAssignment || !session) return;
+    setRetryingAssignment(true);
+    setFormError('');
+
+    try {
+      const { ok, data: result } = await safeJsonFetch('/api/super-admin?action=assign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          userId: failedAssignment.userId,
+          fullName: failedAssignment.name,
+          email: failedAssignment.email,
+          department: failedAssignment.department,
+          section: failedAssignment.section,
+          active: failedAssignment.active,
+        }),
+      });
+
+      if (!ok) {
+        setFormError(result?.error || 'The department assignment still could not be saved.');
+        return;
+      }
+
+      const sec = failedAssignment.section;
+      const dept = failedAssignment.department;
+
+      setFormSuccess(result.message || 'Department assignment saved successfully.');
+      setRecentCredentials({
+        name: failedAssignment.name,
+        email: failedAssignment.email,
+        invitationLink: failedAssignment.invitationLink,
+        department: DEPARTMENTS[dept].label,
+        section: sec,
+        portalUrl: `${window.location.origin}${getDepartmentDashboardUrl(dept, sec)}`,
+      });
+      setFailedAssignment(null);
+      setFormName('');
+      setFormEmail('');
+      setFormPassword('');
+      setFormActive(true);
+      await loadHeads();
+    } catch {
+      setFormError('Could not reach the server while retrying the assignment.');
+    } finally {
+      setRetryingAssignment(false);
+    }
+  };
+
   // Handle Edit Head modal open
   const openEditModal = (head: DepartmentHeadRecord) => {
     setEditingHead(head);
@@ -282,8 +361,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
-          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           fullName: editName,
@@ -318,8 +396,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
-          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           active: newStatus,
@@ -350,8 +427,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
-          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           newPassword: newPassword || undefined,
@@ -389,8 +465,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
       const { ok, data: result } = await safeJsonFetch(`/api/super-admin?action=delete&id=${headId}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
-          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -588,6 +663,42 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
           <div className="p-3.5 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-sm flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
             <span>{formError}</span>
+          </div>
+        )}
+
+        {failedAssignment && (
+          <div className="p-3.5 text-xs bg-[#171208] border border-[#d4af37]/50 rounded-sm space-y-3">
+            <div className="flex items-start gap-2.5 text-[#f3e5ab]">
+              <ShieldAlert className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-medium">
+                  The Auth account already exists (UID {failedAssignment.userId}). Only the department
+                  assignment is missing.
+                </p>
+                <p className="text-neutral-400 font-light">
+                  Nothing will be duplicated. Fix the cause shown above (usually the SQL migration or a
+                  department/division already held by another head), then retry.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRetryAssignment}
+              disabled={retryingAssignment}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] hover:brightness-110 rounded-sm cursor-pointer disabled:opacity-50"
+            >
+              {retryingAssignment ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Retrying Assignment…</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Retry department assignment</span>
+                </>
+              )}
+            </button>
           </div>
         )}
 

@@ -267,9 +267,13 @@ export function getRoleTitle(
  * Checks active server session first, then falls back to Supabase if configured.
  */
 export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupResult> {
-  // 1. Check local session token first (server-side authentication)
+  // 1. Local dev session token. Skipped whenever a real Supabase user ID is
+  //    supplied, so a stale token can never override the authenticated account.
   try {
-    const token = typeof window !== 'undefined' ? sessionStorage.getItem('westmun_head_session') : null;
+    const token =
+      !userId && typeof window !== 'undefined'
+        ? sessionStorage.getItem('westmun_head_session')
+        : null;
     if (token) {
       const resp = await fetch('/api/head-auth?action=session', {
         headers: {
@@ -306,11 +310,11 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
   }
 
   try {
-    // Query public.department_heads using `user_id = session.user.id`
-    // Selects only the actual existing columns: department, section
+    // Query public.department_heads using `user_id = session.user.id`.
+    // RLS still restricts this to the caller's own row.
     const { data, error } = await supabase
       .from('department_heads')
-      .select('department, section')
+      .select('department, section, active')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -359,6 +363,11 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
 
     // Query ran cleanly: check if an assignment row exists
     if (!data) {
+      return { status: 'not_found' };
+    }
+
+    // Suspended heads keep their row but must lose portal access.
+    if (data.active === false) {
       return { status: 'not_found' };
     }
 

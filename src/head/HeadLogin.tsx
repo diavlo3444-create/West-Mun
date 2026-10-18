@@ -45,41 +45,77 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Check for token in URL query params
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tokenParam = params.get('resetToken') || params.get('token');
-      if (tokenParam) {
-        setResetToken(tokenParam);
-      }
+    let alive = true;
 
-      // Check for Supabase Auth invitation or recovery links in hash or search
-      const hash = window.location.hash || '';
-      const search = window.location.search || '';
-      if (
-        hash.includes('type=invite') ||
-        hash.includes('type=recovery') ||
-        search.includes('type=invite') ||
-        search.includes('type=recovery')
-      ) {
+    // Supabase session detection is disabled in the client config, so invite /
+    // recovery links must be exchanged manually before updateUser() can work.
+    const bootstrapAuthLink = async () => {
+      if (typeof window === 'undefined') return;
+
+      const params = new URLSearchParams(window.location.search);
+      const tokenParam = params.get('resetToken');
+      if (tokenParam) setResetToken(tokenParam);
+
+      const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+      const linkType = params.get('type') || hashParams.get('type') || '';
+      const isAuthLink = linkType === 'invite' || linkType === 'recovery';
+
+      if (isAuthLink) {
         setIsSupabaseRecovery(true);
         setResetToken('supabase_auth_recovery');
       }
-    }
 
-    // 2. Listen to Supabase Auth state changes for recovery events
+      if (!supabase || !supabaseConfigured) return;
+
+      try {
+        // PKCE links arrive as ?code=...
+        const code = params.get('code');
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!alive) return;
+          if (!error && data.session) {
+            setIsSupabaseRecovery(true);
+            setResetToken('supabase_auth_recovery');
+          }
+        } else if (hashParams.get('access_token') && hashParams.get('refresh_token')) {
+          // Implicit-flow links arrive with tokens in the URL hash.
+          const { error } = await supabase.auth.setSession({
+            access_token: hashParams.get('access_token') as string,
+            refresh_token: hashParams.get('refresh_token') as string,
+          });
+          if (!alive) return;
+          if (!error) {
+            setIsSupabaseRecovery(true);
+            setResetToken('supabase_auth_recovery');
+          }
+        }
+      } catch {
+        if (alive) setError('This invitation link is invalid or has expired. Ask the IT Super Admin for a new one.');
+      }
+    };
+
+    bootstrapAuthLink();
+
+    // Listen to Supabase Auth state changes for recovery events
     if (supabase) {
       const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          setIsSupabaseRecovery(true);
-          setResetToken('supabase_auth_recovery');
+        if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+          if (event === 'PASSWORD_RECOVERY') {
+            setIsSupabaseRecovery(true);
+            setResetToken('supabase_auth_recovery');
+          }
         }
       });
 
       return () => {
+        alive = false;
         authListener?.subscription?.unsubscribe();
       };
     }
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   /**
@@ -107,7 +143,8 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1. Try Supabase Auth first if configured
+    // 1. Genuine Supabase Auth verification. There is NO fallback after a
+    //    failed password check: a wrong password must always fail.
     if (supabase && supabaseConfigured) {
       try {
         const { data: supaData, error: supaErr } = await supabase.auth.signInWithPassword({
@@ -115,31 +152,45 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
           password,
         });
 
-        if (!supaErr && supaData?.user) {
-          const lookup = await lookupHeadAssignment(supaData.user.id);
-          if (lookup.status === 'success' && lookup.assignment) {
-            setBusy(false);
-            navigateToDashboard(lookup.assignment);
-            return;
-          } else if (lookup.status === 'permission_denied') {
-            setBusy(false);
-            setError(lookup.message || 'Row Level Security policy blocked reading department assignment.');
-            return;
-          } else {
-            setBusy(false);
-            setAccessDeniedInfo({
-              email: cleanEmail,
-              userId: supaData.user.id,
-            });
-            return;
-          }
+        if (supaErr || !supaData?.user) {
+          setError('Incorrect email or password.');
+          setBusy(false);
+          return;
         }
+
+        const lookup = await lookupHeadAssignment(supaData.user.id);
+        if (lookup.status === 'success' && lookup.assignment) {
+          setBusy(false);
+          navigateToDashboard(lookup.assignment);
+          return;
+        }
+
+        if (lookup.status === 'permission_denied') {
+          setBusy(false);
+          setError(lookup.message || 'Your department assignment could not be verified.');
+          return;
+        }
+
+        setBusy(false);
+        setAccessDeniedInfo({ email: cleanEmail, userId: supaData.user.id });
+        return;
       } catch {
-        // Fall back to head-auth endpoint below
+        setBusy(false);
+        setError('Sign-in failed. Please try again.');
+        return;
       }
     }
 
-    // 2. Fallback to /api/head-auth endpoint
+    // 2. Production must never use the local file-backed auth fallback.
+    if (import.meta.env.PROD) {
+      setBusy(false);
+      setError(
+        'Supabase Auth is not configured on this deployment. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY and redeploy.'
+      );
+      return;
+    }
+
+    // 3. Local development fallback to /api/head-auth endpoint
     try {
       const response = await fetch('/api/head-auth?action=login', {
         method: 'POST',
@@ -243,7 +294,16 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
       }
     }
 
-    // 2. Fallback to /api/head-auth token reset
+    // 2. Local development fallback only; production password setup must go
+    //    through Supabase Auth invitation/recovery links.
+    if (import.meta.env.PROD) {
+      setResettingPassword(false);
+      setError(
+        'This password setup link is not valid. Ask the IT Super Admin to send a new Supabase invitation or recovery link.'
+      );
+      return;
+    }
+
     try {
       const response = await fetch('/api/head-auth?action=reset-password', {
         method: 'POST',

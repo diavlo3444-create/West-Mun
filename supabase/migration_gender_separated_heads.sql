@@ -73,8 +73,17 @@ create table if not exists public.department_heads (
 
 -- Ensure columns exist if table was previously created
 alter table public.department_heads
+  add column if not exists user_id uuid,
+  add column if not exists id uuid,
+  add column if not exists email text,
   add column if not exists head_name text not null default '',
-  add column if not exists section text check (section in ('male', 'female') or section is null);
+  add column if not exists section text check (section in ('male', 'female') or section is null),
+  add column if not exists active boolean not null default true,
+  add column if not exists updated_at timestamptz not null default now();
+
+-- Keep both identity columns in sync for older installs whose primary key is id.
+update public.department_heads set user_id = id where user_id is null and id is not null;
+update public.department_heads set id = user_id where id is null and user_id is not null;
 
 -- Database-level check constraint: gender-separated departments MUST specify 'male' or 'female'.
 -- All other departments MUST have a null section.
@@ -252,10 +261,11 @@ begin
     raise exception 'user_not_found: no Supabase Auth account exists for email %', p_user_email using errcode = 'P0002';
   end if;
 
-  -- Insert or update assignment
-  insert into public.department_heads (id, email, head_name, department, section, active, updated_at)
-  values (v_user_id, lower(btrim(p_user_email)), btrim(p_head_name), p_department, p_section, true, now())
-  on conflict (id) do update
+  -- Insert or update assignment (user_id is the application's key; id stays
+  -- populated for installs whose primary key is still id).
+  insert into public.department_heads (user_id, id, email, head_name, department, section, active, updated_at)
+  values (v_user_id, v_user_id, lower(btrim(p_user_email)), btrim(p_head_name), p_department, p_section, true, now())
+  on conflict (user_id) do update
     set head_name   = excluded.head_name,
         department  = excluded.department,
         section     = excluded.section,

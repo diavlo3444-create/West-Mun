@@ -49,14 +49,16 @@ function readJsonFile<T>(filePath: string, fallback: T): T {
 // ============================================================================
 // 2. ADMIN CREDENTIALS & SESSION MANAGEMENT (Zero Client Secret Exposure)
 // ============================================================================
-// Secretariat admin key configured for conference administration ('masterkey' default)
-function getTargetAdminPassword(): string {
+// Optional local-development Secretariat key. There is deliberately no default:
+// when unset, these legacy local routes stay disabled instead of accepting a
+// well-known password.
+function getTargetAdminPassword(): string | null {
   const envKey = process.env.ADMIN_PASSWORD;
   if (typeof envKey === 'string' && envKey.trim().length > 0) {
     // Strip surrounding quotes and whitespace from env variable if present
     return envKey.trim().replace(/^["']|["']$/g, '');
   }
-  return 'masterkey';
+  return null;
 }
 
 // Active session storage with TTL (2 hours)
@@ -410,6 +412,11 @@ app.post('/api/admin/login', (req: Request, res: Response) => {
   }
 
   const targetPassword = getTargetAdminPassword();
+  if (!targetPassword) {
+    return res.status(503).json({
+      error: 'Local admin password authentication is disabled. Configure ADMIN_PASSWORD for local development, or use Supabase Auth.',
+    });
+  }
 
   // Constant-time comparison using sha256 hashes to prevent timing attacks
   const targetHash = crypto.createHash('sha256').update(targetPassword).digest();
@@ -455,7 +462,7 @@ app.post('/api/admin/login', (req: Request, res: Response) => {
  */
 app.all('/api/super-admin*', async (req: Request, res: Response) => {
   try {
-    const { default: handler } = await import('./api/super-admin.ts');
+    const { default: handler } = await import('./serverless/super-admin.ts');
     await handler(req, res);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Internal Server Error';
@@ -468,7 +475,7 @@ app.all('/api/super-admin*', async (req: Request, res: Response) => {
  */
 app.all('/api/head-auth*', async (req: Request, res: Response) => {
   try {
-    const { default: handler } = await import('./api/head-auth.ts');
+    const { default: handler } = await import('./serverless/head-auth.ts');
     await handler(req, res);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Internal Server Error';

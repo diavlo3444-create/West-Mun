@@ -81,8 +81,12 @@ export default function HeadPortal() {
         }
       }
 
-      // 2. Fallback to /api/head-auth session token
-      const token = typeof window !== 'undefined' ? sessionStorage.getItem('westmun_head_session') : null;
+      // 2. Local development fallback to /api/head-auth session token.
+      //    Production access is granted only by a verified Supabase session.
+      const token =
+        !import.meta.env.PROD && typeof window !== 'undefined'
+          ? sessionStorage.getItem('westmun_head_session')
+          : null;
       if (!resolvedHead && token) {
         try {
           const resp = await fetch('/api/head-auth?action=session', {

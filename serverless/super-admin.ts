@@ -1,6 +1,7 @@
 import {
-  verifySuperAdminCaller,
+  verifyAdminCaller,
   handleCreateHeadAccount,
+  handleAssignHead,
   handleListHeads,
   handleUpdateHead,
   handleResetPassword,
@@ -74,20 +75,25 @@ export default async function handler(req: any, res: any) {
     const action = url.searchParams.get('action') || '';
     const headId = url.searchParams.get('id') || '';
 
-    // 1. Verification Endpoint
-    if (action === 'verify' || url.pathname.endsWith('/verify')) {
-      const check = await verifySuperAdminCaller(authHeader, req.headers);
+    // 1. Session / identity verification (any organiser in public.admins).
+    //    The bearer token is verified with Supabase Auth server-side; the
+    //    caller's email, role flags and headers are never trusted.
+    if (action === 'session' || action === 'verify' || url.pathname.endsWith('/verify')) {
+      const check = await verifyAdminCaller(authHeader);
       return res.status(check.statusCode).json({
         success: check.authorized,
         authorized: check.authorized,
+        isAdmin: Boolean(check.isAdmin),
+        isSuperAdmin: Boolean(check.isSuperAdmin),
         user: check.user,
+        code: check.code,
         error: check.error,
       });
     }
 
     // 2. Head Accounts Management - List
     if (method === 'GET') {
-      const result = await handleListHeads(authHeader, req.headers);
+      const result = await handleListHeads(authHeader);
       return res.status(result.statusCode).json(result.body);
     }
 
@@ -96,7 +102,13 @@ export default async function handler(req: any, res: any) {
       const body = await parseJsonBody(req);
       if (action === 'reset-password' || url.pathname.includes('/password')) {
         const targetId = headId || body.id;
-        const result = await handleResetPassword(authHeader, targetId, body, req.headers, origin);
+        const result = await handleResetPassword(authHeader, targetId, body, undefined, origin);
+        return res.status(result.statusCode).json(result.body);
+      }
+
+      // Recoverable retry: Auth user already exists, (re)write the assignment.
+      if (action === 'assign' || url.pathname.endsWith('/assign')) {
+        const result = await handleAssignHead(authHeader, body);
         return res.status(result.statusCode).json(result.body);
       }
 
@@ -108,7 +120,7 @@ export default async function handler(req: any, res: any) {
     if (method === 'PATCH' || method === 'PUT') {
       const body = await parseJsonBody(req);
       const targetId = headId || body.id;
-      const result = await handleUpdateHead(authHeader, targetId, body, req.headers);
+      const result = await handleUpdateHead(authHeader, targetId, body);
       return res.status(result.statusCode).json(result.body);
     }
 
@@ -116,7 +128,7 @@ export default async function handler(req: any, res: any) {
     if (method === 'DELETE') {
       const body = await parseJsonBody(req);
       const targetId = headId || body.id;
-      const result = await handleDeleteHead(authHeader, targetId, req.headers);
+      const result = await handleDeleteHead(authHeader, targetId);
       return res.status(result.statusCode).json(result.body);
     }
 

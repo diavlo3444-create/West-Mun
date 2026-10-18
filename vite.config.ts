@@ -16,9 +16,9 @@ export default defineConfig(() => {
 
             let targetFilePath: string | null = null;
             if (req.url.startsWith('/api/super-admin')) {
-              targetFilePath = path.resolve(process.cwd(), 'api/super-admin.ts');
+              targetFilePath = path.resolve(process.cwd(), 'serverless/super-admin.ts');
             } else if (req.url.startsWith('/api/head-auth')) {
-              targetFilePath = path.resolve(process.cwd(), 'api/head-auth.ts');
+              targetFilePath = path.resolve(process.cwd(), 'serverless/head-auth.ts');
             } else if (
               req.url.startsWith('/api/admin') ||
               req.url.startsWith('/api/contact') ||
@@ -68,7 +68,16 @@ export default defineConfig(() => {
     server: {
       host: '0.0.0.0',
       port: 3000,
-      allowedHosts: true,
+      // Allow the local hostnames plus any host explicitly supplied for a
+      // hosted preview. Never use a blanket allowlist.
+      allowedHosts: [
+        'localhost',
+        '127.0.0.1',
+        ...(process.env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS || '')
+          .split(',')
+          .map((h) => h.trim())
+          .filter(Boolean),
+      ],
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

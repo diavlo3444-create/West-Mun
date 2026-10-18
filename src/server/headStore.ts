@@ -152,9 +152,10 @@ const OFFICIAL_INITIAL_HEADS: InitialHeadSeed[] = [
 
 function generateInitialRecords(): HeadAccountRecord[] {
   const now = new Date().toISOString();
-  return OFFICIAL_INITIAL_HEADS.map((seed, idx) => {
-    // Generate secure initial password for each department head
-    const tempPass = `WestMun2027!${seed.department}!${idx + 1}`;
+  return OFFICIAL_INITIAL_HEADS.map((seed) => {
+    // Seeded local records are metadata only. The password is random and never
+    // disclosed, so no guessable default credential exists in the fallback store.
+    const tempPass = crypto.randomBytes(32).toString('hex');
     const { hash, salt } = hashPassword(tempPass);
 
     return {
