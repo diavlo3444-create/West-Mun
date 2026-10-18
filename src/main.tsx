@@ -24,6 +24,8 @@ async function boot() {
   let Page: React.ComponentType;
   if (path === '/admin' || path.startsWith('/admin/')) {
     Page = (await import('./admin/AdminApp')).default;
+  } else if (path === '/head' || path.startsWith('/head/')) {
+    Page = (await import('./head/HeadPortal')).default;
   } else if (path === '/terms') {
     const { LegalPage } = await import('./pages/LegalPage');
     Page = () => <LegalPage kind="terms" />;

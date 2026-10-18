@@ -23,10 +23,14 @@ Local development: copy `.env.example` to `.env.local`, fill both values, `npm i
 
 ## Everyday use
 
-- **Settings → Registration:** tick "Registration is open", set fees and optional opening/closing dates. The database enforces them (a hand-made request cannot register outside the window, mark itself accepted, or pay a different fee).
-- **Applications:** filter/search, change status and payment, add private notes, delete, download CSV. Status changes do **not** email anyone.
-- **Messages:** contact-form messages. Reply from your own email.
-- **Website content:** announcements, secretariat, committees, schedule (days, then sessions), FAQ, documents (PDF/image upload), sponsors. Untick "Published" to hide without deleting. Documents, sponsors and announcements stay hidden on the website until you add the first item.
+- **Dashboard:** Real-time conference overview with total registrations, pending review counters, approved candidates, team breakdown metrics, 14-day velocity timeline chart, and recent application feed.
+- **Registrations:** Complete delegate and staff registry. Search by name, email, school, application ID; filter by category (Delegates, Security, Media, Volunteers) and status (Pending, Approved, Rejected, Waitlisted, Withdrawn); date range filters; sorting; pagination; applicant dossier review modal with 1-click Approve / Reject, private internal notes, and confirmation dialogs; CSV export.
+- **Team Management:** Independent registration controls for Security, Media, Volunteers, and Delegates. Toggle registration Open or Closed per team. Server triggers in PostgreSQL (`team_registrations_guard` and `delegates_guard`) reject direct API submissions when closed.
+- **Statistics & Reports:** Visual analytics, approval/rejection ratios, team distribution progress bars, submission velocity charts, and CSV report downloads.
+- **Settings → Registration:** Master switches for delegate & team registration, fee schedules, and registration windows.
+- **Messages:** Contact form inquiries.
+- **Website content:** Announcements, secretariat dais, committees, schedule, FAQ, documents, sponsors.
+- **Team Management Migration:** If you are using team registrations for the first time, run `supabase/migration_team_management.sql` in Supabase > SQL Editor > New query.
 - Add/remove organisers: add a user in Supabase, run `make_admin.sql` with their email. Remove: `delete from public.admins where lower(email)=lower('their@email');`
 
 ## Weak points you still own

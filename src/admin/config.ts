@@ -250,7 +250,10 @@ export const SETTING_GROUPS: SettingGroup[] = [
     title: 'Registration',
     description: 'The master switch, fees and windows. The database enforces these: nobody can register outside them or pay a different price.',
     fields: [
-      { key: 'registration_open', label: 'Registration is open', type: 'boolean', help: 'Master switch. Off = nobody can register, whatever the dates say.' },
+      { key: 'registration_open', label: 'Registration is open (Delegates)', type: 'boolean', help: 'Master switch for delegate applications. Off = nobody can register as a delegate.' },
+      { key: 'team_security_open', label: 'Security team registration is open', type: 'boolean', help: 'Independent switch for Security team applications.' },
+      { key: 'team_media_open', label: 'Media team registration is open', type: 'boolean', help: 'Independent switch for Media & Press team applications.' },
+      { key: 'team_volunteers_open', label: 'Volunteers team registration is open', type: 'boolean', help: 'Independent switch for Volunteer team applications.' },
       { key: 'registration_currency', label: 'Currency', type: 'text', max: 10, placeholder: 'USD' },
       { key: 'fee_early_bird', label: 'Early Bird fee', type: 'number', help: 'Numbers only, e.g. 10 or 12.50. Leave empty to show "TBA".' },
       { key: 'early_bird_opens', label: 'Early Bird opens', type: 'date', help: 'Optional. Dates are checked in UTC.' },

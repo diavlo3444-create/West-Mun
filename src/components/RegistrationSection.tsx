@@ -1,12 +1,14 @@
-import React from 'react';
-import { ShieldCheck, Calendar, Clock, MapPin } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldCheck, Calendar, Clock, MapPin, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 import { useSettings, orTba } from '../lib/content';
+import { TeamRegistrationModal } from './TeamRegistrationModal';
 
 export const RegistrationSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
   const settings = useSettings();
+  const [teamModalOpen, setTeamModalOpen] = useState(false);
 
   return (
     <section
@@ -148,6 +150,17 @@ export const RegistrationSection: React.FC = React.memo(() => {
               'Official conference registration dates, delegate and delegation fee schedules, and committee allocation matrices will be published once conference dates and host venue agreements are ratified by the Secretariat.'}
           </p>
 
+          <div className="mb-6 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setTeamModalOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 transition-all cursor-pointer shadow-md"
+            >
+              <Users className="w-3.5 h-3.5 text-black" />
+              <span>Apply for Conference Teams (Security, Media, Volunteers)</span>
+            </button>
+          </div>
+
           <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-neutral-400 pt-3 border-t border-neutral-800">
             <span className="inline-flex items-center gap-1.5 font-mono">
               <Calendar className="w-3.5 h-3.5 text-[#d4af37]" />
@@ -164,6 +177,13 @@ export const RegistrationSection: React.FC = React.memo(() => {
           </div>
         </motion.div>
       </div>
+
+      {teamModalOpen && (
+        <TeamRegistrationModal
+          settings={settings}
+          onClose={() => setTeamModalOpen(false)}
+        />
+      )}
     </section>
   );
 });

@@ -489,14 +489,14 @@ grant insert, update, delete on public.settings, public.secretariat, public.comm
 
 grant select on public.admins to authenticated;
 
--- The public may only fill in these columns; everything else is set by the
--- triggers above (so status / payment / fee can never come from the browser).
 grant insert (full_name, email, institution, tier, delegation_type, age_confirmed, consent_version)
   on public.delegates to anon, authenticated;
 grant insert (name, email, subject, message, consent_version)
   on public.inquiries to anon, authenticated;
+grant insert (full_name, email, phone, institution, team, experience, statement, age_confirmed, consent_version)
+  on public.team_registrations to anon, authenticated;
 
-grant select, update, delete on public.delegates, public.inquiries to authenticated;
+grant select, update, delete on public.delegates, public.inquiries, public.team_registrations to authenticated;
 
 
 -- ---------------------------------------------------------------------
