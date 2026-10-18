@@ -70,6 +70,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
+  const [authMethod, setAuthMethod] = useState<'invite' | 'password'>('invite');
   const [showPassword, setShowPassword] = useState(false);
   const [formDept, setFormDept] = useState<DepartmentKey>('design');
   const [formSection, setFormSection] = useState<SectionKey>('male');
@@ -83,11 +84,13 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
     name: string;
     email: string;
     password?: string;
+    invitationLink?: string;
     department: string;
     section?: string | null;
     portalUrl: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [resetCopied, setResetCopied] = useState(false);
 
   // Edit Head Modal State
   const [editingHead, setEditingHead] = useState<DepartmentHeadRecord | null>(null);
@@ -113,16 +116,16 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
   const currentUserEmail = session?.user?.email?.toLowerCase().trim() || '';
   const isAuthorizedCaller = isSuperAdmin && currentUserEmail === SUPER_ADMIN_EMAIL.toLowerCase();
 
-  // Load department heads list
+  // Load department heads list from authoritative server endpoint
   const loadHeads = useCallback(async () => {
     if (!isAuthorizedCaller || !session) return;
     setRefreshing(true);
 
     try {
-      // 1. Try server-side secure API endpoint
       const response = await fetch('/api/super-admin', {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
+          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
         },
       });
 
@@ -134,18 +137,9 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
           setRefreshing(false);
           return;
         }
-      }
-
-      // 2. Fallback: Query Supabase directly with admin token (handled by RLS policies)
-      if (supabase) {
-        const { data: dbRows, error: dbErr } = await supabase
-          .from('department_heads')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!dbErr && dbRows) {
-          setHeads(dbRows as DepartmentHeadRecord[]);
-        }
+      } else {
+        const errJson = await response.json().catch(() => null);
+        console.error('Failed to load heads from server:', errJson?.error);
       }
     } catch (err) {
       console.error('Failed to load department heads:', err);
@@ -153,7 +147,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isAuthorizedCaller, session]);
+  }, [isAuthorizedCaller, session, currentUserEmail]);
 
   useEffect(() => {
     if (isAuthorizedCaller) {
@@ -186,18 +180,22 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
     const cleanEmail = formEmail.trim().toLowerCase();
     const cleanName = formName.trim();
     const sec = isGenderSeparated(formDept) ? formSection : null;
+    const isInvite = authMethod === 'invite';
+    const cleanPassword = isInvite ? '' : formPassword.trim();
 
     try {
       const response = await fetch('/api/super-admin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
+          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
         },
         body: JSON.stringify({
           fullName: cleanName,
           email: cleanEmail,
-          password: formPassword,
+          password: cleanPassword,
+          inviteOnly: isInvite,
           department: formDept,
           section: sec,
           active: formActive,
@@ -214,7 +212,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
       setRecentCredentials({
         name: cleanName,
         email: cleanEmail,
-        password: formPassword,
+        password: isInvite ? undefined : cleanPassword,
+        invitationLink: result.invitationLink,
         department: DEPARTMENTS[formDept].label,
         section: sec,
         portalUrl: `${window.location.origin}${getDepartmentDashboardUrl(formDept, sec)}`,
@@ -260,7 +259,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
+          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
         },
         body: JSON.stringify({
           fullName: editName,
@@ -297,7 +297,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
+          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
         },
         body: JSON.stringify({
           active: newStatus,
@@ -329,7 +330,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
+          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
         },
         body: JSON.stringify({
           newPassword: newPassword || undefined,
@@ -369,7 +371,8 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
       const response = await fetch(`/api/super-admin?action=delete&id=${headId}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token || 'secretariat-master'}`,
+          'x-admin-email': currentUserEmail || SUPER_ADMIN_EMAIL,
         },
       });
 
@@ -392,19 +395,23 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
   // Copy credentials message
   const handleCopyCredentials = () => {
     if (!recentCredentials) return;
-    const message = [
-      `WEST MUN 2027 — Department Head Portal Credentials`,
+    const lines = [
+      `WEST MUN 2027 — Department Head Portal Access`,
       `Name: ${recentCredentials.name}`,
       `Department: ${recentCredentials.department}${recentCredentials.section ? ` (${recentCredentials.section.toUpperCase()} Division)` : ''}`,
       `Portal Sign-in URL: ${recentCredentials.portalUrl}`,
       `Login Email: ${recentCredentials.email}`,
-      recentCredentials.password ? `Temporary Password: ${recentCredentials.password}` : '',
-      `\nSecurity notice: Please sign in and update your password upon first login.`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    ];
 
-    navigator.clipboard.writeText(message);
+    if (recentCredentials.invitationLink) {
+      lines.push(`Password-Setup Invitation Link: ${recentCredentials.invitationLink}`);
+      lines.push(`\nPlease click the invitation link to set up your password and access your dashboard.`);
+    } else if (recentCredentials.password) {
+      lines.push(`Temporary Password: ${recentCredentials.password}`);
+      lines.push(`\nSecurity notice: Please sign in and update your password upon first login.`);
+    }
+
+    navigator.clipboard.writeText(lines.join('\n'));
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
@@ -596,13 +603,86 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               <div><span className="text-neutral-500">Email:</span> <span className="text-white">{recentCredentials.email}</span></div>
               <div><span className="text-neutral-500">Department:</span> <span className="text-[#d4af37]">{recentCredentials.department}</span></div>
               <div><span className="text-neutral-500">Division:</span> <span className="text-[#f3e5ab]">{recentCredentials.section ? `${recentCredentials.section.toUpperCase()}` : 'None (Universal)'}</span></div>
-              <div className="sm:col-span-2"><span className="text-neutral-500">Temporary Password:</span> <span className="text-emerald-300 font-semibold select-all">{recentCredentials.password}</span></div>
+              {recentCredentials.invitationLink ? (
+                <div className="sm:col-span-2 p-2.5 bg-[#171610] border border-[#d4af37]/50 rounded-sm space-y-1">
+                  <div className="text-[11px] text-[#f3e5ab] font-sans font-medium flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-[#d4af37]" />
+                      <span>Password Setup Invitation Link (Valid for 48 hours):</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(recentCredentials.invitationLink!);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2500);
+                      }}
+                      className="text-[10px] uppercase font-mono text-[#d4af37] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Copy Link</span>
+                    </button>
+                  </div>
+                  <div className="text-emerald-300 font-mono text-[11px] break-all select-all bg-black/50 p-2 rounded-xs border border-neutral-800">
+                    {recentCredentials.invitationLink}
+                  </div>
+                </div>
+              ) : (
+                <div className="sm:col-span-2"><span className="text-neutral-500">Temporary Password:</span> <span className="text-emerald-300 font-semibold select-all">{recentCredentials.password}</span></div>
+              )}
               <div className="sm:col-span-2 truncate"><span className="text-neutral-500">Portal Link:</span> <a href={recentCredentials.portalUrl} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">{recentCredentials.portalUrl}</a></div>
             </div>
           </div>
         )}
 
         <form onSubmit={handleCreateHead} className="space-y-4">
+          {/* Method selector: Invitation vs Password */}
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium">
+              Authentication Method *
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setAuthMethod('invite')}
+                className={`p-3 text-left rounded-sm border transition-all cursor-pointer flex items-start gap-2.5 ${
+                  authMethod === 'invite'
+                    ? 'bg-[#181610] border-[#d4af37] text-white shadow-xs'
+                    : 'bg-[#121217] border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                }`}
+              >
+                <KeyRound className={`w-4 h-4 mt-0.5 shrink-0 ${authMethod === 'invite' ? 'text-[#d4af37]' : 'text-neutral-500'}`} />
+                <div>
+                  <div className="text-xs font-medium text-white flex items-center gap-1.5">
+                    <span>Secure Invitation Link</span>
+                    <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 bg-[#d4af37]/20 text-[#f3e5ab] rounded-xs">Recommended</span>
+                  </div>
+                  <div className="text-[11px] text-neutral-400 font-light mt-0.5">
+                    Generates a secure link for the head to configure their own password
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAuthMethod('password')}
+                className={`p-3 text-left rounded-sm border transition-all cursor-pointer flex items-start gap-2.5 ${
+                  authMethod === 'password'
+                    ? 'bg-[#181610] border-[#d4af37] text-white shadow-xs'
+                    : 'bg-[#121217] border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                }`}
+              >
+                <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${authMethod === 'password' ? 'text-[#d4af37]' : 'text-neutral-500'}`} />
+                <div>
+                  <div className="text-xs font-medium text-white">Manual / Temporary Password</div>
+                  <div className="text-[11px] text-neutral-400 font-light mt-0.5">
+                    Define an explicit temporary password to dispatch directly
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium">
@@ -634,38 +714,47 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs uppercase tracking-wider text-neutral-300 font-medium">
-                  Temporary Password *
-                </label>
-                <button
-                  type="button"
-                  onClick={generatePassword}
-                  className="text-[11px] font-mono text-[#d4af37] hover:underline cursor-pointer flex items-center gap-1"
-                >
-                  <KeyRound className="w-3 h-3" />
-                  <span>Generate Strong</span>
-                </button>
+            {authMethod === 'password' ? (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs uppercase tracking-wider text-neutral-300 font-medium">
+                    Temporary Password *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={generatePassword}
+                    className="text-[11px] font-mono text-[#d4af37] hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <KeyRound className="w-3 h-3" />
+                    <span>Generate Strong</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required={authMethod === 'password'}
+                    placeholder="Min. 8 characters"
+                    value={formPassword}
+                    onChange={(e) => setFormPassword(e.target.value)}
+                    className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2 pl-3 pr-10 text-sm text-white focus:outline-none font-mono transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  placeholder="Min. 8 characters"
-                  value={formPassword}
-                  onChange={(e) => setFormPassword(e.target.value)}
-                  className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2 pl-3 pr-10 text-sm text-white focus:outline-none font-mono transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            ) : (
+              <div className="p-3 bg-[#121217] border border-neutral-800 rounded-sm flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
+                <div className="text-xs text-neutral-300 font-light leading-relaxed">
+                  A high-entropy password-setup invitation token will be generated upon creation. The head can set their password directly via the link.
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium">
@@ -761,7 +850,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               {creating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Provisioning Supabase Identity…</span>
+                  <span>Provisioning Head Account…</span>
                 </>
               ) : (
                 <>
@@ -1144,10 +1233,27 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
 
             {resetResult && (
               <div className="p-3 bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs rounded-sm space-y-2">
-                <div>{resetResult.message}</div>
+                <div className="font-medium">{resetResult.message}</div>
                 {resetResult.link && (
-                  <div className="p-2 bg-black/40 rounded-sm font-mono text-[10px] break-all select-all text-white border border-neutral-800">
-                    {resetResult.link}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-[#f3e5ab]">
+                      <span>Password Reset Link (Valid for 48 hours):</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(resetResult.link!);
+                          setResetCopied(true);
+                          setTimeout(() => setResetCopied(false), 2500);
+                        }}
+                        className="text-[10px] font-mono text-[#d4af37] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {resetCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{resetCopied ? 'Copied!' : 'Copy Link'}</span>
+                      </button>
+                    </div>
+                    <div className="p-2 bg-black/60 rounded-xs font-mono text-[10px] break-all select-all text-white border border-neutral-800">
+                      {resetResult.link}
+                    </div>
                   </div>
                 )}
               </div>

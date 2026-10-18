@@ -242,18 +242,66 @@ export function getDepartmentDashboardUrl(
   return `/head/${department}`;
 }
 
+export function getRoleTitle(
+  department: DepartmentKey,
+  section?: SectionKey | null
+): string {
+  const match = AUTHORIZED_HEADS.find((h) => {
+    if (h.department !== department) return false;
+    if (isGenderSeparated(department)) {
+      return h.section === section;
+    }
+    return true;
+  });
+  if (match?.roleTitle) return match.roleTitle;
+  const deptMeta = DEPARTMENTS[department];
+  if (!deptMeta) return 'Department Head';
+  if (isGenderSeparated(department) && section) {
+    return `${section === 'female' ? 'Female' : 'Male'} Head of ${deptMeta.label}`;
+  }
+  return `Head of ${deptMeta.label}`;
+}
+
 /**
- * Look up verified department assignment for authenticated user UID.
- * Queries public.department_heads using `user_id = session.user.id`.
- * Selects only the real database columns: `department, section`.
- * Distinguishes between success, not found, permission denied (RLS), and network errors.
+ * Look up verified department assignment for authenticated head.
+ * Checks active server session first, then falls back to Supabase if configured.
  */
-export async function lookupHeadAssignment(userId: string): Promise<HeadLookupResult> {
+export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupResult> {
+  // 1. Check local session token first (server-side authentication)
+  try {
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('westmun_head_session') : null;
+    if (token) {
+      const resp = await fetch('/api/head-auth?action=session', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.authorized && data.head) {
+          const dept = data.head.department as DepartmentKey;
+          const sec = data.head.section as SectionKey | null;
+          return {
+            status: 'success',
+            assignment: {
+              department: dept,
+              section: sec,
+              headName: data.head.headName || null,
+              roleTitle: getRoleTitle(dept, sec),
+            },
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Head Authorization] Session verification check bypassed:', err);
+  }
+
+  // 2. Supabase fallback if configured
   const { supabase, supabaseConfigured } = await import('../lib/supabase');
-  if (!supabaseConfigured || !supabase) {
+  if (!supabaseConfigured || !supabase || !userId) {
     return {
-      status: 'network_error',
-      message: 'Database connection is not configured.',
+      status: 'not_found',
     };
   }
 

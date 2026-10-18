@@ -191,38 +191,80 @@ export default function AdminApp() {
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return;
     setError('');
     setBusy(true);
 
-    const { data, error: err } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    const cleanEmail = email.trim().toLowerCase();
 
-    if (err || !data.session) {
-      setBusy(false);
-      setError('Sign-in failed. Please verify your email and password.');
-      return;
+    // 1. Try Supabase Auth first if configured
+    if (supabase) {
+      try {
+        const { data, error: err } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+
+        if (!err && data?.session) {
+          const { data: row } = await supabase
+            .from('admins')
+            .select('user_id')
+            .eq('user_id', data.session.user.id)
+            .maybeSingle();
+
+          if (row || cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
+            setBusy(false);
+            setPassword('');
+            setSession(data.session);
+            setIsAdmin(true);
+            return;
+          }
+        }
+      } catch {
+        // Fallback to direct IT Super Admin check below
+      }
     }
 
-    const { data: row } = await supabase
-      .from('admins')
-      .select('user_id')
-      .eq('user_id', data.session.user.id)
-      .maybeSingle();
+    // 2. Direct IT Super Admin & Secretariat Authentication
+    // Strictly protects diavlo3444@gmail.com without requiring external database setup
+    if (cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase() || !supabaseConfigured) {
+      try {
+        const verifyResp = await fetch('/api/super-admin?action=verify', {
+          headers: {
+            Authorization: `Bearer ${password.trim()}`,
+            'x-admin-email': cleanEmail,
+          },
+        });
 
-    if (!row) {
-      await supabase.auth.signOut();
-      setBusy(false);
-      setError('This account does not have organiser permissions. Request access from the Secretariat.');
-      return;
+        if (verifyResp.ok) {
+          const verifyData = await verifyResp.json();
+          if (verifyData.authorized) {
+            setBusy(false);
+            setPassword('');
+            setSession({
+              access_token: password.trim(),
+              token_type: 'bearer',
+              expires_in: 86400,
+              refresh_token: '',
+              user: {
+                id: verifyData.user?.id || 'super-admin-root',
+                app_metadata: {},
+                user_metadata: {},
+                aud: 'authenticated',
+                created_at: new Date().toISOString(),
+                email: cleanEmail,
+              },
+            } as Session);
+            setIsAdmin(true);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Super Admin verification check error:', err);
+      }
     }
 
     setBusy(false);
-    setPassword('');
-    setSession(data.session);
-    setIsAdmin(true);
+    setError('Sign-in failed. Please verify your organiser email and authorization password.');
   };
 
   // Update a single setting in Supabase
@@ -250,22 +292,7 @@ export default function AdminApp() {
     </div>
   );
 
-  if (!supabaseConfigured) {
-    return shell(
-      <div className="max-w-xl mx-auto px-5 py-24">
-        <div className={`${cardCls} p-7 text-center space-y-4`}>
-          <div className="w-12 h-12 mx-auto rounded-full bg-amber-950/50 border border-amber-500/40 flex items-center justify-center text-[#d4af37]">
-            <ShieldAlert className="w-6 h-6" />
-          </div>
-          <h1 className="text-xl font-serif text-white">Supabase Connection Required</h1>
-          <p className="text-sm text-neutral-400 leading-relaxed font-light">
-            Set <code className="text-[#d4af37] font-mono">VITE_SUPABASE_URL</code> and{' '}
-            <code className="text-[#d4af37] font-mono">VITE_SUPABASE_ANON_KEY</code> in Vercel or your local environment.
-          </p>
-        </div>
-      </div>,
-    );
-  }
+  // Notice: If Supabase is unconfigured, AdminApp allows direct IT Super Admin authentication
 
   if (booting) {
     return shell(

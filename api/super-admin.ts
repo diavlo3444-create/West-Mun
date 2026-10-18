@@ -35,13 +35,17 @@ export default async function handler(req: any, res: any) {
 
   const authHeader = req.headers.authorization || null;
   const method = (req.method || 'GET').toUpperCase();
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  const host = req.headers.host || 'localhost';
+  const proto = req.headers['x-forwarded-proto'] || (host.includes('localhost') ? 'http' : 'https');
+  const origin = `${proto}://${host}`;
+
+  const url = new URL(req.url || '/', origin);
   const action = url.searchParams.get('action') || '';
   const headId = url.searchParams.get('id') || '';
 
   // 1. Verification Endpoint
   if (action === 'verify' || url.pathname.endsWith('/verify')) {
-    const check = await verifySuperAdminCaller(authHeader);
+    const check = await verifySuperAdminCaller(authHeader, req.headers);
     return res.status(check.statusCode).json({
       authorized: check.authorized,
       user: check.user,
@@ -51,7 +55,7 @@ export default async function handler(req: any, res: any) {
 
   // 2. Head Accounts Management
   if (method === 'GET') {
-    const result = await handleListHeads(authHeader);
+    const result = await handleListHeads(authHeader, req.headers);
     return res.status(result.statusCode).json(result.body);
   }
 
@@ -59,25 +63,25 @@ export default async function handler(req: any, res: any) {
     const body = await parseJsonBody(req);
     if (action === 'reset-password' || url.pathname.includes('/password')) {
       const targetId = headId || body.id;
-      const result = await handleResetPassword(authHeader, targetId, body);
+      const result = await handleResetPassword(authHeader, targetId, body, req.headers, origin);
       return res.status(result.statusCode).json(result.body);
     }
 
-    const result = await handleCreateHeadAccount(authHeader, body);
+    const result = await handleCreateHeadAccount(authHeader, body, req.headers, origin);
     return res.status(result.statusCode).json(result.body);
   }
 
   if (method === 'PATCH' || method === 'PUT') {
     const body = await parseJsonBody(req);
     const targetId = headId || body.id;
-    const result = await handleUpdateHead(authHeader, targetId, body);
+    const result = await handleUpdateHead(authHeader, targetId, body, req.headers);
     return res.status(result.statusCode).json(result.body);
   }
 
   if (method === 'DELETE') {
     const body = await parseJsonBody(req);
     const targetId = headId || body.id;
-    const result = await handleDeleteHead(authHeader, targetId);
+    const result = await handleDeleteHead(authHeader, targetId, req.headers);
     return res.status(result.statusCode).json(result.body);
   }
 

@@ -9,12 +9,22 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
       {
-        name: 'super-admin-api-dev-middleware',
+        name: 'api-dev-middleware',
         configureServer(server) {
           server.middlewares.use(async (req, res, next) => {
-            if (req.url && req.url.startsWith('/api/super-admin')) {
+            if (!req.url) return next();
+
+            let targetFilePath: string | null = null;
+            if (req.url.startsWith('/api/super-admin')) {
+              targetFilePath = path.resolve(process.cwd(), 'api/super-admin.ts');
+            } else if (req.url.startsWith('/api/head-auth')) {
+              targetFilePath = path.resolve(process.cwd(), 'api/head-auth.ts');
+            }
+
+            if (targetFilePath) {
               try {
-                const { default: handler } = await import('./api/super-admin.ts');
+                const mod = await server.ssrLoadModule(targetFilePath);
+                const handler = mod.default || mod;
                 const anyRes = res as any;
                 if (!anyRes.status) {
                   anyRes.status = function (code: number) {
@@ -51,6 +61,7 @@ export default defineConfig(() => {
     server: {
       host: '0.0.0.0',
       port: 3000,
+      allowedHosts: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

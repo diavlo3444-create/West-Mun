@@ -33,12 +33,11 @@ Local development: copy `.env.example` to `.env.local`, fill both values, `npm i
 - **Team Management Migration:** If you are using team registrations for the first time, run `supabase/migration_team_management.sql` in Supabase > SQL Editor > New query.
 - Add/remove organisers: add a user in Supabase, run `make_admin.sql` with their email. Remove: `delete from public.admins where lower(email)=lower('their@email');`
 - **IT Super Admin Dashboard (`/admin` → IT Super Admin):**
-  - Dedicated master console strictly reserved for `diavlo3444@gmail.com` when authenticated and verified in `public.admins`.
-  - Enables direct provisioning of Department Head accounts with secure temporary passwords, automatic rollback on error, role editing, instant portal access suspension, and password reset workflows.
-  - To enable:
-    1. Run `supabase/migration_super_admin.sql` in Supabase > SQL Editor.
-    2. Add `diavlo3444@gmail.com` into `public.admins` using the script in `supabase/migration_super_admin.sql`.
-    3. In Vercel (or production server environment variables), add `SUPABASE_SERVICE_ROLE_KEY` to allow serverless user provisioning.
+  - Dedicated master console strictly reserved for `diavlo3444@gmail.com`.
+  - Self-contained server-side Head Account Management without requiring Supabase Auth migrations or `SUPABASE_SERVICE_ROLE_KEY`.
+  - Enables direct provisioning of Department Head accounts with secure salted scrypt password hashing, department and division assignment (`male`/`female` strictly enforced for Media & Press, Security, and Volunteers), instant portal access suspension/reactivation, role editing, and one-click password reset invitation generation.
+  - Pre-seeded with the 17 official department heads from the official roster.
+  - Head Portal (`/head`) authenticates directly with `/api/head-auth`, issuing 256-bit cryptographically secure session tokens and routing authorized heads to their respective dashboards while strictly isolating departments.
 
 ## Weak points you still own
 

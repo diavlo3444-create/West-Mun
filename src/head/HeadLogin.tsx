@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Shield,
   Loader2,
   ArrowRight,
   KeyRound,
   AlertCircle,
+  CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import {
-  fetchHeadAssignment,
   getDepartmentDashboardUrl,
+  getRoleTitle,
   type HeadAssignment,
+  type DepartmentKey,
+  type SectionKey,
 } from './departments';
 import { AccessDenied } from './AccessDenied';
 
@@ -31,6 +34,23 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
     userId?: string;
   } | null>(null);
 
+  // Invitation / Password Reset Link support via ?resetToken=...
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tokenParam = params.get('resetToken') || params.get('token');
+      if (tokenParam) {
+        setResetToken(tokenParam);
+      }
+    }
+  }, []);
+
   /**
    * Redirect user to their specific department and section dashboard
    */
@@ -47,55 +67,53 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
   };
 
   /**
-   * Handle credential submission
+   * Handle credential submission via server-side /api/head-auth
    */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) {
-      setError('Database connection is not configured.');
-      return;
-    }
-
     setError('');
     setBusy(true);
 
     const cleanEmail = email.trim().toLowerCase();
 
     try {
-      // 1. Authenticate with Supabase Auth
-      const { data, error: authErr } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
+      const response = await fetch('/api/head-auth?action=login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password,
+        }),
       });
 
-      if (authErr || !data.session || !data.user) {
-        setBusy(false);
+      const data = await response.json();
+      setBusy(false);
+
+      if (!response.ok || !data.success || !data.token) {
         setError(
-          authErr?.message ||
+          data.error ||
             'Authentication failed. Please verify your department head email and password.'
         );
         return;
       }
 
-      // 2. Get the authenticated user's actual UID from the Supabase session
-      const authUserId = data.user.id;
+      // Store authenticated session token
+      sessionStorage.setItem('westmun_head_session', data.token);
 
-      // 3. Query public.department_heads for that exact user_id
-      const assignment = await fetchHeadAssignment(authUserId);
+      const headData = data.head;
+      const dept = headData.department as DepartmentKey;
+      const sec = headData.section as SectionKey | null;
 
-      setBusy(false);
+      const assignment: HeadAssignment = {
+        department: dept,
+        section: sec,
+        headName: headData.head_name || headData.headName || null,
+        roleTitle: getRoleTitle(dept, sec),
+      };
 
-      if (assignment) {
-        // Valid assignment exists -> automatically redirect to their assigned department dashboard
-        navigateToDashboard(assignment);
-      } else {
-        // Authenticated in Supabase, but no active assignment in public.department_heads
-        // Display clear message that the account is not authorized and provide a sign-out option.
-        setAccessDeniedInfo({
-          email: data.user.email || cleanEmail,
-          userId: authUserId,
-        });
-      }
+      navigateToDashboard(assignment);
     } catch (err: unknown) {
       setBusy(false);
       const msg = err instanceof Error ? err.message : 'An unexpected error occurred during login.';
@@ -104,11 +122,69 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
   };
 
   /**
-   * Sign out and return to clean login state
+   * Handle Password Reset / Account Invitation Completion
+   */
+  const handleCompleteReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters in length.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match. Please verify your entries.');
+      return;
+    }
+
+    setResettingPassword(true);
+
+    try {
+      const response = await fetch('/api/head-auth?action=reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token: resetToken,
+          newPassword,
+        }),
+      });
+
+      const data = await response.json();
+      setResettingPassword(false);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to complete password reset.');
+      }
+
+      setResetSuccess(data.message || 'Password successfully updated! You can now sign in.');
+      setResetToken(null);
+      // Clean query params
+      if (window.history?.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (err: unknown) {
+      setResettingPassword(false);
+      const msg = err instanceof Error ? err.message : 'Failed to update password.';
+      setError(msg);
+    }
+  };
+
+  /**
+   * Sign out helper
    */
   const handleSignOut = async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
+    const token = sessionStorage.getItem('westmun_head_session');
+    if (token) {
+      try {
+        await fetch('/api/head-auth?action=logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {}
+      sessionStorage.removeItem('westmun_head_session');
     }
     setAccessDeniedInfo(null);
     setEmail('');
@@ -116,7 +192,6 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
     setError('');
   };
 
-  // If user has authenticated via login but has no assignment in public.department_heads
   if (accessDeniedInfo) {
     return (
       <AccessDenied
@@ -140,7 +215,7 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
           </div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-sm bg-[#17171d] border border-neutral-800 text-[10px] font-mono uppercase tracking-widest text-[#d4af37] mb-2">
             <KeyRound className="w-3 h-3" />
-            <span>Authorized Access Only</span>
+            <span>Authorized Command Access</span>
           </div>
           <h1
             className="text-2xl sm:text-3xl font-serif text-white tracking-tight"
@@ -163,65 +238,146 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label
-              htmlFor="head-email"
-              className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium"
-            >
-              Head Email Address
-            </label>
-            <input
-              id="head-email"
-              type="email"
-              required
-              autoComplete="username"
-              placeholder="head@westmun.org"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2.5 px-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none transition-colors"
-            />
+        {resetSuccess && (
+          <div className="mb-5 p-3.5 text-xs text-emerald-300 bg-emerald-950/40 border border-emerald-500/40 rounded-sm leading-relaxed font-light flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <span>{resetSuccess}</span>
           </div>
+        )}
 
-          <div>
-            <label
-              htmlFor="head-password"
-              className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium"
-            >
-              Password
-            </label>
-            <input
-              id="head-password"
-              type="password"
-              required
-              autoComplete="current-password"
-              placeholder="••••••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2.5 px-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none transition-colors"
-            />
-          </div>
+        {/* 1. Account Invitation / Reset Password View */}
+        {resetToken ? (
+          <form onSubmit={handleCompleteReset} className="space-y-4">
+            <div className="p-3 bg-[#141418] border border-[#d4af37]/40 rounded-sm mb-3">
+              <span className="text-xs uppercase font-mono tracking-wider text-[#d4af37] font-semibold flex items-center gap-1.5 mb-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Head Account Activation</span>
+              </span>
+              <p className="text-xs text-neutral-300 leading-relaxed font-light">
+                Enter a new secure password to activate your official department head credentials.
+              </p>
+            </div>
 
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full py-3 text-xs font-semibold uppercase tracking-widest text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer shadow-md inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {busy ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Verifying Credentials & Department…</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign In to Head Portal</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+            <div>
+              <label
+                htmlFor="reset-new-password"
+                className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium"
+              >
+                New Password (min 8 chars)
+              </label>
+              <input
+                id="reset-new-password"
+                type="password"
+                required
+                autoComplete="new-password"
+                placeholder="••••••••••••"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2.5 px-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="reset-confirm-password"
+                className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium"
+              >
+                Confirm New Password
+              </label>
+              <input
+                id="reset-confirm-password"
+                type="password"
+                required
+                autoComplete="new-password"
+                placeholder="••••••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2.5 px-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={resettingPassword}
+                className="w-full py-3 text-xs font-semibold uppercase tracking-widest text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer shadow-md inline-flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {resettingPassword ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Updating Credentials…</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Activate Account & Password</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* 2. Standard Login Form */
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label
+                htmlFor="head-email"
+                className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium"
+              >
+                Head Email Address
+              </label>
+              <input
+                id="head-email"
+                type="email"
+                required
+                autoComplete="username"
+                placeholder="head@westmun.org"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2.5 px-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="head-password"
+                className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium"
+              >
+                Password
+              </label>
+              <input
+                id="head-password"
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="••••••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2.5 px-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full py-3 text-xs font-semibold uppercase tracking-widest text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer shadow-md inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Verifying Credentials & Department…</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In to Head Portal</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="mt-8 pt-5 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500">
           <a
@@ -230,7 +386,7 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
           >
             <span>← Conference Home</span>
           </a>
-          <span className="font-mono text-neutral-600">Confidential · RLS Active</span>
+          <span className="font-mono text-neutral-600">Secretariat Verified</span>
         </div>
       </div>
     </div>
