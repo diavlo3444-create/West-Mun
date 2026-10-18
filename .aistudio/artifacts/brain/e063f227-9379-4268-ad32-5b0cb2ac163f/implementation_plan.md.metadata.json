@@ -1,6 +1,0 @@
-{
-  "summary": "Implementation plan for bidirectional scroll-controlled video playback with reverse inertia. Adds seamless reverse playback when scrolling upward, preserving velocity scaling and gentle friction deceleration to a halt, with gentle resting when reaching the first frame.",
-  "updatedAt": "2026-10-17T10:27:46.685989511Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

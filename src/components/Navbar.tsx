@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { useSettings } from '../lib/content';
-import { tierState } from '../lib/registration';
 
 interface NavbarProps {
   scrolled?: boolean;
@@ -18,9 +16,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
   logoVisible = true,
   navVisible = true,
 }) => {
-  const settings = useSettings();
-  const regOpen = tierState(settings, 'early_bird') === 'open' || tierState(settings, 'regular') === 'open';
-  const regLabel = regOpen ? 'Register Now' : 'Registration: TBA';
+  const regLabel = 'Registration: TBA';
   const [internalScrolled, setInternalScrolled] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.scrollY > 40;
@@ -152,17 +148,17 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
             aria-expanded={menuOpen}
           >
             <span
-              className={`w-6 h-[2px] bg-[#d4af37] transition-all duration-300 ease-in-out ${
+              className={`w-6 h-[2px] bg-[#d4af37] transition-[transform,opacity] duration-300 ease-in-out ${
                 menuOpen ? 'rotate-45 translate-y-[7px]' : ''
               }`}
             />
             <span
-              className={`w-6 h-[2px] bg-[#d4af37] transition-all duration-300 ease-in-out ${
+              className={`w-6 h-[2px] bg-[#d4af37] transition-[transform,opacity] duration-300 ease-in-out ${
                 menuOpen ? 'opacity-0' : 'opacity-100'
               }`}
             />
             <span
-              className={`w-6 h-[2px] bg-[#d4af37] transition-all duration-300 ease-in-out ${
+              className={`w-6 h-[2px] bg-[#d4af37] transition-[transform,opacity] duration-300 ease-in-out ${
                 menuOpen ? '-rotate-45 -translate-y-[7px]' : ''
               }`}
             />
@@ -172,7 +168,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
 
       {/* Mobile Navigation Overlay */}
       <div
-        className={`fixed inset-0 z-30 bg-[#070707]/98 flex flex-col justify-center items-start px-8 sm:px-12 gap-6 lg:hidden transition-all duration-300 ease-in-out ${
+        className={`fixed inset-0 z-30 bg-[#070707]/98 flex flex-col justify-center items-start px-8 sm:px-12 gap-6 lg:hidden transition-opacity duration-300 ease-in-out ${
           menuOpen
             ? 'opacity-100 pointer-events-auto'
             : 'opacity-0 pointer-events-none'

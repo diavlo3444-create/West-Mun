@@ -89,12 +89,14 @@ export const FAQSection: React.FC = React.memo(() => {
 
                 <div
                   id={`faq-answer-${faq.id}`}
-                  className={`px-6 sm:px-8 transition-all duration-300 ease-in-out overflow-hidden ${
-                    isOpen ? 'max-h-96 pb-6 pt-2 opacity-100' : 'max-h-0 pb-0 pt-0 opacity-0'
+                  className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+                    isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
                   }`}
                 >
-                  <div className="pt-2 border-t border-neutral-800/70 text-sm text-neutral-300 leading-relaxed font-light">
-                    {faq.answer}
+                  <div className="overflow-hidden px-6 sm:px-8">
+                    <div className="pt-2 pb-6 border-t border-neutral-800/70 text-sm text-neutral-300 leading-relaxed font-light">
+                      {faq.answer}
+                    </div>
                   </div>
                 </div>
               </motion.div>

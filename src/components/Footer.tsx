@@ -22,7 +22,7 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
   return (
     <footer ref={ref} className="relative z-20 bg-[#050506] text-white border-t border-neutral-900 py-16">
       <div
-        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-all duration-1000 ease-out transform ${
+        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-[opacity,transform] duration-1000 ease-out will-change-[opacity,transform] ${
           isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         }`}
       >
@@ -83,7 +83,7 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
                 <a href="#faq" className="hover:text-white transition-colors">Delegate FAQ</a>
               </li>
               <li>
-                <a href="#register" className="hover:text-[#d4af37] transition-colors">Registration</a>
+                <a href="#register" className="hover:text-[#d4af37] transition-colors">Registration (TBA)</a>
               </li>
             </ul>
           </div>

@@ -103,6 +103,10 @@ class VelocityInertiaHelper {
   private idleThresholdMs: number;
   private minHaltRate: number;
 
+  private lastSeekTime: number = 0;
+  private pendingSeekTime: number | null = null;
+  private isSeeking: boolean = false;
+
   constructor(
     videoRef: React.RefObject<HTMLVideoElement | null>,
     isVisibleRef: React.RefObject<boolean>,
@@ -117,6 +121,45 @@ class VelocityInertiaHelper {
     this.friction = config?.friction ?? 0.92;
     this.idleThresholdMs = config?.idleThresholdMs ?? 80;
     this.minHaltRate = config?.minHaltRate ?? 0.12;
+  }
+
+  /**
+   * Safe seek dispatcher that uses fastSeek when supported and prevents decoder stalls
+   */
+  private dispatchSeek(video: HTMLVideoElement, time: number): void {
+    const clampedTime = Math.max(0, time);
+    if (Math.abs(video.currentTime - clampedTime) < 0.02) return;
+
+    if (video.seeking || this.isSeeking) {
+      this.pendingSeekTime = clampedTime;
+      return;
+    }
+
+    try {
+      this.isSeeking = true;
+      if (typeof (video as unknown as { fastSeek?: (t: number) => void }).fastSeek === 'function') {
+        (video as unknown as { fastSeek: (t: number) => void }).fastSeek(clampedTime);
+      } else {
+        video.currentTime = clampedTime;
+      }
+    } catch {
+      this.isSeeking = false;
+    }
+  }
+
+  /**
+   * Called when video finishes seeking a frame, draining any coalesced pending seek
+   */
+  public onSeeked(): void {
+    this.isSeeking = false;
+    if (this.pendingSeekTime !== null) {
+      const nextTime = this.pendingSeekTime;
+      this.pendingSeekTime = null;
+      const video = this.videoRef.current;
+      if (video) {
+        this.dispatchSeek(video, nextTime);
+      }
+    }
   }
 
   /**
@@ -222,7 +265,7 @@ class VelocityInertiaHelper {
         video.playbackRate = effectiveRate;
       } catch {}
     } else {
-      // Reverse playback: ensure forward playback is paused and step currentTime backward
+      // Reverse playback: ensure forward playback is paused and step currentTime backward cleanly
       if (!video.paused) {
         video.pause();
       }
@@ -231,15 +274,18 @@ class VelocityInertiaHelper {
 
       if (newTime <= 0.02) {
         // Reached the start of the video: pause gently at the first frame
-        try {
-          video.currentTime = 0;
-        } catch {}
+        this.dispatchSeek(video, 0);
         this.stop();
         return;
       } else {
-        try {
-          video.currentTime = newTime;
-        } catch {}
+        const nowMs = performance.now();
+        // Throttle reverse seek requests to avoid saturating mobile/low-end hardware decoders
+        if (nowMs - this.lastSeekTime >= 30) {
+          this.lastSeekTime = nowMs;
+          this.dispatchSeek(video, newTime);
+        } else {
+          this.pendingSeekTime = newTime;
+        }
       }
     }
 
@@ -265,6 +311,8 @@ class VelocityInertiaHelper {
     }
     this.currentPlaybackRate = 1.0;
     this.smoothedVelocity = 0;
+    this.pendingSeekTime = null;
+    this.isSeeking = false;
   }
 }
 
@@ -681,6 +729,7 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
             }}
             onLoadedMetadata={(e) => handleVideoReady(e.currentTarget)}
             onCanPlay={(e) => handleVideoReady(e.currentTarget)}
+            onSeeked={() => inertiaHelperRef.current?.onSeeked()}
             className="absolute inset-0 h-full w-full object-cover pointer-events-none select-none opacity-85"
             style={{
               objectPosition: '70% center',

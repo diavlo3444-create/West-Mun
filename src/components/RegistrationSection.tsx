@@ -1,32 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ShieldCheck, Calendar, Clock, MapPin } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 import { useSettings, orTba } from '../lib/content';
-import { tierState, formatFee, type Tier, type TierState } from '../lib/registration';
-import { RegistrationForm } from './RegistrationForm';
 
 export const RegistrationSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
   const settings = useSettings();
-  const [formOpen, setFormOpen] = useState(false);
-
-  const states: Record<Tier, TierState> = {
-    early_bird: tierState(settings, 'early_bird'),
-    regular: tierState(settings, 'regular'),
-  };
-  const openTiers = (Object.keys(states) as Tier[]).filter((t) => states[t] === 'open');
-  const badge = (t: Tier) =>
-    ({ open: 'Status: Open', not_yet: 'Status: Opens soon', ended: 'Status: Closed', closed: 'Status: TBA' })[states[t]];
-  const windowText = (t: Tier) => {
-    const o = settings[`${t}_opens`]?.trim();
-    const c = settings[`${t}_closes`]?.trim();
-    if (!o && !c) return 'To Be Announced';
-    return `${o || '…'} → ${c || '…'}`;
-  };
 
   return (
-    <section id="register" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
+    <section
+      id="register"
+      ref={ref}
+      className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900"
+    >
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
         {/* Section Header */}
         <motion.div
@@ -51,7 +38,8 @@ export const RegistrationSection: React.FC = React.memo(() => {
             </span>
           </h2>
           <p className="text-neutral-300 text-base sm:text-lg leading-relaxed font-light">
-            {settings.registration_intro}
+            {settings.registration_intro ||
+              'Secure your delegation’s place at the Western Model United Nations Conference. All official fee structures, registration schedules, and country allocation matrices are To Be Announced (TBA).'}
           </p>
         </motion.div>
 
@@ -63,13 +51,13 @@ export const RegistrationSection: React.FC = React.memo(() => {
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
             transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm relative flex flex-col justify-between hover:border-[#d4af37]/40 transition-all duration-300"
+            className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm relative flex flex-col justify-between hover:border-[#d4af37]/40 transition-[transform,border-color,box-shadow] duration-300"
           >
             <div>
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[11px] font-mono uppercase tracking-widest text-[#d4af37]">Tier 01</span>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 bg-[#17171d] text-neutral-400 border border-neutral-800 rounded-sm">
-                  {badge('early_bird')}
+                  Status: TBA
                 </span>
               </div>
               <h3 className="text-xl font-serif text-white mb-2">Early Bird Delegate</h3>
@@ -79,21 +67,21 @@ export const RegistrationSection: React.FC = React.memo(() => {
               <div className="space-y-2 py-4 border-t border-neutral-800 text-xs">
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Registration Fee:</span>
-                  <span className="font-mono text-[#d4af37] font-bold">{formatFee(settings, 'early_bird')}</span>
+                  <span className="font-mono text-[#d4af37] font-bold">TBA</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Application Deadline:</span>
-                  <span className="font-mono text-neutral-300">{orTba(settings.early_bird_closes)}</span>
+                  <span className="font-mono text-neutral-300">TBA</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Registration Window:</span>
-                  <span className="font-mono text-neutral-400">{windowText('early_bird')}</span>
+                  <span className="font-mono text-neutral-400">To Be Announced</span>
                 </div>
               </div>
             </div>
             <div className="mt-6 pt-4 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500">
               <span>Eligibility: High School & Collegiate Delegates</span>
-              <span className="font-mono text-[#d4af37]">{formatFee(settings, 'early_bird')}</span>
+              <span className="font-mono text-[#d4af37]">TBA</span>
             </div>
           </motion.div>
 
@@ -103,7 +91,7 @@ export const RegistrationSection: React.FC = React.memo(() => {
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
             transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="p-8 bg-[#0e0e12] border border-[#d4af37]/40 rounded-sm relative flex flex-col justify-between shadow-[0_0_30px_rgba(212,175,55,0.06)] hover:border-[#d4af37] transition-all duration-300"
+            className="p-8 bg-[#0e0e12] border border-[#d4af37]/40 rounded-sm relative flex flex-col justify-between shadow-[0_0_30px_rgba(212,175,55,0.06)] hover:border-[#d4af37] transition-[transform,border-color,box-shadow] duration-300"
           >
             <div className="absolute -top-3 left-6 px-3 py-0.5 bg-[#d4af37] text-black text-[10px] uppercase font-bold tracking-widest rounded-sm">
               Standard Delegate
@@ -112,7 +100,7 @@ export const RegistrationSection: React.FC = React.memo(() => {
               <div className="flex justify-between items-start mb-4 mt-1">
                 <span className="text-[11px] font-mono uppercase tracking-widest text-[#d4af37]">Tier 02</span>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 bg-[#17171d] text-neutral-400 border border-neutral-800 rounded-sm">
-                  {badge('regular')}
+                  Status: TBA
                 </span>
               </div>
               <h3 className="text-xl font-serif text-white mb-2">Regular Registration</h3>
@@ -122,21 +110,21 @@ export const RegistrationSection: React.FC = React.memo(() => {
               <div className="space-y-2 py-4 border-t border-neutral-800 text-xs">
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Registration Fee:</span>
-                  <span className="font-mono text-[#d4af37] font-bold">{formatFee(settings, 'regular')}</span>
+                  <span className="font-mono text-[#d4af37] font-bold">TBA</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Application Deadline:</span>
-                  <span className="font-mono text-neutral-300">{orTba(settings.regular_closes)}</span>
+                  <span className="font-mono text-neutral-300">TBA</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Registration Window:</span>
-                  <span className="font-mono text-neutral-400">{windowText('regular')}</span>
+                  <span className="font-mono text-neutral-400">To Be Announced</span>
                 </div>
               </div>
             </div>
             <div className="mt-6 pt-4 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-400">
               <span>Eligibility: Open to All Registered Delegates</span>
-              <span className="font-mono text-[#d4af37]">{formatFee(settings, 'regular')}</span>
+              <span className="font-mono text-[#d4af37]">TBA</span>
             </div>
           </motion.div>
         </div>
@@ -150,25 +138,16 @@ export const RegistrationSection: React.FC = React.memo(() => {
         >
           <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 bg-[#141418] border border-[#d4af37]/40 rounded-sm text-xs text-[#f3e5ab] font-medium uppercase tracking-wider">
             <ShieldCheck className="w-3.5 h-3.5 text-[#d4af37]" />
-            <span>{openTiers.length ? 'Registration Status: Open' : 'Registration Status: To Be Announced'}</span>
+            <span>Registration Status: To Be Announced</span>
           </div>
           <h3 className="text-lg sm:text-xl font-serif text-white mb-2">
-            {openTiers.length ? 'Delegate registration is open' : settings.registration_notice_title}
+            {settings.registration_notice_title || 'Official Delegate Registration Opening Soon (TBA)'}
           </h3>
           <p className="text-xs sm:text-sm text-neutral-400 font-light leading-relaxed max-w-xl mx-auto mb-4">
-            {openTiers.length
-              ? 'Complete the short form to submit your application. The Secretariat reviews every application.'
-              : settings.registration_notice_text}
+            {settings.registration_notice_text ||
+              'Official conference registration dates, delegate and delegation fee schedules, and committee allocation matrices will be published once conference dates and host venue agreements are ratified by the Secretariat.'}
           </p>
-          {openTiers.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setFormOpen(true)}
-              className="mb-5 px-6 py-3 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 transition-all cursor-pointer"
-            >
-              Register now
-            </button>
-          )}
+
           <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-neutral-400 pt-3 border-t border-neutral-800">
             <span className="inline-flex items-center gap-1.5 font-mono">
               <Calendar className="w-3.5 h-3.5 text-[#d4af37]" />
@@ -180,15 +159,13 @@ export const RegistrationSection: React.FC = React.memo(() => {
             </span>
             <span className="inline-flex items-center gap-1.5 font-mono">
               <Clock className="w-3.5 h-3.5 text-[#d4af37]" />
-              Portal Access: <strong className="text-[#d4af37]">{openTiers.length ? 'Open' : 'TBA'}</strong>
+              Portal Access: <strong className="text-[#d4af37]">TBA</strong>
             </span>
           </div>
         </motion.div>
       </div>
-      {formOpen && openTiers.length > 0 && (
-        <RegistrationForm settings={settings} openTiers={openTiers} onClose={() => setFormOpen(false)} />
-      )}
     </section>
   );
 });
+
 RegistrationSection.displayName = 'RegistrationSection';
