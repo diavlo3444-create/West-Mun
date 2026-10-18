@@ -2,16 +2,24 @@ import React, { useState } from 'react';
 import { Mail, Instagram, MapPin, Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
-import { submitInquiry } from '../lib/api';
+import { supabase } from '../lib/supabase';
+import { useSettings, orTba } from '../lib/content';
+import { safeUrl } from '../lib/safe';
+import { ConsentCheck } from './ConsentCheck';
 
 export const ContactSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
+  const settings = useSettings();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     subject: '',
     message: '',
+    website: '', // honeypot: real people never see or fill this
   });
+  const [consent, setConsent] = useState(false);
+  const instagramUrl = safeUrl(settings.instagram_url);
+  const contactEmail = settings.contact_email.trim();
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -43,10 +51,14 @@ export const ContactSection: React.FC = React.memo(() => {
       errs.subject = 'Subject must be under 150 characters.';
     }
 
-    if (!trimmedMessage || trimmedMessage.length < 5) {
-      errs.message = 'Please provide your message (at least 5 characters).';
+    if (!trimmedMessage || trimmedMessage.length < 10) {
+      errs.message = 'Please provide your message (at least 10 characters).';
     } else if (trimmedMessage.length > 3000) {
       errs.message = 'Message must be under 3000 characters.';
+    }
+
+    if (!consent) {
+      errs.consent = 'Please agree to the Terms and Privacy Policy to send your message.';
     }
 
     return errs;
@@ -65,15 +77,28 @@ export const ContactSection: React.FC = React.memo(() => {
     setIsSubmitting(true);
 
     try {
-      const res = await submitInquiry({
+      if (formData.website) {
+        setSent(true); // bot: pretend success, send nothing
+        return;
+      }
+      if (!supabase) {
+        throw new Error('Messages are not available right now. Please try again later.');
+      }
+      const { error } = await supabase.from('inquiries').insert({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         subject: formData.subject.trim(),
         message: formData.message.trim(),
+        consent_version: settings.legal_version || 'unknown',
       });
-
-      if (!res.success) {
-        throw new Error(res.error || 'Unable to transmit inquiry.');
+      if (error) {
+        if (error.message?.includes('rate_limited')) {
+          throw new Error('Many messages are arriving right now. Please wait a minute and try again.');
+        }
+        if (error.code === '23514') {
+          throw new Error('Some details are not valid. Please check your email address and message length.');
+        }
+        throw new Error('We could not send your message. Please try again later.');
       }
       setSent(true);
     } catch (err: unknown) {
@@ -107,7 +132,7 @@ export const ContactSection: React.FC = React.memo(() => {
             Contact <span className="gold-gradient-text">WEST MUN</span>
           </h2>
           <p className="text-neutral-300 text-base sm:text-lg leading-relaxed font-light">
-            Have questions regarding committee agendas, delegation quotas, or institutional sponsorships? Connect with the organizing team directly.
+            {settings.contact_intro}
           </p>
         </motion.div>
 
@@ -122,7 +147,7 @@ export const ContactSection: React.FC = React.memo(() => {
             <div className="p-6 bg-[#0c0c0e] border border-neutral-800 rounded-sm">
               <h3 className="text-lg font-serif text-white mb-4">Official Channels</h3>
               <p className="text-xs text-neutral-400 mb-6 font-light leading-relaxed">
-                Official email addresses and social handles will be activated concurrently with the launch of the delegate handbook.
+                {contactEmail ? 'Reach the organizing team through any of the channels below.' : 'Official email addresses and social handles will be activated concurrently with the launch of the delegate handbook.'}
               </p>
 
               <div className="space-y-4 text-xs">
@@ -134,15 +159,22 @@ export const ContactSection: React.FC = React.memo(() => {
                   <Mail className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
                   <div>
                     <span className="text-neutral-400 block font-medium">Official Secretariat Email</span>
-                    <span className="font-mono text-[#d4af37] font-semibold">TBA</span>
+                    {contactEmail ? (
+                      <a href={`mailto:${contactEmail}`} className="font-mono text-[#d4af37] font-semibold hover:text-[#f3e5ab] break-all">
+                        {contactEmail}
+                      </a>
+                    ) : (
+                      <span className="font-mono text-[#d4af37] font-semibold">TBA</span>
+                    )}
                   </div>
                 </motion.div>
 
                 {/* Instagram */}
+                {instagramUrl && (
                 <motion.a
                   whileHover={{ x: 3, transition: { duration: 0.2 } }}
                   whileTap={{ scale: 0.99 }}
-                  href="https://www.instagram.com/westmun_27?rpxt=c3JkNHN2Mm44OTh5&utm_source=qr"
+                  href={instagramUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Visit WEST MUN on Instagram"
@@ -154,10 +186,11 @@ export const ContactSection: React.FC = React.memo(() => {
                       Official Instagram
                     </span>
                     <span className="font-mono text-[#d4af37] font-semibold text-xs">
-                      @westmun_27 ↗
+                      {orTba(settings.instagram_handle, 'Instagram')} ↗
                     </span>
                   </div>
                 </motion.a>
+                )}
 
                 {/* Venue / Location */}
                 <motion.div
@@ -167,7 +200,7 @@ export const ContactSection: React.FC = React.memo(() => {
                   <MapPin className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
                   <div>
                     <span className="text-neutral-400 block font-medium">Conference Venue & City</span>
-                    <span className="font-mono text-[#d4af37] font-semibold">TBA</span>
+                    <span className="font-mono text-[#d4af37] font-semibold">{orTba(settings.conference_venue)}</span>
                   </div>
                 </motion.div>
               </div>
@@ -184,7 +217,7 @@ export const ContactSection: React.FC = React.memo(() => {
             <div className="p-8 sm:p-10 bg-[#0e0e11] border border-neutral-800/90 rounded-sm">
               <h3 className="text-xl font-serif text-white mb-2">Send a Diplomatic Inquiry</h3>
               <p className="text-xs text-neutral-400 mb-6 font-light">
-                Submit an inquiry directly to the Secretariat queue. Our team reviews incoming messages periodically.
+                Submit an inquiry directly to the Secretariat queue. Our team reviews incoming messages periodically. We use your details only to reply (see our Privacy Policy).
               </p>
 
               {sent ? (
@@ -200,7 +233,8 @@ export const ContactSection: React.FC = React.memo(() => {
                     type="button"
                     onClick={() => {
                       setSent(false);
-                      setFormData({ name: '', email: '', subject: '', message: '' });
+                      setFormData({ name: '', email: '', subject: '', message: '', website: '' });
+                      setConsent(false);
                     }}
                     className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] rounded-sm hover:bg-[#e5c158] transition-colors cursor-pointer"
                   >
@@ -270,6 +304,13 @@ export const ContactSection: React.FC = React.memo(() => {
                     />
                     {errors.message && <p className="text-[11px] text-red-400 mt-1">{errors.message}</p>}
                   </div>
+
+                  {/* honeypot */}
+                  <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', top: 'auto', width: 1, height: 1, overflow: 'hidden' }}>
+                    <label>Website <input tabIndex={-1} autoComplete="off" value={formData.website} onChange={(e) => setFormData({ ...formData, website: e.target.value })} /></label>
+                  </div>
+
+                  <ConsentCheck id="contact-consent" checked={consent} onChange={setConsent} error={errors.consent} />
 
                   {submitError && (
                     <div className="p-3 bg-red-950/40 border border-red-500/40 rounded-sm flex items-start gap-2.5 text-xs text-red-300">

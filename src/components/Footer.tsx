@@ -1,15 +1,19 @@
 import React from 'react';
 import { ArrowUp, Shield, Instagram } from 'lucide-react';
 import { useInView } from '../hooks/useInView';
+import { useSettings, orTba } from '../lib/content';
+import { safeUrl } from '../lib/safe';
 
 interface FooterProps {
   onReplayIntro?: () => void;
-  onOpenAdminPortal?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
   const { ref, isInView } = useInView<HTMLElement>({ threshold: 0.05 });
   const currentYear = 2027;
+  const settings = useSettings();
+  const instagramUrl = safeUrl(settings.instagram_url);
+  const contactEmail = settings.contact_email.trim();
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -79,7 +83,7 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
                 <a href="#faq" className="hover:text-white transition-colors">Delegate FAQ</a>
               </li>
               <li>
-                <a href="#register" className="hover:text-[#d4af37] transition-colors">Registration (TBA)</a>
+                <a href="#register" className="hover:text-[#d4af37] transition-colors">Registration</a>
               </li>
             </ul>
           </div>
@@ -92,25 +96,31 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
             <ul className="space-y-2.5 text-xs text-neutral-400">
               <li>
                 <span className="text-neutral-500 block">General Secretariat:</span>
-                <span className="font-mono text-[#d4af37]">TBA</span>
+                {contactEmail ? (
+                  <a href={`mailto:${contactEmail}`} className="font-mono text-[#d4af37] hover:text-[#f3e5ab] break-all">{contactEmail}</a>
+                ) : (
+                  <span className="font-mono text-[#d4af37]">TBA</span>
+                )}
               </li>
               <li>
                 <span className="text-neutral-500 block">Host Venue:</span>
-                <span className="font-mono text-neutral-300">TBA</span>
+                <span className="font-mono text-neutral-300">{orTba(settings.conference_venue)}</span>
               </li>
+              {instagramUrl && (
               <li>
                 <span className="text-neutral-500 block mb-1">Official Instagram:</span>
                 <a
-                  href="https://www.instagram.com/westmun_27?rpxt=c3JkNHN2Mm44OTh5&utm_source=qr"
+                  href={instagramUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Visit WEST MUN on Instagram"
                   className="inline-flex items-center gap-1.5 text-xs font-mono text-[#d4af37] hover:text-[#f3e5ab] transition-colors"
                 >
                   <Instagram className="w-3.5 h-3.5" />
-                  <span>@westmun_27 ↗</span>
+                  <span>{orTba(settings.instagram_handle, 'Instagram')} ↗</span>
                 </a>
               </li>
+              )}
             </ul>
           </div>
         </div>
@@ -119,6 +129,8 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
         <div className="pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
           <p>© {currentYear} WEST MUN (Model United Nations). All rights reserved.</p>
           <div className="flex items-center gap-6">
+            <a href="/terms" className="hover:text-[#d4af37] transition-colors">Terms of Service</a>
+            <a href="/privacy" className="hover:text-[#d4af37] transition-colors">Privacy Policy</a>
             <button
               type="button"
               onClick={scrollToTop}
@@ -130,6 +142,10 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
             </button>
           </div>
         </div>
+
+        <p className="mt-6 text-[11px] text-neutral-600 leading-relaxed max-w-3xl">
+          WEST MUN is an independent Model United Nations conference simulation. It is not affiliated with, endorsed by, or sponsored by the United Nations.
+        </p>
 
         {/* Dedicated Replay Intro Button at the very bottom */}
         {onReplayIntro && (

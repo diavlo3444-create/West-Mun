@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --font-heading: 'Cinzel', 'HelveticaNowDisplay-Medium', Georgia, serif;
+  --font-heading: 'Cinzel', Georgia, serif;
   --font-serif: 'Cormorant Garamond', Georgia, serif;
-  --font-body: 'Plus Jakarta Sans', 'HelveticaNowDisplayW01-Rg', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   
   --gold-primary: #d4af37;

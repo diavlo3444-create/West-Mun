@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
+import { usePublicTable, DEFAULT_FAQ, type FaqRow } from '../lib/content';
 
 interface FAQItem {
   id: string;
@@ -11,55 +12,14 @@ interface FAQItem {
 
 export const FAQSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
-  const [openId, setOpenId] = useState<string | null>('faq-1');
+  const [pickedId, setPickedId] = useState<string | null | undefined>(undefined);
 
-  const faqs: FAQItem[] = [
-    {
-      id: 'faq-1',
-      question: 'What is WEST MUN?',
-      answer:
-        'WEST MUN (Western Model United Nations) is an academic conference simulating the United Nations and associated multilateral organs. Student delegates act as diplomats representing designated countries, researching international issues, negotiating policies, and authoring formal resolutions.',
-    },
-    {
-      id: 'faq-2',
-      question: 'Who can participate?',
-      answer:
-        'WEST MUN welcomes high school and university students with an interest in international relations, debate, politics, law, and diplomacy. Both individual delegates (independent registrations) and school delegations accompanied by faculty advisors are eligible to register.',
-    },
-    {
-      id: 'faq-3',
-      question: 'Do I need previous MUN experience?',
-      answer:
-        'No prior Model UN experience is required. The conference features committees tailored across skill levels, ranging from beginner-friendly General Assembly rooms with dais guidance to fast-paced advanced crisis simulations. Introductory procedure briefings are held during Day 1.',
-    },
-    {
-      id: 'faq-4',
-      question: 'What should delegates prepare prior to the conference?',
-      answer:
-        'Delegates should thoroughly study their committee’s official Background Guide, research their assigned nation’s foreign policy and treaty record, and prepare a written Position Paper. Delegates will also benefit from practicing speeches and familiarizing themselves with the Rules of Procedure.',
-    },
-    {
-      id: 'faq-5',
-      question: 'What are the registration fees?',
-      answer:
-        'Official registration fees for delegates, delegations, and faculty advisors are To Be Announced (TBA). The Secretariat is committed to keeping registration accessible and will announce final pricing alongside early-bird deadlines prior to open enrollment.',
-    },
-    {
-      id: 'faq-6',
-      question: 'When and where will the conference take place?',
-      answer:
-        'The official conference dates and host venue/city are To Be Announced (TBA). The Secretariat is finalizing agreements with partner educational facilities and will release the confirmed schedule on this website.',
-    },
-    {
-      id: 'faq-7',
-      question: 'How can I contact the organizing team?',
-      answer:
-        'Official secretariat contact email and communication channels are To Be Announced (TBA). In the interim, delegates and faculty may submit pre-registration alerts or message inquiries through our on-page Contact section below.',
-    },
-  ];
+  const faqs: FAQItem[] = usePublicTable<FaqRow>('faq', DEFAULT_FAQ);
 
+  // undefined = nothing clicked yet, so the first question is open by default
+  const openId = pickedId === undefined ? faqs[0]?.id ?? null : pickedId;
   const toggleFAQ = (id: string) => {
-    setOpenId((prev) => (prev === id ? null : id));
+    setPickedId(openId === id ? null : id);
   };
 
   return (
@@ -92,6 +52,7 @@ export const FAQSection: React.FC = React.memo(() => {
 
         {/* Accordion */}
         <div className="space-y-4">
+          {faqs.length === 0 && <p className="text-center text-sm text-neutral-500">No questions published yet.</p>}
           {faqs.map((faq, index) => {
             const isOpen = openId === faq.id;
             return (

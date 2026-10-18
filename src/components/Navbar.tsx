@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
+import { useSettings } from '../lib/content';
+import { tierState } from '../lib/registration';
 
 interface NavbarProps {
   scrolled?: boolean;
@@ -16,6 +18,9 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
   logoVisible = true,
   navVisible = true,
 }) => {
+  const settings = useSettings();
+  const regOpen = tierState(settings, 'early_bird') === 'open' || tierState(settings, 'regular') === 'open';
+  const regLabel = regOpen ? 'Register Now' : 'Registration: TBA';
   const [internalScrolled, setInternalScrolled] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.scrollY > 40;
@@ -134,7 +139,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
               href="#register"
               className="inline-flex items-center justify-center px-4 py-2 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 transition-all shadow-[0_2px_12px_rgba(212,175,55,0.25)]"
             >
-              Registration: TBA
+              {regLabel}
             </motion.a>
           </div>
 
@@ -206,7 +211,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
             onClick={() => setMenuOpen(false)}
             className="w-full inline-flex items-center justify-center py-3 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 transition-all text-center"
           >
-            Registration: TBA
+            {regLabel}
           </motion.a>
         </div>
       </div>

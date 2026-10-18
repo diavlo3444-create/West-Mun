@@ -2,6 +2,8 @@ import React from 'react';
 import { User, Shield, CheckCircle2, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
+import { usePublicTable, DEFAULT_SECRETARIAT, type SecretariatRow } from '../lib/content';
+import { safeUrl } from '../lib/safe';
 
 interface TeamMember {
   role: string;
@@ -9,7 +11,6 @@ interface TeamMember {
   department: string;
   bio: string;
   image?: string;
-  fallbackImage?: string;
   isConfirmed: boolean;
   appointmentNumber: string;
   imagePosition?: string;
@@ -18,50 +19,18 @@ interface TeamMember {
 export const SecretariatSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
 
-  const secretariat: TeamMember[] = [
-    {
-      role: 'Secretary-General',
-      name: 'Rakan Almerbad',
-      department: 'Executive Leadership',
-      bio: 'Overseeing conference proceedings, guiding delegates, and maintaining parliamentary decorum. Dedicated to ensuring an exceptional, collaborative MUN experience for all delegations.',
-      image: '/rakan-almerbad.jpg',
-      imagePosition: 'object-center',
-      isConfirmed: true,
-      appointmentNumber: '01',
-    },
-    {
-      role: 'Deputy Secretary-General',
-      name: 'Yousef Saifi',
-      department: 'Executive Secretariat',
-      bio: 'Experienced debater with a deep passion for global diplomacy and constructive dialogue. Committed to youth empowerment, collaborative problem-solving, and delivering an unforgettable conference.',
-      image: '/yousef.jpg',
-      imagePosition: 'object-top',
-      isConfirmed: true,
-      appointmentNumber: '02',
-    },
-    {
-      role: 'Under-Secretary-General',
-      name: 'Fahad',
-      department: 'Executive Secretariat',
-      bio: 'Directing substantive committee operations, delegate services, and institutional logistics. Dedicated to fostering high-level multilateral debate and diplomatic excellence.',
-      image: '/fahad.jpg',
-      imagePosition: 'object-center',
-      fallbackImage: 'https://i.ibb.co/mrYKgTYc/Whats-App-Image-2026-10-15-at-1-36-37-PM.jpg',
-      isConfirmed: true,
-      appointmentNumber: '03',
-    },
-    {
-      role: 'Senior Advisor',
-      name: 'Muaz Elamir',
-      department: 'Advisory Board',
-      bio: 'Hi im Muaz Elamir My job is to guide the team, share advice, and help make sure the conference runs smoothly so you all have a great MUN experience!',
-      image: '/muaz.jpg',
-      imagePosition: 'object-center',
-      fallbackImage: 'https://i.ibb.co/4wCsnP6Q/Whats-App-Image-2026-10-15-at-11-07-35-PM.jpg',
-      isConfirmed: true,
-      appointmentNumber: '04',
-    },
-  ];
+  const rows = usePublicTable<SecretariatRow>('secretariat', DEFAULT_SECRETARIAT);
+  const positionClass = { center: 'object-center', top: 'object-top', bottom: 'object-bottom' } as const;
+  const secretariat: TeamMember[] = rows.map((r, i) => ({
+    role: r.role,
+    name: r.name,
+    department: r.department,
+    bio: r.bio,
+    image: safeUrl(r.image_url) || undefined,
+    imagePosition: positionClass[r.image_position] ?? 'object-center',
+    isConfirmed: r.confirmed,
+    appointmentNumber: String(i + 1).padStart(2, '0'),
+  }));
 
   return (
     <section id="secretariat" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
@@ -99,7 +68,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
           {secretariat.map((member, index) => (
             <motion.div
-              key={member.role}
+              key={member.role + index}
               initial={{ opacity: 0, y: 24 }}
               animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
               transition={{
@@ -130,11 +99,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
                     alt={member.name}
                     className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${member.imagePosition || 'object-center'}`}
                     loading="lazy"
-                    onError={(e) => {
-                      if (member.fallbackImage && e.currentTarget.src !== member.fallbackImage) {
-                        e.currentTarget.src = member.fallbackImage;
-                      }
-                    }}
+                    referrerPolicy="no-referrer"
                   />
                 ) : (
                   <div className="flex flex-col items-center justify-center text-neutral-400 group-hover:text-[#d4af37] transition-colors">

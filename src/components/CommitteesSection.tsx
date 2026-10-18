@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Shield, FileText, UserCheck, X, ExternalLink, Info } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
+import { usePublicTable, DEFAULT_COMMITTEES, type CommitteeRow } from '../lib/content';
 
 interface CommitteeData {
   id: string;
@@ -19,73 +20,23 @@ export const CommitteesSection: React.FC = React.memo(() => {
   const [selectedCommittee, setSelectedCommittee] = useState<CommitteeData | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
 
-  const committees: CommitteeData[] = [
-    {
-      id: 'comm-1',
-      trackNumber: '01',
-      name: 'TBA',
-      type: 'General Assembly',
-      topic: 'TBA',
-      chair: 'TBA',
-      description: 'Official committee mandate, background guide, and historical setting will be published by the Secretariat upon confirmation.',
-      level: 'Novice & Intermediate',
-    },
-    {
-      id: 'comm-2',
-      trackNumber: '02',
-      name: 'TBA',
-      type: 'Security Council',
-      topic: 'TBA',
-      chair: 'TBA',
-      description: 'Official committee mandate, background guide, and historical setting will be published by the Secretariat upon confirmation.',
-      level: 'Advanced & Crisis',
-    },
-    {
-      id: 'comm-3',
-      trackNumber: '03',
-      name: 'TBA',
-      type: 'Economic & Social Council',
-      topic: 'TBA',
-      chair: 'TBA',
-      description: 'Official committee mandate, background guide, and historical setting will be published by the Secretariat upon confirmation.',
-      level: 'Intermediate',
-    },
-    {
-      id: 'comm-4',
-      trackNumber: '04',
-      name: 'TBA',
-      type: 'Specialized Agency',
-      topic: 'TBA',
-      chair: 'TBA',
-      description: 'Official committee mandate, background guide, and historical setting will be published by the Secretariat upon confirmation.',
-      level: 'All Experience Levels',
-    },
-    {
-      id: 'comm-5',
-      trackNumber: '05',
-      name: 'TBA',
-      type: 'Crisis Committee',
-      topic: 'TBA',
-      chair: 'TBA',
-      description: 'Official committee mandate, background guide, and historical setting will be published by the Secretariat upon confirmation.',
-      level: 'Advanced / Dynamic Directives',
-    },
-    {
-      id: 'comm-6',
-      trackNumber: '06',
-      name: 'TBA',
-      type: 'Regional Body',
-      topic: 'TBA',
-      chair: 'TBA',
-      description: 'Official committee mandate, background guide, and historical setting will be published by the Secretariat upon confirmation.',
-      level: 'Intermediate',
-    },
-  ];
+  const rows = usePublicTable<CommitteeRow>('committees', DEFAULT_COMMITTEES);
+  const committees: CommitteeData[] = rows.map((r, i) => ({
+    id: r.id,
+    trackNumber: String(i + 1).padStart(2, '0'),
+    name: r.name,
+    type: r.type,
+    topic: r.topic,
+    chair: r.chair,
+    description: r.description,
+    level: r.level,
+  }));
+  const filterTypes = ['all', ...Array.from(new Set(committees.map((c) => c.type)))];
 
   const filteredCommittees =
     filterType === 'all'
       ? committees
-      : committees.filter((c) => c.type.toLowerCase().includes(filterType.toLowerCase()));
+      : committees.filter((c) => c.type === filterType);
 
   return (
     <section id="committees" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
@@ -122,7 +73,7 @@ export const CommitteesSection: React.FC = React.memo(() => {
         {/* Filter Bar */}
         <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-8 text-xs scrollbar-none">
           <span className="text-neutral-500 uppercase tracking-widest text-[11px] mr-2">Filter:</span>
-          {['all', 'General Assembly', 'Security Council', 'Crisis', 'Specialized'].map((type) => (
+          {filterTypes.map((type) => (
             <motion.button
               key={type}
               whileHover={{ scale: 1.03 }}
@@ -238,36 +189,34 @@ export const CommitteesSection: React.FC = React.memo(() => {
               </div>
 
               <h3 id="modal-title" className="text-2xl font-serif text-white mb-2">
-                Committee Dossier: <span className="text-[#d4af37]">TBA</span>
+                Committee Dossier: <span className="text-[#d4af37]">{selectedCommittee.name}</span>
               </h3>
 
-              <div className="p-3 bg-[#16161c] border border-neutral-800 rounded-sm mb-6 flex items-start gap-2.5 text-xs text-neutral-300">
-                <Info className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-                <span>
-                  Official committee title, background study guides, and chair appointments are pending final ratification by the Secretariat (TBA).
-                </span>
-              </div>
+              {selectedCommittee.name === 'TBA' && (
+                <div className="p-3 bg-[#16161c] border border-neutral-800 rounded-sm mb-6 flex items-start gap-2.5 text-xs text-neutral-300">
+                  <Info className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
+                  <span>
+                    Official committee title, background study guides, and chair appointments are pending final ratification by the Secretariat (TBA).
+                  </span>
+                </div>
+              )}
 
               <div className="space-y-3.5 text-sm mb-8 divide-y divide-neutral-800/80">
                 <div className="pt-2 flex justify-between">
                   <span className="text-neutral-400">Committee Name:</span>
-                  <span className="font-mono text-[#d4af37]">TBA</span>
+                  <span className="font-mono text-[#d4af37]">{selectedCommittee.name}</span>
                 </div>
                 <div className="pt-2 flex justify-between">
                   <span className="text-neutral-400">Primary Agenda:</span>
-                  <span className="font-mono text-[#d4af37]">TBA</span>
+                  <span className="font-mono text-[#d4af37]">{selectedCommittee.topic}</span>
                 </div>
                 <div className="pt-2 flex justify-between">
                   <span className="text-neutral-400">Chairperson / Director:</span>
-                  <span className="font-mono text-[#d4af37]">TBA</span>
+                  <span className="font-mono text-[#d4af37]">{selectedCommittee.chair}</span>
                 </div>
                 <div className="pt-2 flex justify-between">
                   <span className="text-neutral-400">Experience Tier:</span>
                   <span className="text-white">{selectedCommittee.level}</span>
-                </div>
-                <div className="pt-2 flex justify-between">
-                  <span className="text-neutral-400">Rules of Procedure:</span>
-                  <span className="text-white">HMUN / THIMUN Standard (TBA)</span>
                 </div>
               </div>
 

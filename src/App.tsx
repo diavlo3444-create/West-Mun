@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { OpeningIntro } from './components/OpeningIntro';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -12,13 +12,14 @@ import { RegistrationSection } from './components/RegistrationSection';
 import { FAQSection } from './components/FAQSection';
 import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
-import { AdminPortalModal } from './components/AdminPortalModal';
+import { AnnouncementsSection } from './components/AnnouncementsSection';
+import { DocumentsSection } from './components/DocumentsSection';
+import { SponsorsSection } from './components/SponsorsSection';
 
 
 
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [adminPortalOpen, setAdminPortalOpen] = useState(false);
 
   // Intro animation playback state:
   // Shows on first visit or when triggered by Replay Intro
@@ -62,32 +63,6 @@ export default function App() {
     setIntroKey((prev) => prev + 1);
   }, []);
 
-  const handleOpenAdminPortal = useCallback(() => {
-    setAdminPortalOpen(true);
-  }, []);
-
-  const handleCloseAdminPortal = useCallback(() => {
-    setAdminPortalOpen(false);
-  }, []);
-
-  // Preserve administrative access via shortcut or dev window call without public-facing link
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).openAdminPortal = handleOpenAdminPortal;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-        e.preventDefault();
-        setAdminPortalOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (window as any).openAdminPortal;
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleOpenAdminPortal]);
-
   return (
     <div className="relative min-h-screen w-full bg-[#070707] text-[#f5f5f5]">
       {/* Opening Intro Animation (Logo Centered -> Falling Gold Particles -> Flight to Navbar) */}
@@ -110,6 +85,9 @@ export default function App() {
       {/* B. Scroll-Controlled Cinematic Hero Section */}
       <Hero />
 
+      {/* Announcements (hidden until the first one is published) */}
+      <AnnouncementsSection />
+
       {/* C. Conference Introduction */}
       <ConferenceIntro />
 
@@ -128,8 +106,14 @@ export default function App() {
       {/* H. Secretariat & Organizing Team */}
       <SecretariatSection />
 
+      {/* Documents (hidden until the first one is added) */}
+      <DocumentsSection />
+
       {/* I. Registration Portal */}
       <RegistrationSection />
+
+      {/* Sponsors (hidden until the first one is added) */}
+      <SponsorsSection />
 
       {/* J. Frequently Asked Questions */}
       <FAQSection />
@@ -138,16 +122,7 @@ export default function App() {
       <ContactSection />
 
       {/* L. Conference Footer */}
-      <Footer
-        onReplayIntro={handleReplayIntro}
-        onOpenAdminPortal={handleOpenAdminPortal}
-      />
-
-      {/* Secretariat Diplomatic Admin Portal Modal */}
-      <AdminPortalModal
-        isOpen={adminPortalOpen}
-        onClose={handleCloseAdminPortal}
-      />
+      <Footer onReplayIntro={handleReplayIntro} />
     </div>
   );
 }

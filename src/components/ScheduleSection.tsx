@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Clock, MapPin, Calendar, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
+import { usePublicTable, DEFAULT_DAYS, DEFAULT_SESSIONS, type ScheduleDayRow, type ScheduleSessionRow } from '../lib/content';
 
 interface ScheduleSession {
   time: string;
@@ -14,83 +15,18 @@ export const ScheduleSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
   const [activeDay, setActiveDay] = useState<number>(1);
 
-  const daysData = [
-    {
-      dayNumber: 1,
-      dayTitle: 'Day 1 — Convocations & Opening Deliberations',
-      date: 'TBA',
-      sessions: [
-        {
-          time: 'TBA',
-          title: 'Delegate Accreditation & Registration',
-          location: 'TBA',
-          description: 'Official credential issuance, placard collection, and handbook verification for registered delegations and single delegates.',
-        },
-        {
-          time: 'TBA',
-          title: 'Opening Ceremony & Diplomatic Keynote Address',
-          location: 'TBA',
-          description: 'Secretariat welcome, introduction of committee dais teams, and opening remarks by invited international relations guest speakers.',
-        },
-        {
-          time: 'TBA',
-          title: 'Committee Session I: Roll Call & Agenda Adoption',
-          location: 'TBA',
-          description: 'Formal roll call of member states, setting the agenda, opening of the General Speakers List, and initial moderated caucuses.',
-        },
-      ],
-    },
-    {
-      dayNumber: 2,
-      dayTitle: 'Day 2 — Intensive Negotiation & Working Papers',
-      date: 'TBA',
-      sessions: [
-        {
-          time: 'TBA',
-          title: 'Committee Session II: Substantive Debate',
-          location: 'TBA',
-          description: 'Deep debate on core agenda items. Introduction of unmoderated caucuses, formation of regional blocs, and drafting initial working papers.',
-        },
-        {
-          time: 'TBA',
-          title: 'Committee Session III: Crisis Directives & Working Papers',
-          location: 'TBA',
-          description: 'Dais review of submitted working papers. Introduction of crisis updates and real-time diplomatic intelligence scenarios.',
-        },
-        {
-          time: 'TBA',
-          title: 'Committee Session IV: Draft Resolution Formulation',
-          location: 'TBA',
-          description: 'Consolidation of competing working papers into formal draft resolutions with registered sponsor and signatory states.',
-        },
-      ],
-    },
-    {
-      dayNumber: 3,
-      dayTitle: 'Day 3 — Voting Procedure & Closing Assembly',
-      date: 'TBA',
-      sessions: [
-        {
-          time: 'TBA',
-          title: 'Committee Session V: Amendments & Debate',
-          location: 'TBA',
-          description: 'Presentation of friendly and unfriendly amendments, final speeches for and against operative clauses, and bloc consolidation.',
-        },
-        {
-          time: 'TBA',
-          title: 'Formal Voting Procedure on Draft Resolutions',
-          location: 'TBA',
-          description: 'Strict roll call voting procedure in accordance with parliamentary rules. Adoption or rejection of final committee resolutions.',
-        },
-        {
-          time: 'TBA',
-          title: 'Closing Ceremony & Delegation Adjournment',
-          location: 'TBA',
-          description: 'Secretary-General closing address, committee awards presentation, gavel handover, and official adjournment of WEST MUN.',
-        },
-      ],
-    },
-  ];
+  const dayRows = usePublicTable<ScheduleDayRow>('schedule_days', DEFAULT_DAYS);
+  const sessionRows = usePublicTable<ScheduleSessionRow>('schedule_sessions', DEFAULT_SESSIONS);
+  const daysData = dayRows.map((d, i) => ({
+    dayNumber: i + 1,
+    dayTitle: d.title,
+    date: d.date_text,
+    sessions: sessionRows
+      .filter((x) => x.day_id === d.id)
+      .map((x) => ({ time: x.time_text, title: x.title, location: x.location, description: x.description })),
+  }));
+  const activeData = daysData[activeDay - 1] ?? daysData[0];
+  if (!activeData) return null;
 
   return (
     <section id="schedule" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
@@ -121,7 +57,7 @@ export const ScheduleSection: React.FC = React.memo(() => {
           </div>
           <div className="p-3 bg-[#111114] border border-[#d4af37]/30 rounded-sm flex items-center gap-2 text-xs text-neutral-300">
             <AlertCircle className="w-4 h-4 text-[#d4af37] shrink-0" />
-            <span>Exact calendar dates, times, and venue rooms are TBA pending committee finalization.</span>
+            <span>Dates, times, and venue rooms are subject to change; check back for updates.</span>
           </div>
         </motion.div>
 
@@ -140,33 +76,33 @@ export const ScheduleSection: React.FC = React.memo(() => {
               }`}
             >
               <span>Day {d.dayNumber}</span>
-              <span className="text-[10px] font-mono opacity-80">(Date: TBA)</span>
+              <span className="text-[10px] font-mono opacity-80">({d.date})</span>
             </motion.button>
           ))}
         </div>
 
         {/* Active Day Title & Overview */}
         <motion.div
-          key={activeDay}
+          key={activeData.dayNumber}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
           className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#0d0d10] border border-neutral-800 rounded-sm"
         >
           <h3 className="text-lg font-serif text-white">
-            {daysData[activeDay - 1].dayTitle}
+            {activeData.dayTitle}
           </h3>
           <div className="flex items-center gap-2 text-xs text-[#d4af37] font-mono">
             <Calendar className="w-4 h-4" />
-            <span>Date: {daysData[activeDay - 1].date}</span>
+            <span>Date: {activeData.date}</span>
           </div>
         </motion.div>
 
         {/* Timeline Layout */}
         <div className="relative border-l border-neutral-800 ml-4 sm:ml-8 pl-6 sm:pl-10 space-y-8">
-          {daysData[activeDay - 1].sessions.map((session: ScheduleSession, index: number) => (
+          {activeData.sessions.map((session: ScheduleSession, index: number) => (
             <motion.div
-              key={session.title + activeDay}
+              key={session.title + activeData.dayNumber}
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{

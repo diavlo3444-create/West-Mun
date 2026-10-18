@@ -332,8 +332,8 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     scrubScale: -1,
   });
 
-  const fallbackVideo =
-    'https://flow-content.google/video/fa4bbb59-43c8-4a80-adf5-56331769e37f?Expires=1792033962&KeyName=labs-flow-prod-cdn-key&Signature=tdvKzLhOlfu06BKzGLvNYhyymI8';
+  // Local fallback if the primary video fails to load (no third-party hosts)
+  const fallbackVideo = '/background_original.mp4';
 
   const [videoSrc, setVideoSrc] = useState<string>(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
