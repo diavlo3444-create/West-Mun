@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, Loader2, RefreshCw, Trash2, X } from 'lucide-react';
+import { Download, Loader2, Mail, RefreshCw, Send, Trash2, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { downloadText, toCsv } from '../lib/safe';
 import { DELEGATE_STATUSES, PAYMENT_STATUSES, TIER_LABELS, TYPE_LABELS } from './config';
@@ -34,6 +34,9 @@ export const ApplicationsManager: React.FC = () => {
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Row>({});
   const [saving, setSaving] = useState(false);
+  const [gmailBusy, setGmailBusy] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [gmailNotice, setGmailNotice] = useState('');
 
   const load = useCallback(async () => {
     if (!supabase) return;
@@ -46,6 +49,9 @@ export const ApplicationsManager: React.FC = () => {
   }, []);
   useEffect(() => {
     load();
+    const result = new URLSearchParams(window.location.search).get('gmail');
+    if (result === 'connected') setGmailNotice('Gmail authorization connected. Acceptance emails remain manual.');
+    else if (result) setGmailNotice('Gmail connection result: ' + result.replace(/-/g, ' ') + '. Check configuration if this was not successful.');
   }, [load]);
 
   const filtered = useMemo(() => {
@@ -103,6 +109,33 @@ export const ApplicationsManager: React.FC = () => {
     load();
   };
 
+  const connectGmail = async () => {
+    if (!supabase || gmailBusy) return;
+    setGmailBusy(true);
+    setGmailNotice('');
+    const { data, error: invokeError } = await supabase.functions.invoke('gmail-oauth-start', { body: {} });
+    setGmailBusy(false);
+    if (invokeError || !data?.authorization_url) {
+      setGmailNotice(invokeError?.message || data?.error || 'Could not start Gmail authorization.');
+      return;
+    }
+    window.location.assign(data.authorization_url);
+  };
+
+  const sendAcceptanceEmail = async () => {
+    if (!supabase || !current || emailBusy || current.status !== 'accepted') return;
+    if (!window.confirm('Send the WEST MUN acceptance email to ' + current.email + ' now? This sends a real email.')) return;
+    setEmailBusy(true);
+    setGmailNotice('');
+    const { data, error: invokeError } = await supabase.functions.invoke('gmail-send-acceptance', { body: { delegateId: current.id } });
+    setEmailBusy(false);
+    if (invokeError || !data?.sent) {
+      setGmailNotice(invokeError?.message || data?.error || 'Email was not confirmed as sent.');
+      return;
+    }
+    setGmailNotice('Acceptance email sent to ' + data.recipient + '.');
+  };
+
   const exportCsv = () => {
     const head = ['id', 'submitted_at', 'full_name', 'email', 'institution', 'tier', 'delegation_type', 'status', 'payment_status', 'fee_amount', 'admin_notes', 'consent_version', 'consent_at'];
     const body = filtered.map((r) => head.map((k) => (k === 'submitted_at' ? r.created_at : r[k])));
@@ -116,7 +149,8 @@ export const ApplicationsManager: React.FC = () => {
           <h2 className="text-xl wm-serif text-white">Applications</h2>
           <p className="text-xs text-neutral-400 mt-1">Delegate registrations. Only organisers can see these.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={btnGhost} onClick={connectGmail} disabled={gmailBusy}>{gmailBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Connect Gmail</button>
           <button type="button" className={btnGhost} onClick={load}><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>
           <button type="button" className={btnGold} onClick={exportCsv} disabled={filtered.length === 0}><Download className="w-3.5 h-3.5" /> CSV ({filtered.length})</button>
         </div>
@@ -147,6 +181,7 @@ export const ApplicationsManager: React.FC = () => {
         </select>
       </div>
 
+      {gmailNotice && <div className="mb-4 p-3 text-xs text-neutral-200 bg-neutral-900 border border-[#d4af37]/30 rounded-md" role="status">{gmailNotice}</div>}
       {error && <div className="mb-4 p-3 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-md" role="alert">{error}</div>}
       {notice && <div className="mb-4 p-3 text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/30 rounded-md">{notice}</div>}
 
@@ -216,8 +251,11 @@ export const ApplicationsManager: React.FC = () => {
                 <label htmlFor="a-notes" className={labelCls}>Internal notes (private)</label>
                 <textarea id="a-notes" rows={4} maxLength={5000} className={inputCls} value={draft.admin_notes} onChange={(e) => setDraft({ ...draft, admin_notes: e.target.value })} />
               </div>
-              <div className="flex items-center justify-between">
-                <button type="button" className={btnGold} onClick={save} disabled={saving}>{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save</button>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className={btnGold} onClick={save} disabled={saving}>{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save</button>
+                  <button type="button" className={btnGhost} onClick={sendAcceptanceEmail} disabled={emailBusy || current.status !== 'accepted'} title={current.status !== 'accepted' ? 'Save this application as Accepted first.' : 'Send acceptance email manually'}>{emailBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Send acceptance email</button>
+                </div>
                 <button type="button" className={btnDanger} onClick={remove}><Trash2 className="w-3.5 h-3.5" /> Delete</button>
               </div>
               <p className="text-[11px] text-neutral-400">Changing a status does not email the delegate. Contact them yourself.</p>
