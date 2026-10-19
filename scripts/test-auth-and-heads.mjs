@@ -411,6 +411,13 @@ r = await call('POST', '/api/super-admin?action=reset-password&id=' + AFFECTED, 
 });
 check('short password reset is rejected', r.status === 400 && r.body?.code === 'WEAK_PASSWORD', r);
 
+r = await call('PATCH', '/api/super-admin?id=' + AFFECTED, {
+  token: 'token-super',
+  body: { active: false },
+});
+check('deactivating a department-head assignment succeeds without an Auth ban', r.status === 200 && r.body?.success === true, r);
+check('assignment deactivation does not change Auth ban state', !(state.authAdminUpdates || []).some((entry) => entry.uid === AFFECTED && Object.hasOwn(entry.body || {}, 'ban_duration')), state.authAdminUpdates);
+
 r = await call('DELETE', '/api/super-admin?id=' + AFFECTED, { token: 'token-super' });
 check('authorized super admin can delete a head assignment', r.status === 200 && r.body?.success === true, r);
 check('deletion removes only the department_heads row', !state.heads.some((h) => h.user_id === AFFECTED), state.heads);
