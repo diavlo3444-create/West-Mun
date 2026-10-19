@@ -22,6 +22,25 @@ interface AccessDeniedState {
   requestedSec?: string;
 }
 
+
+/**
+ * Auth links for invitations and password recovery create a temporary Supabase
+ * session. That session must not be treated as a completed portal sign-in.
+ */
+function isPasswordSetupLinkInUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+  const type = params.get('type') || hashParams.get('type') || '';
+  return (
+    ['invite', 'recovery', 'signup'].includes(type) ||
+    params.has('token_hash') ||
+    params.has('code') ||
+    params.has('resetToken') ||
+    (hashParams.has('access_token') && hashParams.has('refresh_token'))
+  );
+}
+
 export default function HeadPortal() {
   const [headUser, setHeadUser] = useState<{
     id: string;
@@ -69,6 +88,15 @@ export default function HeadPortal() {
           event === 'TOKEN_REFRESHED' ||
           event === 'INITIAL_SESSION'
         ) {
+          // Do not turn the temporary session from an invite/recovery URL into
+          // portal access before the recipient has explicitly set a password.
+          if (isPasswordSetupLinkInUrl()) {
+            setHeadUser(null);
+            setAssignment(null);
+            setAccessDeniedState(null);
+            setLoading(false);
+            return;
+          }
           verifyAccess();
         }
       });
@@ -252,7 +280,15 @@ export default function HeadPortal() {
       setLoading(false);
     };
 
-    verifyAccess();
+    if (isPasswordSetupLinkInUrl()) {
+      // Let HeadLogin exchange/validate the link and require password setup first.
+      setHeadUser(null);
+      setAssignment(null);
+      setAccessDeniedState(null);
+      setLoading(false);
+    } else {
+      verifyAccess();
+    }
 
     return () => {
       active = false;
