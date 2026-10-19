@@ -489,7 +489,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         description="Review every application in one place. Decisions and private notes are written straight to Supabase."
         actions={
           <>
-            <button type="button" onClick={connectGmail} className={btnGhost} disabled={gmailBusy || gmailStatus === "loading" || gmailStatus === "connected" || gmailStatus === "configuration_error"}>
+            <button type="button" onClick={connectGmail} className={btnGhost} disabled={gmailBusy || gmailStatus === "loading" || gmailStatus === "connected" || gmailStatus === "configuration_error" || (gmailStatus === "reconnect_required" && !isSuperAdmin)}>
               {gmailBusy || gmailStatus === "loading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Mail className="h-3.5 w-3.5" aria-hidden="true" /> }
               {gmailStatus === "reconnect_required" ? "Reconnect Gmail" : "Connect Gmail"}
             </button>
