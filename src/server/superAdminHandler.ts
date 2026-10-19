@@ -1273,11 +1273,8 @@ export async function handleDeleteHead(
         };
       }
 
-      // 2. Disable user in Supabase Auth (or delete)
-      await supabaseAdmin.auth.admin.updateUserById(headId, {
-        ban_duration: '876000h',
-      }).catch(() => null);
-
+      // Removing a department-head assignment must never alter the underlying
+      // Supabase Auth account. Account suspension is a separate, explicit action.
       try {
         HeadStore.delete(headId);
       } catch {}
@@ -1286,7 +1283,7 @@ export async function handleDeleteHead(
         statusCode: 200,
         body: {
           success: true,
-          message: 'Department head assignment removed from Supabase. Portal access revoked.',
+          message: 'Department-head assignment removed successfully. The underlying Auth account remains unchanged.',
         },
       };
     } catch (err: unknown) {
