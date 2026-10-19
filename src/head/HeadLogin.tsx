@@ -99,26 +99,20 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
       if (!supabase || !supabaseConfigured) return;
 
       try {
-        // 1. Check if a session already exists (e.g. from detectSessionInUrl)
-        const { data: currentSession } = await supabase.auth.getSession();
-        if (currentSession?.session) {
-          if (isAuthLink) {
-            setIsSupabaseRecovery(true);
-            setResetToken('supabase_auth_recovery');
-          }
-          return;
-        }
-
-        // 2. PKCE links arrive as ?code=...
+        // Process credentials in the incoming link before considering any saved
+        // session. A browser may already be signed in as a different account.
+        // 1. PKCE links arrive as ?code=...
         const code = params.get('code');
         if (code) {
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
           if (!alive) return;
-          if (!exchangeError && data?.session) {
-            setIsSupabaseRecovery(true);
-            setResetToken('supabase_auth_recovery');
+          if (exchangeError || !data?.session) {
+            setError('This invitation or password recovery link is invalid or has expired. Request a new link.');
             return;
           }
+          setIsSupabaseRecovery(true);
+          setResetToken('supabase_auth_recovery');
+          return;
         }
 
         // 3. Token hash links arrive as ?token_hash=...
@@ -129,11 +123,13 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
             type: (linkType as any) || 'recovery',
           });
           if (!alive) return;
-          if (!verifyError && data?.session) {
-            setIsSupabaseRecovery(true);
-            setResetToken('supabase_auth_recovery');
+          if (verifyError || !data?.session) {
+            setError('This invitation or password recovery link is invalid or has expired. Request a new link.');
             return;
           }
+          setIsSupabaseRecovery(true);
+          setResetToken('supabase_auth_recovery');
+          return;
         }
 
         // 4. Implicit-flow links arrive with tokens in the URL hash.
@@ -143,11 +139,21 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
             refresh_token: hashParams.get('refresh_token') as string,
           });
           if (!alive) return;
-          if (!sessionError && data?.session) {
-            setIsSupabaseRecovery(true);
-            setResetToken('supabase_auth_recovery');
+          if (sessionError || !data?.session) {
+            setError('This invitation or password recovery link is invalid or has expired. Request a new link.');
             return;
           }
+          setIsSupabaseRecovery(true);
+          setResetToken('supabase_auth_recovery');
+          return;
+        }
+
+        // A prior navigation may leave the link type in the URL after Supabase
+        // has already established the temporary recovery/invitation session.
+        const { data: currentSession } = await supabase.auth.getSession();
+        if (currentSession?.session && isAuthLink) {
+          setIsSupabaseRecovery(true);
+          setResetToken('supabase_auth_recovery');
         }
       } catch {
         if (alive) {
