@@ -57,7 +57,7 @@ export const FileUpload: React.FC<{ kind: 'image' | 'file'; onUploaded: (url: st
         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
         {busy ? 'Uploading…' : `Upload ${kind === 'image' ? 'image' : 'file'}`}
       </button>
-      <span className="ml-2 text-[11px] text-neutral-500">{nice}, max 15 MB</span>
+      <span className="ml-2 text-[11px] text-neutral-400">{nice}, max 15 MB</span>
       {error && <p className={errCls}>{error}</p>}
     </div>
   );

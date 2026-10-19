@@ -10,3 +10,6 @@ data/
 *.tmp
 .vercel
 .aistudio/
+
+# Local design-review screenshots produced by agent tooling
+artifacts/

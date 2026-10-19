@@ -80,14 +80,14 @@ export const SettingsManager: React.FC = () => {
   return (
     <form onSubmit={save} noValidate>
       <div className="mb-5">
-        <h2 className="text-xl font-serif text-white">Settings</h2>
+        <h2 className="text-xl wm-serif text-white">Settings</h2>
         <p className="text-xs text-neutral-400 mt-1 max-w-xl">
           Fees, dates, links and page texts. Everything here is <strong>public</strong>: never type passwords or private notes into settings.
         </p>
       </div>
 
       {message && (
-        <div className={`mb-4 p-3 text-xs rounded-sm border ${message.ok ? 'text-emerald-300 bg-emerald-950/30 border-emerald-500/30' : 'text-red-300 bg-red-950/40 border-red-500/40'}`} role="status">
+        <div className={`mb-4 p-3 text-xs rounded-md border ${message.ok ? 'text-emerald-300 bg-emerald-950/30 border-emerald-500/30' : 'text-red-300 bg-red-950/40 border-red-500/40'}`} role="status">
           {message.text}
         </div>
       )}
@@ -137,7 +137,7 @@ export const SettingsManager: React.FC = () => {
         ))}
       </div>
 
-      <div className="sticky bottom-0 mt-6 py-4 bg-[#0a0a0d]/95 border-t border-neutral-800">
+      <div className="sticky bottom-0 mt-6 py-4 bg-[#0a0a0d]/95 border-t border-white/[0.07]">
         <button type="submit" className={btnGold} disabled={saving}>
           {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save settings
         </button>

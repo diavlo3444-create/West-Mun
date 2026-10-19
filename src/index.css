@@ -167,4 +167,145 @@ body {
   contain-intrinsic-size: auto 700px;
 }
 
+/* =====================================================================
+   WEST MUN — Dashboard design system
+   Shared by /admin and /head only. Scoped under .wm-app so the public
+   landing page keeps its existing look and motion untouched.
+   ===================================================================== */
+.wm-app {
+  --wm-bg: #070708;
+  --wm-sidebar: #09090b;
+  --wm-surface: #0c0c0f;
+  --wm-rail: #111114;
+  --wm-line: rgba(255, 255, 255, 0.075);
+  --wm-line-soft: rgba(255, 255, 255, 0.045);
+  --wm-gold: #d4af37;
+  --wm-gold-soft: rgba(212, 175, 55, 0.1);
+  --wm-gold-line: rgba(212, 175, 55, 0.28);
+  --wm-ink: #f4f2ec;
+  --wm-muted: #a3a19a;
+
+  min-height: 100vh;
+  background-color: var(--wm-bg);
+  background-image:
+    radial-gradient(900px 460px at 14% -10%, rgba(212, 175, 55, 0.06), transparent 62%),
+    radial-gradient(720px 420px at 100% 0%, rgba(255, 255, 255, 0.022), transparent 58%);
+  background-repeat: no-repeat;
+  background-position: top left;
+  background-size: 100% 820px;
+  color: var(--wm-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.wm-display {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+.wm-serif {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+
+.wm-hairline {
+  background-image: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.55), transparent);
+}
+
+/* Focus is visible for keyboards, never a permanent ring on mouse users. */
+.wm-app button:focus-visible,
+.wm-app a:focus-visible,
+.wm-app [role='button']:focus-visible {
+  outline: 2px solid rgba(212, 175, 55, 0.8);
+  outline-offset: 2px;
+}
+.wm-app input:focus-visible,
+.wm-app select:focus-visible,
+.wm-app textarea:focus-visible {
+  outline: 1px solid rgba(212, 175, 55, 0.85);
+  outline-offset: 1px;
+}
+
+.wm-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2b2b2e transparent;
+}
+.wm-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.wm-scroll::-webkit-scrollbar-thumb {
+  background: #2b2b2e;
+  border-radius: 999px;
+  border: 2px solid var(--wm-surface);
+}
+.wm-scroll::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3e;
+}
+
+/* Page content rise. Small distance, fast easing: clarifies navigation
+   without delaying administrative work. */
+@keyframes wm-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.wm-page-in {
+  animation: wm-page-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes wm-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes wm-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.wm-overlay-in {
+  animation: wm-overlay-in 0.16s ease-out both;
+}
+.wm-dialog-in {
+  animation: wm-dialog-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes wm-drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.wm-drawer-in {
+  animation: wm-drawer-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wm-page-in,
+  .wm-overlay-in,
+  .wm-dialog-in,
+  .wm-drawer-in {
+    animation: none !important;
+  }
+  .wm-app *,
+  .wm-app *::before,
+  .wm-app *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 

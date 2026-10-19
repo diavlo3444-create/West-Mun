@@ -69,8 +69,11 @@ export default function HeadPortal() {
               resolvedAssignment = lookup.assignment;
               resolvedHead = {
                 id: supaUser.id,
-                email: supaUser.email || '',
-                headName: lookup.assignment.headName || supaUser.user_metadata?.full_name || '',
+                email: lookup.assignment.headEmail || supaUser.email || '',
+                headName:
+                  lookup.assignment.headName ||
+                  (supaUser.user_metadata?.full_name as string | undefined) ||
+                  '',
                 department: lookup.assignment.department,
                 section: lookup.assignment.section,
               };
@@ -224,14 +227,14 @@ export default function HeadPortal() {
   // 2. Loading state for protected department routes
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-[#070709] text-white">
-        <div className="flex flex-col items-center gap-4 p-8 bg-[#0c0c10] border border-[#d4af37]/30 rounded-sm shadow-2xl">
-          <div className="w-12 h-12 rounded-full bg-[#121217] border border-[#d4af37]/60 flex items-center justify-center text-[#d4af37] shadow-[0_0_20px_rgba(212,175,55,0.2)]">
-            <Shield className="w-6 h-6 animate-pulse" />
+      <div className="wm-app flex min-h-screen flex-col items-center justify-center px-4 py-12">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#d4af37]/30 bg-[#101014] text-[#d4af37]">
+            <Shield className="h-5 w-5" aria-hidden="true" />
           </div>
-          <div className="flex items-center gap-2 text-xs font-mono tracking-widest uppercase text-neutral-400">
-            <Loader2 className="w-4 h-4 animate-spin text-[#d4af37]" />
-            <span>Verifying Department Authorization…</span>
+          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[#d4af37]" aria-hidden="true" />
+            <span>Verifying department authorization</span>
           </div>
         </div>
       </div>

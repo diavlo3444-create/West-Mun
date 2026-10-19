@@ -58,7 +58,7 @@ export const InquiriesManager: React.FC = () => {
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
-          <h2 className="text-xl font-serif text-white">Messages</h2>
+          <h2 className="text-xl wm-serif text-white">Messages</h2>
           <p className="text-xs text-neutral-400 mt-1">Messages sent through the contact form. Reply from your own email.</p>
         </div>
         <div className="flex gap-2">
@@ -73,21 +73,21 @@ export const InquiriesManager: React.FC = () => {
           {INQUIRY_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       </div>
-      {error && <div className="mb-4 p-3 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-sm" role="alert">{error}</div>}
+      {error && <div className="mb-4 p-3 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-md" role="alert">{error}</div>}
       {loading ? (
         <p className="text-sm text-neutral-400 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</p>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-neutral-500 py-10 text-center border border-dashed border-neutral-800 rounded-sm">{rows.length === 0 ? 'No messages yet.' : 'No messages match.'}</p>
+        <p className="text-sm text-neutral-400 py-10 text-center border border-dashed border-white/[0.07] rounded-md">{rows.length === 0 ? 'No messages yet.' : 'No messages match.'}</p>
       ) : (
         <div className="space-y-3">
           {filtered.map((r) => (
             <article key={r.id} className={`${cardCls} p-4 ${r.status === 'new' ? 'border-[#d4af37]/40' : ''}`}>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <div className="text-sm text-white">{r.name} <a href={`mailto:${r.email}?subject=${encodeURIComponent('Re: ' + r.subject)}`} className="text-xs text-[#d4af37] ml-1 break-all">{r.email}</a></div>
-                <span className="text-[11px] font-mono text-neutral-500">{new Date(r.created_at).toLocaleString()}</span>
+                <span className="text-[11px] font-mono text-neutral-400">{new Date(r.created_at).toLocaleString()}</span>
               </div>
-              <div className="text-sm text-neutral-200 mb-1"><span className="text-neutral-500">Subject: </span>{r.subject}</div>
-              <p className="text-xs text-neutral-300 whitespace-pre-wrap leading-relaxed bg-[#0a0a0d] border border-neutral-800 rounded-sm p-3">{r.message}</p>
+              <div className="text-sm text-neutral-200 mb-1"><span className="text-neutral-400">Subject: </span>{r.subject}</div>
+              <p className="text-xs text-neutral-300 whitespace-pre-wrap leading-relaxed bg-[#0a0a0d] border border-white/[0.07] rounded-md p-3">{r.message}</p>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-[10rem_1fr_auto_auto] gap-2 items-start">
                 <select className={inputCls} value={r.status} onChange={(e) => patch(r.id, { status: e.target.value })} aria-label="Status">
                   {INQUIRY_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}

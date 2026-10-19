@@ -12,14 +12,14 @@ const badge: Record<string, string> = {
   accepted: 'border-emerald-500/40 text-emerald-300',
   waitlisted: 'border-amber-500/40 text-amber-300',
   rejected: 'border-red-500/40 text-red-300',
-  withdrawn: 'border-neutral-700 text-neutral-500',
+  withdrawn: 'border-neutral-700 text-neutral-400',
   unpaid: 'border-neutral-600 text-neutral-300',
   paid: 'border-emerald-500/40 text-emerald-300',
   waived: 'border-sky-500/40 text-sky-300',
   refunded: 'border-amber-500/40 text-amber-300',
 };
 const Pill: React.FC<{ v: string; l: string }> = ({ v, l }) => (
-  <span className={`text-[10px] font-mono uppercase px-2 py-0.5 border rounded-sm whitespace-nowrap ${badge[v] ?? 'border-neutral-600 text-neutral-300'}`}>{l || '—'}</span>
+  <span className={`text-[10px] font-mono uppercase px-2 py-0.5 border rounded-md whitespace-nowrap ${badge[v] ?? 'border-neutral-600 text-neutral-300'}`}>{l || '—'}</span>
 );
 
 export const ApplicationsManager: React.FC = () => {
@@ -113,7 +113,7 @@ export const ApplicationsManager: React.FC = () => {
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
-          <h2 className="text-xl font-serif text-white">Applications</h2>
+          <h2 className="text-xl wm-serif text-white">Applications</h2>
           <p className="text-xs text-neutral-400 mt-1">Delegate registrations. Only organisers can see these.</p>
         </div>
         <div className="flex gap-2">
@@ -125,7 +125,7 @@ export const ApplicationsManager: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         {([['Total', stats.total], ['Received', stats.received], ['Accepted', stats.accepted], ['Paid', stats.paid]] as const).map(([k, v]) => (
           <div key={k} className={`${cardCls} p-3`}>
-            <div className="text-[10px] uppercase tracking-widest text-neutral-500">{k}</div>
+            <div className="text-[10px] uppercase tracking-widest text-neutral-400">{k}</div>
             <div className="text-2xl font-sans font-semibold tabular-nums text-white">{v}</div>
           </div>
         ))}
@@ -147,28 +147,28 @@ export const ApplicationsManager: React.FC = () => {
         </select>
       </div>
 
-      {error && <div className="mb-4 p-3 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-sm" role="alert">{error}</div>}
-      {notice && <div className="mb-4 p-3 text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/30 rounded-sm">{notice}</div>}
+      {error && <div className="mb-4 p-3 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-md" role="alert">{error}</div>}
+      {notice && <div className="mb-4 p-3 text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/30 rounded-md">{notice}</div>}
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
         <div className={`${cardCls} xl:col-span-3 overflow-x-auto`}>
           {loading ? (
             <p className="p-5 text-sm text-neutral-400 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</p>
           ) : filtered.length === 0 ? (
-            <p className="p-8 text-sm text-neutral-500 text-center">{rows.length === 0 ? 'No applications yet.' : 'No applications match these filters.'}</p>
+            <p className="p-8 text-sm text-neutral-400 text-center">{rows.length === 0 ? 'No applications yet.' : 'No applications match these filters.'}</p>
           ) : (
             <table className="w-full text-left text-xs">
-              <thead className="text-[10px] font-mono uppercase text-[#d4af37] border-b border-neutral-800">
+              <thead className="text-[10px] font-mono uppercase text-[#d4af37] border-b border-white/[0.07]">
                 <tr><th className="p-3">Delegate</th><th className="p-3">Tier</th><th className="p-3">Status</th><th className="p-3">Payment</th><th className="p-3">Date</th></tr>
               </thead>
               <tbody className="divide-y divide-neutral-800/70">
                 {filtered.map((r) => (
                   <tr key={r.id} onClick={() => open(r)} className={`cursor-pointer hover:bg-neutral-800/30 ${openId === r.id ? 'bg-neutral-800/40' : ''}`}>
-                    <td className="p-3"><div className="text-white">{r.full_name}</div><div className="text-neutral-500 truncate max-w-[16rem]">{r.institution}</div></td>
+                    <td className="p-3"><div className="text-white">{r.full_name}</div><div className="text-neutral-400 truncate max-w-[16rem]">{r.institution}</div></td>
                     <td className="p-3 text-neutral-300">{TIER_LABELS[r.tier] ?? r.tier}</td>
                     <td className="p-3"><Pill v={r.status} l={label(DELEGATE_STATUSES, r.status)} /></td>
                     <td className="p-3"><Pill v={r.payment_status} l={label(PAYMENT_STATUSES, r.payment_status)} /></td>
-                    <td className="p-3 font-mono text-neutral-500">{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td className="p-3 font-mono text-neutral-400">{new Date(r.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -181,18 +181,18 @@ export const ApplicationsManager: React.FC = () => {
             <div className={`${cardCls} p-5 space-y-4 xl:sticky xl:top-4`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-lg font-serif text-white">{current.full_name}</div>
+                  <div className="text-lg wm-serif text-white">{current.full_name}</div>
                   <a href={`mailto:${current.email}`} className="text-xs text-[#d4af37] break-all">{current.email}</a>
                 </div>
                 <button type="button" className="text-neutral-400 hover:text-white cursor-pointer" onClick={() => setOpenId(null)} aria-label="Close"><X className="w-4 h-4" /></button>
               </div>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                <dt className="text-neutral-500">School / organisation</dt><dd className="text-neutral-200">{current.institution}</dd>
-                <dt className="text-neutral-500">Tier</dt><dd className="text-neutral-200">{TIER_LABELS[current.tier] ?? current.tier}</dd>
-                <dt className="text-neutral-500">Registering as</dt><dd className="text-neutral-200">{TYPE_LABELS[current.delegation_type] ?? current.delegation_type}</dd>
-                <dt className="text-neutral-500">Submitted</dt><dd className="text-neutral-200">{new Date(current.created_at).toLocaleString()}</dd>
-                <dt className="text-neutral-500">Consent</dt><dd className="text-neutral-200">v{current.consent_version}, {new Date(current.consent_at).toLocaleDateString()}</dd>
-                <dt className="text-neutral-500">18+ / permission</dt><dd className="text-neutral-200">{current.age_confirmed ? 'Confirmed' : 'No'}</dd>
+                <dt className="text-neutral-400">School / organisation</dt><dd className="text-neutral-200">{current.institution}</dd>
+                <dt className="text-neutral-400">Tier</dt><dd className="text-neutral-200">{TIER_LABELS[current.tier] ?? current.tier}</dd>
+                <dt className="text-neutral-400">Registering as</dt><dd className="text-neutral-200">{TYPE_LABELS[current.delegation_type] ?? current.delegation_type}</dd>
+                <dt className="text-neutral-400">Submitted</dt><dd className="text-neutral-200">{new Date(current.created_at).toLocaleString()}</dd>
+                <dt className="text-neutral-400">Consent</dt><dd className="text-neutral-200">v{current.consent_version}, {new Date(current.consent_at).toLocaleDateString()}</dd>
+                <dt className="text-neutral-400">18+ / permission</dt><dd className="text-neutral-200">{current.age_confirmed ? 'Confirmed' : 'No'}</dd>
               </dl>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -220,10 +220,10 @@ export const ApplicationsManager: React.FC = () => {
                 <button type="button" className={btnGold} onClick={save} disabled={saving}>{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save</button>
                 <button type="button" className={btnDanger} onClick={remove}><Trash2 className="w-3.5 h-3.5" /> Delete</button>
               </div>
-              <p className="text-[11px] text-neutral-500">Changing a status does not email the delegate. Contact them yourself.</p>
+              <p className="text-[11px] text-neutral-400">Changing a status does not email the delegate. Contact them yourself.</p>
             </div>
           ) : (
-            <p className="text-xs text-neutral-500 p-4 border border-dashed border-neutral-800 rounded-sm">Select an application to see details and change its status.</p>
+            <p className="text-xs text-neutral-400 p-4 border border-dashed border-white/[0.07] rounded-md">Select an application to see details and change its status.</p>
           )}
         </div>
       </div>

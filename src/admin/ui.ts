@@ -1,16 +1,19 @@
 // Shared class names so every admin screen looks the same.
+// These mirror src/dashboard/ui.tsx; keep both in sync when the design tokens change.
 export const inputCls =
-  'w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2 px-3 text-sm text-white placeholder-neutral-600 focus:outline-none transition-colors';
-export const labelCls = 'block text-xs uppercase tracking-wider text-neutral-300 mb-1 font-medium';
-export const helpCls = 'text-[11px] text-neutral-500 mt-1 leading-snug';
-export const errCls = 'text-[11px] text-red-400 mt-1';
-export const cardCls = 'bg-[#0e0e12] border border-neutral-800 rounded-sm';
+  'w-full rounded-md border border-white/[0.1] bg-[#101013] px-3 py-2 text-[12.5px] text-neutral-100 placeholder:text-neutral-400/70 transition-colors duration-150 hover:border-white/[0.16] focus:border-[#d4af37]/70 focus:outline-none';
+export const labelCls =
+  'mb-1.5 block text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-400';
+export const helpCls = 'mt-1 text-[10.5px] leading-snug text-neutral-400';
+export const errCls = 'mt-1 text-[10.5px] text-rose-400';
+export const cardCls =
+  'relative rounded-[10px] border border-white/[0.075] bg-[#0c0c0f] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]';
 export const btnGold =
-  'inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] hover:bg-[#e5c158] rounded-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-2 rounded-md bg-[#d4af37] px-3.5 py-2 text-[12px] font-semibold tracking-[0.02em] text-black transition-colors duration-150 hover:bg-[#e2c258] active:bg-[#c8a331] disabled:cursor-not-allowed disabled:opacity-40';
 export const btnGhost =
-  'inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs text-neutral-300 hover:text-white border border-neutral-700 hover:border-neutral-500 rounded-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-1.5 rounded-md border border-white/[0.1] bg-white/[0.02] px-3 py-1.5 text-[11.5px] font-medium text-neutral-300 transition-colors duration-150 hover:border-white/[0.18] hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
 export const btnDanger =
-  'inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs text-red-300 hover:text-white border border-red-500/40 hover:bg-red-600/80 hover:border-red-500 rounded-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-1.5 rounded-md border border-rose-400/25 bg-rose-400/[0.06] px-3 py-1.5 text-[11.5px] font-medium text-rose-300 transition-colors duration-150 hover:border-rose-400/40 hover:bg-rose-400/[0.12] hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-40';
 
 export type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 

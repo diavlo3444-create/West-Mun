@@ -1,13 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useDeferredValue, useMemo, useState } from 'react';
 import {
   Search,
-  Filter,
   Download,
   RefreshCw,
   Eye,
   CheckCircle2,
   XCircle,
-  Clock,
   AlertCircle,
   Shield,
   Camera,
@@ -21,10 +19,31 @@ import {
   ChevronRight,
   FileText,
   AlertTriangle,
+  SlidersHorizontal,
+  Inbox,
+  ListFilter,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { cardCls, btnGold, btnGhost, btnDanger, inputCls, labelCls, explainError, type Row } from './ui';
+import { explainError, type Row } from './ui';
 import { downloadText, toCsv } from '../lib/safe';
+import {
+  EmptyState,
+  Modal,
+  Notice,
+  PageHeader,
+  Panel,
+  SegmentedTabs,
+  Skeleton,
+  StatusBadge,
+  Toast,
+  btnDanger,
+  btnGhost,
+  btnPrimary,
+  btnSecondary,
+  inputCls,
+  labelCls,
+  selectCls,
+} from '../dashboard/ui';
 
 export interface UnifiedRegistration extends Row {
   _type: 'delegate' | 'team';
@@ -36,182 +55,241 @@ interface RegistrationsManagerProps {
   delegates: Row[];
   teamRegistrations: Row[];
   loading: boolean;
+  error?: string;
   onRefresh: () => void;
   selectedApp?: { app: any; type: 'delegate' | 'team' } | null;
   onClearSelectedApp?: () => void;
+}
+
+type StatusTab = 'all' | 'pending' | 'approved' | 'rejected' | 'waitlisted';
+
+const TEAM_META: Record<string, { label: string; short: string; icon: typeof Shield }> = {
+  delegates: { label: 'Conference delegates', short: 'Delegates', icon: GraduationCap },
+  security: { label: 'Security & Protocol', short: 'Security', icon: Shield },
+  media: { label: 'Media & Press', short: 'Media', icon: Camera },
+  volunteers: { label: 'Conference Volunteers', short: 'Volunteers', icon: HeartHandshake },
+};
+
+function teamLabel(team: string): string {
+  return TEAM_META[team]?.short ?? team;
+}
+
+function teamIcon(team: string) {
+  const Icon = TEAM_META[team]?.icon ?? GraduationCap;
+  return <Icon className="h-3 w-3" aria-hidden="true" />;
+}
+
+function initials(name?: string): string {
+  const cleaned = String(name || '?').trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return cleaned.slice(0, 2).toUpperCase();
+}
+
+function formatDate(value?: string, withTime = false): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+  });
 }
 
 export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   delegates,
   teamRegistrations,
   loading,
+  error,
   onRefresh,
   selectedApp,
   onClearSelectedApp,
 }) => {
-  // Filters & Search
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [teamFilter, setTeamFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [sectionFilter, setSectionFilter] = useState('all');
+  const [statusTab, setStatusTab] = useState<StatusTab>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'name_asc' | 'status'>('date_desc');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // Pagination
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
-  // Detail Modal & Draft state
   const [activeItem, setActiveItem] = useState<UnifiedRegistration | null>(null);
-  const [draftStatus, setDraftStatus] = useState<string>('received');
-  const [draftNotes, setDraftNotes] = useState<string>('');
+  const [draftStatus, setDraftStatus] = useState('received');
+  const [draftNotes, setDraftNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [modalNotice, setModalNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [modalNotice, setModalNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(
+    null,
+  );
+  const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | 'delete' | null>(null);
+  const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
 
-  // Confirmation modal
-  const [confirmAction, setConfirmAction] = useState<{
-    type: 'approve' | 'reject' | 'delete';
-    title: string;
-    description: string;
-  } | null>(null);
+  const openItem = (item: UnifiedRegistration) => {
+    setActiveItem(item);
+    setDraftStatus(item.status || 'received');
+    setDraftNotes(item.admin_notes || '');
+    setModalNotice(null);
+    setPendingAction(null);
+  };
 
-  // If a parent requested opening an application
+  // Deep-link from the overview page opens the exact dossier.
   React.useEffect(() => {
-    if (selectedApp?.app) {
-      const isTeam = selectedApp.type === 'team';
-      const item: UnifiedRegistration = {
-        ...selectedApp.app,
-        _type: selectedApp.type,
-        _teamId: isTeam ? selectedApp.app.team : 'delegates',
-        _teamLabel: isTeam
-          ? selectedApp.app.team === 'security'
-            ? 'Security Team'
-            : selectedApp.app.team === 'media'
-            ? 'Media Team'
-            : selectedApp.app.team === 'volunteers'
-            ? 'Volunteers Team'
-            : String(selectedApp.app.team)
-          : selectedApp.app.tier === 'early_bird'
-          ? 'Early Bird Delegate'
-          : 'Regular Delegate',
-      };
-      setActiveItem(item);
-      setDraftStatus(item.status || 'received');
-      setDraftNotes(item.admin_notes || '');
-      setModalNotice(null);
-    }
+    if (!selectedApp?.app) return;
+    const isTeam = selectedApp.type === 'team';
+    openItem({
+      ...selectedApp.app,
+      _type: selectedApp.type,
+      _teamId: isTeam ? String(selectedApp.app.team) : 'delegates',
+      _teamLabel: isTeam
+        ? teamLabel(String(selectedApp.app.team))
+        : selectedApp.app.tier === 'early_bird'
+          ? 'Early Bird delegate'
+          : 'Regular delegate',
+    });
   }, [selectedApp]);
 
-  // Consolidate delegate and team records into one unified list
   const unifiedList: UnifiedRegistration[] = useMemo(() => {
     const list: UnifiedRegistration[] = [
       ...delegates.map((d) => ({
         ...d,
         _type: 'delegate' as const,
         _teamId: 'delegates',
-        _teamLabel: d.tier === 'early_bird' ? 'Early Bird Delegate' : 'Regular Delegate',
+        _teamLabel: d.tier === 'early_bird' ? 'Early Bird delegate' : 'Regular delegate',
       })),
       ...teamRegistrations.map((t) => ({
         ...t,
         _type: 'team' as const,
         _teamId: String(t.team),
-        _teamLabel:
-          t.team === 'security'
-            ? 'Security Team'
-            : t.team === 'media'
-            ? 'Media Team'
-            : t.team === 'volunteers'
-            ? 'Volunteers Team'
-            : String(t.team),
+        _teamLabel: teamLabel(String(t.team)),
       })),
     ];
-
     return list;
   }, [delegates, teamRegistrations]);
 
-  // Filter and sort records
+  const statusCounts = useMemo(() => {
+    return {
+      all: unifiedList.length,
+      pending: unifiedList.filter((r) => r.status === 'received' || r.status === 'under_review').length,
+      approved: unifiedList.filter((r) => r.status === 'accepted').length,
+      rejected: unifiedList.filter((r) => r.status === 'rejected').length,
+      waitlisted: unifiedList.filter((r) => r.status === 'waitlisted').length,
+    };
+  }, [unifiedList]);
+
+  const hasSectionData = useMemo(
+    () => unifiedList.some((r) => r.section === 'male' || r.section === 'female'),
+    [unifiedList],
+  );
+
   const filteredList = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
 
-    return unifiedList.filter((item) => {
-      // Search
-      if (q) {
-        const matches = [
-          item.full_name,
-          item.email,
-          item.institution,
-          item.phone,
-          item.id,
-          item._teamLabel,
-        ].some((val) => String(val || '').toLowerCase().includes(q));
-        if (!matches) return false;
-      }
-
-      // Team filter
-      if (teamFilter !== 'all' && item._teamId !== teamFilter) {
-        return false;
-      }
-
-      // Status filter
-      if (statusFilter !== 'all') {
-        if (statusFilter === 'pending' && item.status !== 'received' && item.status !== 'under_review') {
-          return false;
-        } else if (statusFilter === 'approved' && item.status !== 'accepted') {
-          return false;
-        } else if (statusFilter !== 'pending' && statusFilter !== 'approved' && item.status !== statusFilter) {
-          return false;
+    return unifiedList
+      .filter((item) => {
+        if (q) {
+          const matches = [
+            item.full_name,
+            item.email,
+            item.institution,
+            item.phone,
+            item.id,
+            item._teamLabel,
+          ].some((value) => String(value || '').toLowerCase().includes(q));
+          if (!matches) return false;
         }
-      }
 
-      // Date range filter
-      if (startDate) {
-        const itemDate = new Date(item.created_at).toISOString().slice(0, 10);
-        if (itemDate < startDate) return false;
-      }
-      if (endDate) {
-        const itemDate = new Date(item.created_at).toISOString().slice(0, 10);
-        if (itemDate > endDate) return false;
-      }
+        if (teamFilter !== 'all' && item._teamId !== teamFilter) return false;
 
-      return true;
-    }).sort((a, b) => {
-      if (sortBy === 'name_asc') {
-        return String(a.full_name || '').localeCompare(String(b.full_name || ''));
-      }
-      if (sortBy === 'date_asc') {
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      }
-      if (sortBy === 'status') {
-        return String(a.status || '').localeCompare(String(b.status || ''));
-      }
-      // default: date_desc
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-  }, [unifiedList, search, teamFilter, statusFilter, startDate, endDate, sortBy]);
+        if (sectionFilter !== 'all') {
+          if (sectionFilter === 'unassigned') {
+            if (item.section === 'male' || item.section === 'female') return false;
+          } else if (item.section !== sectionFilter) {
+            return false;
+          }
+        }
 
-  // Paginated items
-  const paginatedList = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredList.slice(start, start + pageSize);
-  }, [filteredList, page, pageSize]);
+        if (statusTab === 'pending') {
+          if (item.status !== 'received' && item.status !== 'under_review') return false;
+        } else if (statusTab === 'approved') {
+          if (item.status !== 'accepted') return false;
+        } else if (statusTab === 'rejected') {
+          if (item.status !== 'rejected') return false;
+        } else if (statusTab === 'waitlisted') {
+          if (item.status !== 'waitlisted') return false;
+        }
+
+        if (startDate) {
+          const itemDate = new Date(item.created_at).toISOString().slice(0, 10);
+          if (itemDate < startDate) return false;
+        }
+        if (endDate) {
+          const itemDate = new Date(item.created_at).toISOString().slice(0, 10);
+          if (itemDate > endDate) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'name_asc') {
+          return String(a.full_name || '').localeCompare(String(b.full_name || ''));
+        }
+        if (sortBy === 'date_asc') {
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        if (sortBy === 'status') {
+          return String(a.status || '').localeCompare(String(b.status || ''));
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+  }, [
+    unifiedList,
+    deferredSearch,
+    teamFilter,
+    sectionFilter,
+    statusTab,
+    startDate,
+    endDate,
+    sortBy,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredList.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedList = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, safePage, pageSize]);
 
-  const openModal = (item: UnifiedRegistration) => {
-    setActiveItem(item);
-    setDraftStatus(item.status || 'received');
-    setDraftNotes(item.admin_notes || '');
-    setModalNotice(null);
+  const activeFilters =
+    (teamFilter !== 'all' ? 1 : 0) +
+    (sectionFilter !== 'all' ? 1 : 0) +
+    (statusTab !== 'all' ? 1 : 0) +
+    (startDate ? 1 : 0) +
+    (endDate ? 1 : 0);
+
+  const clearFilters = () => {
+    setSearch('');
+    setTeamFilter('all');
+    setSectionFilter('all');
+    setStatusTab('all');
+    setStartDate('');
+    setEndDate('');
+    setPage(1);
   };
 
   const closeModal = () => {
+    if (saving) return;
     setActiveItem(null);
-    setConfirmAction(null);
+    setPendingAction(null);
     setModalNotice(null);
-    if (onClearSelectedApp) onClearSelectedApp();
+    onClearSelectedApp?.();
   };
 
-  // Persist status and notes change to Supabase
   const saveApplication = async (newStatus?: string) => {
     if (!activeItem || !supabase) return;
     const targetStatus = newStatus || draftStatus;
@@ -220,7 +298,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     setSaving(true);
     setModalNotice(null);
 
-    const { error } = await supabase
+    const { error: saveError } = await supabase
       .from(table)
       .update({
         status: targetStatus,
@@ -230,33 +308,43 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
 
     setSaving(false);
 
-    if (error) {
-      setModalNotice({ type: 'error', text: explainError(error) });
+    if (saveError) {
+      setModalNotice({ type: 'error', text: explainError(saveError) });
       return;
     }
 
     setDraftStatus(targetStatus);
-    setActiveItem((prev) => (prev ? { ...prev, status: targetStatus, admin_notes: draftNotes.trim() } : null));
-    setModalNotice({ type: 'success', text: `Application successfully updated to ${targetStatus.toUpperCase()}.` });
+    setActiveItem((prev) =>
+      prev ? { ...prev, status: targetStatus, admin_notes: draftNotes.trim() } : null,
+    );
+    setPendingAction(null);
+    setModalNotice({ type: 'success', text: 'Decision saved to Supabase.' });
+    setToast({
+      message: `${activeItem.full_name} is now marked ${targetStatus.replace('_', ' ')}.`,
+      tone: 'success',
+    });
     onRefresh();
   };
 
-  // Delete application
   const deleteApplication = async () => {
     if (!activeItem || !supabase) return;
     const table = activeItem._type === 'delegate' ? 'delegates' : 'team_registrations';
+    const deletedName = activeItem.full_name;
 
     setSaving(true);
-    const { error } = await supabase.from(table).delete().eq('id', activeItem.id);
+    const { error: deleteError } = await supabase.from(table).delete().eq('id', activeItem.id);
     setSaving(false);
 
-    if (error) {
-      setModalNotice({ type: 'error', text: explainError(error) });
-      setConfirmAction(null);
+    if (deleteError) {
+      setModalNotice({ type: 'error', text: explainError(deleteError) });
+      setPendingAction(null);
       return;
     }
 
-    closeModal();
+    setActiveItem(null);
+    setPendingAction(null);
+    onClearSelectedApp?.();
+    setToast({ message: `${deletedName}'s record was permanently deleted.`, tone: 'success' });
     onRefresh();
   };
 
@@ -293,602 +381,732 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
 
     downloadText(
       `west-mun-registrations-${teamFilter}-${new Date().toISOString().slice(0, 10)}.csv`,
-      toCsv([head, ...body])
+      toCsv([head, ...body]),
     );
   };
 
-  const getTeamIcon = (teamId: string) => {
-    switch (teamId) {
-      case 'security':
-        return <Shield className="w-3.5 h-3.5 text-blue-400" />;
-      case 'media':
-        return <Camera className="w-3.5 h-3.5 text-purple-400" />;
-      case 'volunteers':
-        return <HeartHandshake className="w-3.5 h-3.5 text-amber-400" />;
-      default:
-        return <GraduationCap className="w-3.5 h-3.5 text-[#d4af37]" />;
-    }
-  };
-
-  const statusPill = (st: string) => {
-    switch (st) {
-      case 'accepted':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-0.5 rounded-sm bg-emerald-950/60 text-emerald-400 border border-emerald-500/40">
-            <CheckCircle2 className="w-3 h-3" /> Approved
-          </span>
-        );
-      case 'rejected':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-0.5 rounded-sm bg-red-950/60 text-red-400 border border-red-500/40">
-            <XCircle className="w-3 h-3" /> Rejected
-          </span>
-        );
-      case 'under_review':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-0.5 rounded-sm bg-sky-950/60 text-sky-400 border border-sky-500/40">
-            <Clock className="w-3 h-3" /> Under Review
-          </span>
-        );
-      case 'waitlisted':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-0.5 rounded-sm bg-amber-950/60 text-amber-400 border border-amber-500/40">
-            <AlertCircle className="w-3 h-3" /> Waitlisted
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-0.5 rounded-sm bg-neutral-900 text-neutral-300 border border-neutral-700">
-            <Clock className="w-3 h-3 text-neutral-400" /> Pending
-          </span>
-        );
-    }
-  };
+  const emptyRecords = unifiedList.length === 0;
 
   return (
     <div className="space-y-5">
-      {/* Header and Quick Stats */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-8 h-[1px] bg-[#d4af37]" />
-            <span className="text-[11px] font-mono tracking-widest uppercase text-[#d4af37] font-semibold">
-              Delegate & Team Registry
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-serif text-white tracking-tight">Registration Records</h1>
-          <p className="text-xs text-neutral-400 mt-1 font-light">
-            Search, review, approve, or reject candidate applications with audit trails.
-          </p>
-        </div>
+      <PageHeader
+        eyebrow="Delegate & staff registry"
+        title="Registrations"
+        description="Review every application in one place. Decisions and private notes are written straight to Supabase."
+        actions={
+          <>
+            <button type="button" onClick={onRefresh} className={btnSecondary} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={exportFilteredCsv}
+              disabled={filteredList.length === 0}
+              className={btnPrimary}
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Export CSV
+            </button>
+          </>
+        }
+      />
+
+      {error && (
+        <Notice tone="error" title="Could not refresh every record">
+          {error}
+        </Notice>
+      )}
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <SegmentedTabs<StatusTab>
+          ariaLabel="Filter by application status"
+          value={statusTab}
+          onChange={(next) => {
+            setStatusTab(next);
+            setPage(1);
+          }}
+          options={[
+            { value: 'all', label: 'All', count: statusCounts.all },
+            { value: 'pending', label: 'Pending', count: statusCounts.pending },
+            { value: 'approved', label: 'Approved', count: statusCounts.approved },
+            { value: 'waitlisted', label: 'Waitlisted', count: statusCounts.waitlisted },
+            { value: 'rejected', label: 'Rejected', count: statusCounts.rejected },
+          ]}
+        />
 
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onRefresh} className={btnGhost}>
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </button>
-          <button
-            type="button"
-            onClick={exportFilteredCsv}
-            disabled={filteredList.length === 0}
-            className={btnGold}
-          >
-            <Download className="w-3.5 h-3.5" /> CSV ({filteredList.length})
-          </button>
-        </div>
-      </div>
-
-      {/* Search and Filters Bar */}
-      <div className={`${cardCls} p-4 space-y-3`}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-          {/* Search Box */}
-          <div className="lg:col-span-4 relative">
-            <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-2.5" />
+          <div className="relative min-w-0 flex-1 sm:w-[270px]">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400"
+              aria-hidden="true"
+            />
             <input
-              type="text"
-              placeholder="Search by name, email, school, ID…"
-              className={`${inputCls} pl-9`}
+              type="search"
+              placeholder="Search name, email, school, ID…"
+              className={`${inputCls} pl-8`}
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
+              aria-label="Search registrations"
             />
           </div>
-
-          {/* Team / Category Filter */}
-          <div className="lg:col-span-3">
-            <select
-              className={inputCls}
-              value={teamFilter}
-              onChange={(e) => {
-                setTeamFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="all">All Teams & Categories</option>
-              <option value="delegates">Delegates (Early Bird & Regular)</option>
-              <option value="security">Security Team</option>
-              <option value="media">Media & Press Team</option>
-              <option value="volunteers">Conference Volunteers</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div className="lg:col-span-3">
-            <select
-              className={inputCls}
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="all">All Application Statuses</option>
-              <option value="pending">Pending (Received / Under Review)</option>
-              <option value="approved">Approved / Accepted</option>
-              <option value="rejected">Rejected</option>
-              <option value="waitlisted">Waitlisted</option>
-              <option value="withdrawn">Withdrawn</option>
-            </select>
-          </div>
-
-          {/* Sort By */}
-          <div className="lg:col-span-2">
-            <select
-              className={inputCls}
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-            >
-              <option value="date_desc">Newest First</option>
-              <option value="date_asc">Oldest First</option>
-              <option value="name_asc">Name (A-Z)</option>
-              <option value="status">Status</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Date Range Sub-Bar */}
-        <div className="pt-3 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-400">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-3.5 h-3.5 text-[#d4af37]" />
-            <span>Submission Date Range:</span>
-            <input
-              type="date"
-              className="bg-[#141418] border border-neutral-700 text-white px-2 py-1 text-xs rounded-sm focus:border-[#d4af37]"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setPage(1);
-              }}
-            />
-            <span>to</span>
-            <input
-              type="date"
-              className="bg-[#141418] border border-neutral-700 text-white px-2 py-1 text-xs rounded-sm focus:border-[#d4af37]"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setPage(1);
-              }}
-            />
-            {(startDate || endDate) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setStartDate('');
-                  setEndDate('');
-                }}
-                className="text-[#d4af37] hover:underline ml-1 cursor-pointer"
-              >
-                Clear
-              </button>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className={`${btnSecondary} ${filtersOpen ? 'border-[#d4af37]/40 text-[#e2c258]' : ''}`}
+            aria-expanded={filtersOpen}
+            aria-controls="registration-filters"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+            Filters
+            {activeFilters > 0 && (
+              <span className="rounded bg-[#d4af37]/15 px-1.5 py-0.5 text-[9.5px] font-mono text-[#e2c258]">
+                {activeFilters}
+              </span>
             )}
-          </div>
-
-          <div className="font-mono text-neutral-400">
-            Showing <strong className="text-white">{filteredList.length}</strong> of{' '}
-            <strong className="text-white">{unifiedList.length}</strong> records
-          </div>
+          </button>
         </div>
       </div>
 
-      {/* Registrations Table */}
-      <div className={`${cardCls} overflow-x-auto`}>
-        {loading ? (
-          <div className="p-12 text-center text-neutral-400 text-sm flex items-center justify-center gap-2">
-            <Loader2 className="w-5 h-5 animate-spin text-[#d4af37]" /> Loading registration records…
+      {filtersOpen && (
+        <Panel id="registration-filters" className="wm-page-in p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
+            <div className="lg:col-span-3">
+              <label htmlFor="filter-department" className={labelCls}>
+                Department
+              </label>
+              <select
+                id="filter-department"
+                className={selectCls}
+                value={teamFilter}
+                onChange={(e) => {
+                  setTeamFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">All departments</option>
+                <option value="delegates">Conference delegates</option>
+                <option value="security">Security & Protocol</option>
+                <option value="media">Media & Press</option>
+                <option value="volunteers">Conference Volunteers</option>
+              </select>
+            </div>
+
+            <div className="lg:col-span-3">
+              <label htmlFor="filter-section" className={labelCls}>
+                Section
+              </label>
+              <select
+                id="filter-section"
+                className={selectCls}
+                value={sectionFilter}
+                onChange={(e) => {
+                  setSectionFilter(e.target.value);
+                  setPage(1);
+                }}
+                disabled={!hasSectionData}
+              >
+                <option value="all">All sections</option>
+                <option value="male">Male division</option>
+                <option value="female">Female division</option>
+                <option value="unassigned">No section</option>
+              </select>
+              {!hasSectionData && (
+                <p className="mt-1 text-[10px] text-neutral-400">No sectioned records yet.</p>
+              )}
+            </div>
+
+            <div className="lg:col-span-2">
+              <label htmlFor="filter-sort" className={labelCls}>
+                Sort
+              </label>
+              <select
+                id="filter-sort"
+                className={selectCls}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              >
+                <option value="date_desc">Newest first</option>
+                <option value="date_asc">Oldest first</option>
+                <option value="name_asc">Name A–Z</option>
+                <option value="status">Status</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-2 lg:col-span-4">
+              <span className={labelCls}>Submitted between</span>
+              <div className="flex items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Calendar
+                    className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-neutral-400"
+                    aria-hidden="true"
+                  />
+                  <input
+                    type="date"
+                    className={`${inputCls} pl-7`}
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setPage(1);
+                    }}
+                    aria-label="Start date"
+                  />
+                </div>
+                <span className="text-[10px] text-neutral-400">to</span>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setPage(1);
+                  }}
+                  aria-label="End date"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3">
+            <p className="text-[10.5px] text-neutral-400">
+              Showing <span className="text-neutral-300">{filteredList.length}</span> of{' '}
+              <span className="text-neutral-300">{unifiedList.length}</span> records
+            </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              disabled={activeFilters === 0 && !search}
+              className={btnGhost}
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+              Clear filters
+            </button>
+          </div>
+        </Panel>
+      )}
+
+      <Panel className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-2 text-[10.5px] text-neutral-400">
+            <ListFilter className="h-3.5 w-3.5 text-[#d4af37]/80" aria-hidden="true" />
+            <span>
+              {filteredList.length} record{filteredList.length === 1 ? '' : 's'}
+              {activeFilters > 0 || search ? ' matching filters' : ' in the registry'}
+            </span>
+          </div>
+          <span className="text-[9.5px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+            {statusCounts.pending} awaiting decision
+          </span>
+        </div>
+
+        {loading && unifiedList.length === 0 ? (
+          <div className="space-y-3 p-5">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="hidden h-4 w-28 sm:block" />
+                <Skeleton className="h-6 w-20" />
+              </div>
+            ))}
           </div>
         ) : paginatedList.length === 0 ? (
-          <div className="p-12 text-center text-neutral-500 text-sm space-y-2">
-            <AlertCircle className="w-8 h-8 text-neutral-600 mx-auto mb-1" />
-            <p>{unifiedList.length === 0 ? 'No applications have been registered yet.' : 'No applications match your selected filters.'}</p>
-            {unifiedList.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('');
-                  setTeamFilter('all');
-                  setStatusFilter('all');
-                  setStartDate('');
-                  setEndDate('');
-                }}
-                className="text-xs text-[#d4af37] hover:underline cursor-pointer"
-              >
-                Reset all filters
-              </button>
-            )}
-          </div>
+          emptyRecords ? (
+            <EmptyState
+              icon={Inbox}
+              title="The registry is empty"
+              description="No delegate or staff applications have been submitted yet. New records appear here automatically."
+              action={
+                <button type="button" onClick={onRefresh} className={btnGhost}>
+                  <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                  Check again
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={Search}
+              title="No records match these filters"
+              description="Try a broader search or clear the current filter set."
+              action={
+                <button type="button" onClick={clearFilters} className={btnSecondary}>
+                  Clear filters
+                </button>
+              }
+            />
+          )
         ) : (
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#121216] border-b border-neutral-800 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
-              <tr>
-                <th className="py-3 px-4">Applicant</th>
-                <th className="py-3 px-4">Team / Category</th>
-                <th className="py-3 px-4">Institution</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Submitted</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-800/60">
-              {paginatedList.map((item) => (
-                <tr key={`${item._type}-${item.id}`} className="hover:bg-neutral-800/30 transition-colors">
-                  {/* Applicant Name & Email */}
-                  <td className="py-3.5 px-4">
-                    <div className="font-semibold text-white">{item.full_name}</div>
-                    <div className="text-[11px] text-neutral-400 font-mono mt-0.5">{item.email}</div>
-                  </td>
-
-                  {/* Team */}
-                  <td className="py-3.5 px-4 whitespace-nowrap">
-                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-[#15151a] border border-neutral-800 text-[#d4af37]">
-                      {getTeamIcon(item._teamId)}
-                      <span className="font-mono text-[11px]">{item._teamLabel}</span>
-                    </div>
-                  </td>
-
-                  {/* Institution */}
-                  <td className="py-3.5 px-4 max-w-[12rem] truncate text-neutral-300">
-                    {item.institution || '—'}
-                  </td>
-
-                  {/* Status */}
-                  <td className="py-3.5 px-4 whitespace-nowrap">{statusPill(item.status)}</td>
-
-                  {/* Submitted Date */}
-                  <td className="py-3.5 px-4 font-mono text-[11px] text-neutral-400 whitespace-nowrap">
-                    {item.created_at ? new Date(item.created_at).toLocaleDateString() : '—'}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => openModal(item)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono uppercase bg-neutral-800 hover:bg-[#d4af37] hover:text-black text-neutral-200 rounded-sm transition-colors cursor-pointer"
+          <>
+            {/* Desktop table */}
+            <div className="wm-scroll hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[820px] text-left">
+                <thead>
+                  <tr className="border-b border-white/[0.06] bg-white/[0.012] text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                    <th scope="col" className="px-5 py-2.5 font-normal">Applicant</th>
+                    <th scope="col" className="px-3 py-2.5 font-normal">Department</th>
+                    <th scope="col" className="hidden px-3 py-2.5 font-normal lg:table-cell">Institution</th>
+                    <th scope="col" className="hidden px-3 py-2.5 font-normal xl:table-cell">Section</th>
+                    <th scope="col" className="px-3 py-2.5 font-normal">Status</th>
+                    <th scope="col" className="hidden px-3 py-2.5 font-normal lg:table-cell">Submitted</th>
+                    <th scope="col" className="px-5 py-2.5 text-right font-normal">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.045]">
+                  {paginatedList.map((item) => (
+                    <tr
+                      key={`${item._type}-${item.id}`}
+                      className="group transition-colors hover:bg-white/[0.025]"
                     >
-                      <Eye className="w-3 h-3" />
-                      <span>Review</span>
-                    </button>
-                  </td>
-                </tr>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[9.5px] font-semibold text-neutral-300">
+                            {initials(item.full_name)}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-[12px] font-medium text-neutral-100">
+                              {item.full_name || 'Unnamed applicant'}
+                            </p>
+                            <p className="truncate font-mono text-[10px] text-neutral-400">{item.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-white/[0.07] bg-white/[0.02] px-1.5 py-0.5 text-[10px] text-neutral-400">
+                          <span className="text-[#c9a64a]/90">{teamIcon(item._teamId)}</span>
+                          {item._teamLabel}
+                        </span>
+                      </td>
+                      <td className="hidden max-w-[12rem] truncate px-3 py-3 text-[11.5px] text-neutral-400 lg:table-cell">
+                        {item.institution || '—'}
+                      </td>
+                      <td className="hidden px-3 py-3 xl:table-cell">
+                        {item.section ? (
+                          <span className="rounded border border-white/[0.08] bg-white/[0.025] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.08em] text-neutral-400">
+                            {item.section}
+                          </span>
+                        ) : (
+                          <span className="text-[10.5px] text-neutral-700">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <StatusBadge status={item.status} />
+                      </td>
+                      <td className="hidden whitespace-nowrap px-3 py-3 font-mono text-[10.5px] text-neutral-400 lg:table-cell">
+                        {formatDate(item.created_at)}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openItem(item)}
+                          className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] px-2 py-1 text-[10.5px] font-medium text-neutral-400 transition-colors hover:border-[#d4af37]/35 hover:bg-[#d4af37]/[0.06] hover:text-[#e2c258]"
+                          aria-label={`Review ${item.full_name}`}
+                        >
+                          <Eye className="h-3 w-3" aria-hidden="true" />
+                          Review
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <ul className="divide-y divide-white/[0.045] md:hidden">
+              {paginatedList.map((item) => (
+                <li key={`mobile-${item._type}-${item.id}`}>
+                  <button
+                    type="button"
+                    onClick={() => openItem(item)}
+                    className="block w-full px-4 py-3.5 text-left transition-colors active:bg-white/[0.03]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[12.5px] font-medium text-neutral-100">
+                          {item.full_name || 'Unnamed applicant'}
+                        </p>
+                        <p className="mt-0.5 truncate font-mono text-[10px] text-neutral-400">{item.email}</p>
+                      </div>
+                      <StatusBadge status={item.status} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-neutral-400">
+                      <span className="text-[#c9a64a]/90">{item._teamLabel}</span>
+                      <span className="text-neutral-700" aria-hidden="true">·</span>
+                      <span className="truncate">{item.institution || 'No institution'}</span>
+                      <span className="text-neutral-700" aria-hidden="true">·</span>
+                      <span className="font-mono">{formatDate(item.created_at)}</span>
+                    </div>
+                  </button>
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+          </>
         )}
 
-        {/* Pagination Bar */}
         {filteredList.length > 0 && (
-          <div className="p-3.5 border-t border-neutral-800 bg-[#101014] flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-400">
-            <div className="flex items-center gap-2">
-              <span>Show</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] bg-white/[0.012] px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-2 text-[10.5px] text-neutral-400">
+              <span>Rows</span>
               <select
-                className="bg-[#141418] border border-neutral-700 text-white rounded-sm px-2 py-0.5 text-xs"
+                className="rounded border border-white/[0.09] bg-[#101013] px-1.5 py-0.5 text-[10.5px] text-neutral-300 focus:outline-none"
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value));
                   setPage(1);
                 }}
+                aria-label="Rows per page"
               >
                 <option value={10}>10</option>
                 <option value={20}>20</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
               </select>
-              <span>per page</span>
+              <span className="hidden sm:inline">
+                · {Math.min((safePage - 1) * pageSize + 1, filteredList.length)}–
+                {Math.min(safePage * pageSize, filteredList.length)} of {filteredList.length}
+              </span>
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className="font-mono">
-                Page {page} of {totalPages}
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-neutral-400">
+                Page {safePage} / {totalPages}
               </span>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  disabled={page <= 1}
+                  disabled={safePage <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="p-1 border border-neutral-700 rounded-sm hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                  aria-label="Previous Page"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded border border-white/[0.08] text-neutral-400 transition-colors hover:bg-white/[0.05] hover:text-white disabled:opacity-30"
+                  aria-label="Previous page"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
                 <button
                   type="button"
-                  disabled={page >= totalPages}
+                  disabled={safePage >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="p-1 border border-neutral-700 rounded-sm hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                  aria-label="Next Page"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded border border-white/[0.08] text-neutral-400 transition-colors hover:bg-white/[0.05] hover:text-white disabled:opacity-30"
+                  aria-label="Next page"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
           </div>
         )}
-      </div>
+      </Panel>
 
-      {/* Application Details Modal */}
-      {activeItem && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 overflow-y-auto"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className={`${cardCls} max-w-2xl w-full my-8 p-6 sm:p-7 shadow-2xl border-[#d4af37]/40 relative`}>
-            {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4 pb-4 border-b border-neutral-800">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-[#d4af37]">
-                    {activeItem._type === 'delegate' ? 'Delegate Dossier' : 'Staff Application'}
-                  </span>
-                  <span>·</span>
-                  <span className="text-[10px] font-mono text-neutral-500">ID: {activeItem.id}</span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-serif text-white">{activeItem.full_name}</h2>
-                <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-neutral-400">
-                  <span className="text-white font-mono">{activeItem.email}</span>
-                  {activeItem.phone && (
-                    <>
-                      <span>·</span>
-                      <span className="font-mono text-neutral-300">{activeItem.phone}</span>
-                    </>
-                  )}
-                  <span>·</span>
-                  <span>{activeItem.institution}</span>
-                </div>
-              </div>
-
+      <Modal
+        open={Boolean(activeItem)}
+        onClose={closeModal}
+        size="lg"
+        eyebrow={activeItem?._type === 'delegate' ? 'Delegate dossier' : 'Staff application'}
+        title={activeItem?.full_name || 'Application'}
+        description={
+          activeItem ? (
+            <span className="font-mono text-[10.5px]">
+              {activeItem.email}
+              {activeItem.phone ? ` · ${activeItem.phone}` : ''}
+              {activeItem.institution ? ` · ${activeItem.institution}` : ''}
+            </span>
+          ) : undefined
+        }
+        footer={
+          activeItem ? (
+            <>
               <button
                 type="button"
-                onClick={closeModal}
-                className="text-neutral-400 hover:text-white p-1 cursor-pointer"
-                aria-label="Close application modal"
+                onClick={() => setPendingAction('delete')}
+                className="mr-auto inline-flex items-center gap-1.5 text-[10.5px] text-neutral-400 transition-colors hover:text-rose-300"
               >
-                <X className="w-5 h-5" />
+                <Trash2 className="h-3 w-3" aria-hidden="true" />
+                Delete record
               </button>
+              <button type="button" onClick={closeModal} className={btnSecondary} disabled={saving}>
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => saveApplication()}
+                className={btnPrimary}
+                disabled={saving}
+              >
+                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                Save changes
+              </button>
+            </>
+          ) : undefined
+        }
+      >
+        {activeItem && (
+          <div className="space-y-4">
+            {modalNotice && (
+              <Notice tone={modalNotice.type === 'error' ? 'error' : 'success'}>
+                {modalNotice.text}
+              </Notice>
+            )}
+
+            {/* Snapshot */}
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-white/[0.07] bg-white/[0.045] sm:grid-cols-4">
+              {[
+                { label: 'Status', value: <StatusBadge status={activeItem.status} /> },
+                { label: 'Department', value: activeItem._teamLabel },
+                {
+                  label: 'Submitted',
+                  value: formatDate(activeItem.created_at, true),
+                },
+                {
+                  label: 'Section',
+                  value: activeItem.section ? activeItem.section.toUpperCase() : 'Not sectioned',
+                },
+              ].map((cell) => (
+                <div key={cell.label} className="bg-[#0c0c0f] px-3 py-2.5">
+                  <span className="mb-1 block text-[8.5px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                    {cell.label}
+                  </span>
+                  <span className="block truncate text-[11px] text-neutral-200">{cell.value}</span>
+                </div>
+              ))}
             </div>
 
-            {/* Notification Banner */}
-            {modalNotice && (
-              <div
-                className={`mt-4 p-3 text-xs rounded-sm border ${
-                  modalNotice.type === 'success'
-                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                    : 'bg-red-950/40 border-red-500/40 text-red-300'
-                }`}
-              >
-                {modalNotice.text}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-3">
+                <p className="mb-2 flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                  <FileText className="h-3 w-3" aria-hidden="true" />
+                  Applicant details
+                </p>
+                <dl className="space-y-1.5 text-[11px]">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-neutral-400">Institution</dt>
+                    <dd className="truncate text-right text-neutral-300">{activeItem.institution || '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-neutral-400">Phone</dt>
+                    <dd className="font-mono text-right text-neutral-300">{activeItem.phone || '—'}</dd>
+                  </div>
+                  {activeItem._type === 'delegate' && (
+                    <>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-neutral-400">Delegation</dt>
+                        <dd className="text-right capitalize text-neutral-300">
+                          {String(activeItem.delegation_type || 'single_delegate').replace('_', ' ')}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-neutral-400">Tier</dt>
+                        <dd className="text-right capitalize text-neutral-300">
+                          {String(activeItem.tier || '—').replace('_', ' ')}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-neutral-400">Payment</dt>
+                        <dd className="text-right capitalize text-neutral-300">
+                          {String(activeItem.payment_status || 'unpaid')}
+                          {activeItem.fee_amount != null ? ` · ${activeItem.fee_amount}` : ''}
+                        </dd>
+                      </div>
+                    </>
+                  )}
+                </dl>
+              </div>
+
+              <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-3">
+                <p className="mb-2 flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                  <Shield className="h-3 w-3" aria-hidden="true" />
+                  Consent & audit
+                </p>
+                <dl className="space-y-1.5 text-[11px]">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-neutral-400">Record ID</dt>
+                    <dd className="truncate font-mono text-[9.5px] text-neutral-400">{activeItem.id}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-neutral-400">Age confirmed</dt>
+                    <dd className="text-right text-neutral-300">
+                      {activeItem.age_confirmed ? 'Verified' : 'Not confirmed'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-neutral-400">Consent version</dt>
+                    <dd className="font-mono text-right text-neutral-300">
+                      {activeItem.consent_version || '—'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-neutral-400">Consent at</dt>
+                    <dd className="text-right text-neutral-300">
+                      {formatDate(activeItem.consent_at || activeItem.created_at)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+
+            {activeItem.experience && (
+              <div>
+                <h3 className="mb-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                  Relevant experience
+                </h3>
+                <div className="wm-scroll max-h-32 overflow-y-auto whitespace-pre-wrap rounded-md border border-white/[0.07] bg-[#101013] p-3 text-[11.5px] leading-relaxed text-neutral-300">
+                  {activeItem.experience}
+                </div>
               </div>
             )}
 
-            {/* Application Data Grid */}
-            <div className="py-5 space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 bg-[#121217] border border-neutral-800/80 rounded-sm text-xs">
-                <div>
-                  <span className="text-neutral-500 block text-[10px] uppercase font-mono">Assigned Category</span>
-                  <span className="text-[#d4af37] font-semibold">{activeItem._teamLabel}</span>
-                </div>
-                <div>
-                  <span className="text-neutral-500 block text-[10px] uppercase font-mono">Current Status</span>
-                  <div className="mt-0.5">{statusPill(activeItem.status)}</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500 block text-[10px] uppercase font-mono">Submission Timestamp</span>
-                  <span className="text-neutral-300 font-mono">
-                    {activeItem.created_at ? new Date(activeItem.created_at).toLocaleString() : '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-neutral-500 block text-[10px] uppercase font-mono">Age / Legal Confirmation</span>
-                  <span className="text-neutral-300 font-mono">{activeItem.age_confirmed ? 'Verified' : 'Unconfirmed'}</span>
-                </div>
-                <div>
-                  <span className="text-neutral-500 block text-[10px] uppercase font-mono">Consent Version</span>
-                  <span className="text-neutral-300 font-mono">{activeItem.consent_version || '2026-10-17'}</span>
-                </div>
-                {activeItem._type === 'delegate' && (
-                  <div>
-                    <span className="text-neutral-500 block text-[10px] uppercase font-mono">Delegation Type</span>
-                    <span className="text-neutral-300 capitalize">{activeItem.delegation_type || 'Single'}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Team specific statement / experience */}
-              {activeItem.experience && (
-                <div>
-                  <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-400 mb-1">
-                    Relevant Prior Experience
-                  </h4>
-                  <div className="p-3 bg-[#121217] border border-neutral-800 rounded-sm text-xs text-neutral-200 leading-relaxed max-h-36 overflow-y-auto whitespace-pre-wrap">
-                    {activeItem.experience}
-                  </div>
-                </div>
-              )}
-
-              {activeItem.statement && (
-                <div>
-                  <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-400 mb-1">
-                    Statement of Motivation
-                  </h4>
-                  <div className="p-3 bg-[#121217] border border-neutral-800 rounded-sm text-xs text-neutral-200 leading-relaxed max-h-36 overflow-y-auto whitespace-pre-wrap">
-                    {activeItem.statement}
-                  </div>
-                </div>
-              )}
-
-              {/* Status Decision Controls */}
-              <div className="pt-3 border-t border-neutral-800/80">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                  <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 font-semibold">
-                    Secretariat Adjudication
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setConfirmAction({
-                          type: 'approve',
-                          title: `Approve Application for ${activeItem.full_name}?`,
-                          description: `This marks the candidate as accepted for ${activeItem._teamLabel}.`,
-                        })
-                      }
-                      disabled={saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase tracking-wider text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/50 rounded-sm cursor-pointer transition-colors"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Approve Application
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setConfirmAction({
-                          type: 'reject',
-                          title: `Reject Application for ${activeItem.full_name}?`,
-                          description: `This marks the candidate as rejected for ${activeItem._teamLabel}.`,
-                        })
-                      }
-                      disabled={saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase tracking-wider text-red-300 bg-red-950/60 hover:bg-red-900/80 border border-red-500/50 rounded-sm cursor-pointer transition-colors"
-                    >
-                      <XCircle className="w-3.5 h-3.5" /> Reject Application
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label className={labelCls}>Fine-grained Status</label>
-                    <select
-                      className={inputCls}
-                      value={draftStatus}
-                      onChange={(e) => setDraftStatus(e.target.value)}
-                    >
-                      <option value="received">Received / Pending</option>
-                      <option value="under_review">Under review</option>
-                      <option value="accepted">Accepted / Approved</option>
-                      <option value="waitlisted">Waitlisted</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="withdrawn">Withdrawn</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Internal Administrative Notes (Private)</label>
-                    <textarea
-                      rows={2}
-                      className={inputCls}
-                      placeholder="Add private evaluation notes, interview results, or dais instructions…"
-                      value={draftNotes}
-                      onChange={(e) => setDraftNotes(e.target.value)}
-                    />
-                  </div>
+            {activeItem.statement && (
+              <div>
+                <h3 className="mb-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                  Statement of motivation
+                </h3>
+                <div className="wm-scroll max-h-32 overflow-y-auto whitespace-pre-wrap rounded-md border border-white/[0.07] bg-[#101013] p-3 text-[11.5px] leading-relaxed text-neutral-300">
+                  {activeItem.statement}
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Modal Footer */}
-            <div className="pt-4 border-t border-neutral-800 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  setConfirmAction({
-                    type: 'delete',
-                    title: `Permanently Delete Application for ${activeItem.full_name}?`,
-                    description: 'This permanently removes the record from the database and cannot be undone.',
-                  })
-                }
-                className="text-xs text-red-400 hover:text-red-300 inline-flex items-center gap-1 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Delete record
-              </button>
+            {/* Decision */}
+            <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-[#d4af37]/85">
+                    Secretariat adjudication
+                  </p>
+                  <p className="mt-0.5 text-[10.5px] text-neutral-400">
+                    Status changes are written directly to the registrations table.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPendingAction('approve')}
+                    disabled={saving || activeItem.status === 'accepted'}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/25 bg-emerald-400/[0.07] px-2.5 py-1.5 text-[10.5px] font-medium text-emerald-300 transition-colors hover:bg-emerald-400/[0.13] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingAction('reject')}
+                    disabled={saving || activeItem.status === 'rejected'}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-rose-400/25 bg-rose-400/[0.06] px-2.5 py-1.5 text-[10.5px] font-medium text-rose-300 transition-colors hover:bg-rose-400/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <XCircle className="h-3 w-3" aria-hidden="true" />
+                    Reject
+                  </button>
+                </div>
+              </div>
 
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={closeModal} className={btnGhost}>
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => saveApplication()}
-                  disabled={saving}
-                  className={btnGold}
+              {pendingAction && (
+                <div
+                  className={`mt-3 rounded-md border p-3 ${
+                    pendingAction === 'delete'
+                      ? 'border-rose-400/25 bg-rose-400/[0.05]'
+                      : pendingAction === 'reject'
+                        ? 'border-rose-400/20 bg-rose-400/[0.04]'
+                        : 'border-emerald-400/20 bg-emerald-400/[0.04]'
+                  }`}
+                  role="alertdialog"
+                  aria-label="Confirm decision"
                 >
-                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Save Changes
-                </button>
-              </div>
-            </div>
-
-            {/* Confirmation Dialog Overlay */}
-            {confirmAction && (
-              <div
-                className="absolute inset-0 z-20 bg-black/90 flex items-center justify-center p-6 rounded-sm"
-                role="dialog"
-                aria-modal="true"
-              >
-                <div className="bg-[#121217] border border-neutral-700 p-5 rounded-sm max-w-sm w-full space-y-3">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-sm font-semibold text-white">{confirmAction.title}</h4>
-                      <p className="text-xs text-neutral-400 mt-1 font-light leading-relaxed">
-                        {confirmAction.description}
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle
+                      className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
+                        pendingAction === 'approve' ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[11.5px] font-medium text-neutral-100">
+                        {pendingAction === 'approve'
+                          ? `Approve ${activeItem.full_name}?`
+                          : pendingAction === 'reject'
+                            ? `Reject ${activeItem.full_name}?`
+                            : `Permanently delete this record?`}
+                      </p>
+                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-neutral-400">
+                        {pendingAction === 'approve'
+                          ? `The application will be marked approved for ${activeItem._teamLabel}. The applicant record is preserved.`
+                          : pendingAction === 'reject'
+                            ? `The application will be marked rejected for ${activeItem._teamLabel}. You can reverse this later.`
+                            : 'This removes the record from Supabase permanently. It cannot be undone.'}
                       </p>
                     </div>
                   </div>
-
-                  <div className="flex justify-end gap-2 pt-2 border-t border-neutral-800">
+                  <div className="mt-3 flex justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => setConfirmAction(null)}
+                      onClick={() => setPendingAction(null)}
                       className={btnGhost}
+                      disabled={saving}
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
+                      autoFocus
                       onClick={() => {
-                        if (confirmAction.type === 'approve') {
-                          saveApplication('accepted');
-                          setConfirmAction(null);
-                        } else if (confirmAction.type === 'reject') {
-                          saveApplication('rejected');
-                          setConfirmAction(null);
-                        } else if (confirmAction.type === 'delete') {
-                          deleteApplication();
-                        }
+                        if (pendingAction === 'approve') saveApplication('accepted');
+                        else if (pendingAction === 'reject') saveApplication('rejected');
+                        else deleteApplication();
                       }}
-                      className={confirmAction.type === 'approve' ? btnGold : btnDanger}
+                      disabled={saving}
+                      className={pendingAction === 'delete' ? btnDanger : btnPrimary}
                     >
-                      Confirm
+                      {saving && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
+                      {pendingAction === 'approve'
+                        ? 'Confirm approval'
+                        : pendingAction === 'reject'
+                          ? 'Confirm rejection'
+                          : 'Delete permanently'}
                     </button>
                   </div>
                 </div>
+              )}
+
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="detail-status" className={labelCls}>
+                    Detailed status
+                  </label>
+                  <select
+                    id="detail-status"
+                    className={selectCls}
+                    value={draftStatus}
+                    onChange={(e) => setDraftStatus(e.target.value)}
+                  >
+                    <option value="received">Received / pending</option>
+                    <option value="under_review">Under review</option>
+                    <option value="accepted">Accepted / approved</option>
+                    <option value="waitlisted">Waitlisted</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="withdrawn">Withdrawn</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="detail-notes" className={labelCls}>
+                    Private administrative notes
+                  </label>
+                  <textarea
+                    id="detail-notes"
+                    rows={2}
+                    className={inputCls}
+                    placeholder="Interview notes, dais instructions, internal rationale…"
+                    value={draftNotes}
+                    onChange={(e) => setDraftNotes(e.target.value)}
+                  />
+                </div>
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
+      </Modal>
+
+      {toast && (
+        <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />
       )}
     </div>
   );

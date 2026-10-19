@@ -50,37 +50,6 @@ export function isGenderSeparated(dept: DepartmentKey): boolean {
   return GENDER_SEPARATED_DEPARTMENTS.includes(dept);
 }
 
-export interface AuthorizedHead {
-  name: string;
-  department: DepartmentKey;
-  section?: SectionKey;
-  roleTitle: string;
-}
-
-/**
- * Official WEST MUN Head Roster.
- * Strict authority: Only individuals listed below are authorized as department heads.
- */
-export const AUTHORIZED_HEADS: readonly AuthorizedHead[] = [
-  { name: 'Mallak Abbas', department: 'design', roleTitle: 'Head of Design & Visual Identity' },
-  { name: 'Naya Barakat', department: 'marketing', roleTitle: 'Head of Marketing & Digital Outreach' },
-  { name: 'Fahad Al Kendi', department: 'media_press', section: 'male', roleTitle: 'Male Head of Media & Press' },
-  { name: 'Selena', department: 'media_press', section: 'female', roleTitle: 'Female Head of Media & Press' },
-  { name: 'Yusef Saad', department: 'security', section: 'male', roleTitle: 'Male Head of Security & Protocol' },
-  { name: 'Najla Rami', department: 'security', section: 'female', roleTitle: 'Female Head of Security & Protocol' },
-  { name: 'Saad Usman', department: 'volunteers', section: 'male', roleTitle: 'Male Head of Volunteers' },
-  { name: 'Maram Ali', department: 'volunteers', section: 'female', roleTitle: 'Female Head of Volunteers' },
-  { name: 'Mazen Alada', department: 'pr', roleTitle: 'Head of Public Relations & External Affairs' },
-  { name: 'Dana Alnajjar', department: 'pr', roleTitle: 'Head of Public Relations & External Affairs' },
-  { name: 'Hoorain', department: 'hr', roleTitle: 'Head of Human Resources & Delegate Services' },
-  { name: 'Seif Ayman', department: 'hr', roleTitle: 'Head of Human Resources & Delegate Services' },
-  { name: 'Ahmed El Amir', department: 'logistics', roleTitle: 'Head of Logistics & Venue Operations' },
-  { name: 'Mohamed Magdi', department: 'it', roleTitle: 'Head of IT & Digital Infrastructure' },
-  { name: 'Saleh', department: 'it', roleTitle: 'Head of IT & Digital Infrastructure' },
-  { name: 'Sultana', department: 'ceremonies', roleTitle: 'Head of Opening & Closing Ceremonies' },
-  { name: 'Majd', department: 'dcc', roleTitle: 'Head of Diplomatic Crisis Corps (DCC)' },
-] as const;
-
 export const DEPARTMENTS: Record<DepartmentKey, DepartmentMeta> = {
   design: {
     key: 'design',
@@ -219,6 +188,7 @@ export interface HeadAssignment {
   department: DepartmentKey;
   section?: SectionKey | null;
   headName?: string | null;
+  headEmail?: string | null;
   roleTitle?: string | null;
 }
 
@@ -242,18 +212,15 @@ export function getDepartmentDashboardUrl(
   return `/head/${department}`;
 }
 
+/**
+ * Role titles are derived from the department catalogue and the assignment
+ * stored in public.department_heads. No head identity is hardcoded in the
+ * frontend: the database remains the single source of truth.
+ */
 export function getRoleTitle(
   department: DepartmentKey,
   section?: SectionKey | null
 ): string {
-  const match = AUTHORIZED_HEADS.find((h) => {
-    if (h.department !== department) return false;
-    if (isGenderSeparated(department)) {
-      return h.section === section;
-    }
-    return true;
-  });
-  if (match?.roleTitle) return match.roleTitle;
   const deptMeta = DEPARTMENTS[department];
   if (!deptMeta) return 'Department Head';
   if (isGenderSeparated(department) && section) {
@@ -291,6 +258,7 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
               department: dept,
               section: sec,
               headName: data.head.headName || null,
+              headEmail: data.head.email || null,
               roleTitle: getRoleTitle(dept, sec),
             },
           };
@@ -314,7 +282,7 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
     // RLS still restricts this to the caller's own row.
     const { data, error } = await supabase
       .from('department_heads')
-      .select('department, section, active')
+      .select('department, section, active, head_name, email')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -397,22 +365,19 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
       section = rawSec as SectionKey;
     }
 
-    // Associate head name and role title from official roster
-    const rosterHead = AUTHORIZED_HEADS.find((h) => {
-      if (h.department !== dept) return false;
-      if (isGenderSeparated(dept)) {
-        return h.section === section;
-      }
-      return true;
-    });
+    // Identity comes from the assigned department_heads row, never a roster
+    // embedded in the bundle. Empty names fall back to the Auth profile in
+    // HeadPortal, and the email column is used only for display.
+    const storedName = typeof data.head_name === 'string' ? data.head_name.trim() : '';
 
     return {
       status: 'success',
       assignment: {
         department: dept,
         section,
-        headName: rosterHead?.name || null,
-        roleTitle: rosterHead?.roleTitle || null,
+        headName: storedName || null,
+        headEmail: typeof data.email === 'string' ? data.email : null,
+        roleTitle: getRoleTitle(dept, section),
       },
     };
   } catch (err: unknown) {

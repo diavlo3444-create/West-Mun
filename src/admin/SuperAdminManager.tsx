@@ -27,6 +27,7 @@ import {
   Info,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { PageHeader, Panel, StatCard, Notice } from '../dashboard/ui';
 import {
   DEPARTMENTS,
   VALID_DEPARTMENTS,
@@ -545,129 +546,129 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
   // ---------------------------------------------------------------------------
   if (!isAuthorizedCaller) {
     return (
-      <div className="bg-[#0c0c10] border border-red-500/30 rounded-sm p-8 sm:p-12 text-center max-w-2xl mx-auto shadow-2xl space-y-5">
-        <div className="w-16 h-16 mx-auto rounded-full bg-red-950/40 border border-red-500/50 flex items-center justify-center text-red-400 shadow-[0_0_25px_rgba(239,68,68,0.25)]">
-          <ShieldAlert className="w-8 h-8" />
-        </div>
-        <div className="space-y-1.5">
-          <h2 className="text-2xl font-serif text-white tracking-tight">Access Restricted</h2>
-          <p className="text-xs uppercase font-mono tracking-widest text-[#d4af37]">
-            IT Super Admin Console
-          </p>
-        </div>
-        <div className="p-4 bg-[#121217] border border-neutral-800 rounded-sm text-xs text-neutral-300 leading-relaxed space-y-2">
-          <p>
-            This section is restricted to the top-level conference administrator{' '}
-            <strong className="text-white font-mono">{SUPER_ADMIN_EMAIL}</strong>.
-          </p>
-          <div className="pt-2 border-t border-neutral-800/80 font-mono text-[11px] text-neutral-400">
-            Current Authenticated User:{' '}
-            <span className="text-red-300">{currentUserEmail || 'Signed Out'}</span>
+      <div className="mx-auto max-w-2xl py-4">
+        <Panel className="overflow-hidden">
+          <div className="h-px wm-hairline" aria-hidden="true" />
+          <div className="p-8 text-center sm:p-10">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-rose-400/25 bg-rose-400/[0.07] text-rose-300">
+              <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <h2 className="wm-serif mt-4 text-[26px] text-white">Restricted console</h2>
+            <p className="mt-1 text-[9.5px] font-mono uppercase tracking-[0.2em] text-[#d4af37]">
+              IT Super Admin
+            </p>
+            <p className="mx-auto mt-4 max-w-md text-[12px] leading-relaxed text-neutral-400">
+              Head account provisioning is limited to the top-level conference administrator{' '}
+              <strong className="font-mono text-white">{SUPER_ADMIN_EMAIL}</strong>. Your session is valid,
+              but it does not hold this permission.
+            </p>
+            <div className="mx-auto mt-5 max-w-sm rounded-md border border-white/[0.07] bg-white/[0.015] px-3.5 py-3 text-left">
+              <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                Current authenticated user
+              </p>
+              <p className="mt-1 truncate font-mono text-[11px] text-rose-300">
+                {currentUserEmail || 'Signed out'}
+              </p>
+            </div>
+            <p className="mt-4 text-[10px] leading-relaxed text-neutral-400">
+              Authorization is re-verified on every request by the server against Supabase Auth and{' '}
+              <code className="font-mono text-neutral-400">public.admins</code>.
+            </p>
           </div>
-        </div>
-        <p className="text-[11px] text-neutral-500 italic">
-          Identity is verified both client-side and via server-side cryptographic token validation.
-        </p>
+        </Panel>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      {/* 1. Header Banner */}
-      <div className="bg-[#0c0c10] border border-[#d4af37]/40 rounded-sm p-6 sm:p-8 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-sm bg-[#141418] border border-[#d4af37]/60 flex items-center justify-center text-[#d4af37] shrink-0 shadow-[0_0_20px_rgba(212,175,55,0.2)]">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-2xl sm:text-3xl font-serif text-white tracking-tight">
-                  IT Super Admin Dashboard
-                </h1>
-                <span className="px-2 py-0.5 rounded-sm bg-[#17171d] border border-[#d4af37]/40 text-[#d4af37] text-[10px] font-mono uppercase tracking-widest">
-                  Master Privileges
-                </span>
-              </div>
-              <p className="text-xs text-neutral-400 font-light">
-                Department Head identity provisioning, password resets, and real-time division access control.
-              </p>
-              <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-[#f3e5ab]">
-                <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Authorized Administrator: {SUPER_ADMIN_EMAIL}</span>
-              </div>
-            </div>
-          </div>
+      <PageHeader
+        eyebrow="Access & systems"
+        title="IT Super Admin"
+        description="Provision department-head identities, assign departments and divisions, and revoke portal access. Every action is executed server-side with the service-role key."
+        meta={
+          <>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#d4af37]/25 bg-[#d4af37]/[0.07] px-2 py-1 text-[9px] font-mono uppercase tracking-[0.13em] text-[#e2c258]">
+              <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+              Master privileges
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[10px] text-neutral-400">
+              <UserCheck className="h-3 w-3 text-emerald-400" aria-hidden="true" />
+              {SUPER_ADMIN_EMAIL}
+            </span>
+          </>
+        }
+        actions={
+          <button
+            type="button"
+            onClick={loadHeads}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.12] bg-white/[0.025] px-3 py-2 text-[11px] font-medium text-neutral-300 transition-colors hover:border-white/[0.2] hover:bg-white/[0.05] hover:text-white disabled:opacity-40"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin text-[#d4af37]' : ''}`} aria-hidden="true" />
+            Refresh roster
+          </button>
+        }
+      />
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={loadHeads}
-              disabled={refreshing}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-mono uppercase tracking-wider text-neutral-300 hover:text-white bg-[#141418] hover:bg-neutral-800 border border-neutral-700 rounded-sm cursor-pointer transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-[#d4af37]' : ''}`} />
-              <span>Refresh Roster</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Overview Metrics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-[#0c0c10] border border-neutral-800 p-4 rounded-sm shadow-sm">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-400 block mb-1">
-            Total Head Accounts
-          </span>
-          <span className="text-2xl font-serif text-white font-semibold">{stats.total}</span>
-        </div>
-        <div className="bg-[#0c0c10] border border-neutral-800 p-4 rounded-sm shadow-sm">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 block mb-1">
-            Active Portal Access
-          </span>
-          <span className="text-2xl font-serif text-emerald-300 font-semibold">{stats.active}</span>
-        </div>
-        <div className="bg-[#0c0c10] border border-neutral-800 p-4 rounded-sm shadow-sm">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-red-400 block mb-1">
-            Suspended / Inactive
-          </span>
-          <span className="text-2xl font-serif text-red-300 font-semibold">{stats.inactive}</span>
-        </div>
-        <div className="bg-[#0c0c10] border border-neutral-800 p-4 rounded-sm shadow-sm">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-[#d4af37] block mb-1">
-            Gender-Divided Roles
-          </span>
-          <span className="text-2xl font-serif text-[#f3e5ab] font-semibold">
-            {stats.genderSeparatedCount}
-          </span>
-        </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="Head accounts"
+          value={stats.total}
+          helper="Auth users with a department assignment"
+          icon={ShieldCheck}
+          tone="gold"
+          loading={loading}
+        />
+        <StatCard
+          label="Active access"
+          value={stats.active}
+          helper="Can sign in to their department dashboard"
+          icon={UserCheck}
+          tone="emerald"
+          loading={loading}
+        />
+        <StatCard
+          label="Suspended"
+          value={stats.inactive}
+          helper="Assignment kept, portal access revoked"
+          icon={ShieldAlert}
+          tone="rose"
+          loading={loading}
+        />
+        <StatCard
+          label="Sectioned roles"
+          value={stats.genderSeparatedCount}
+          helper="Male and female divisions combined"
+          icon={Sparkles}
+          tone="amber"
+          loading={loading}
+        />
       </div>
 
       {/* 3. Provision New Head Account Form */}
-      <div className="bg-[#0c0c10] border border-neutral-800 rounded-sm p-6 sm:p-7 shadow-xl space-y-6">
-        <div className="flex items-center justify-between border-b border-neutral-800/80 pb-4">
+      <Panel className="space-y-5 p-5 sm:p-6">
+        <div className="flex items-center justify-between border-b border-white/[0.07]/80 pb-4">
           <div className="flex items-center gap-2.5">
             <UserPlus className="w-5 h-5 text-[#d4af37]" />
-            <h2 className="text-lg font-serif text-white tracking-tight">
+            <h2 className="text-[13.5px] font-semibold text-white tracking-tight">
               Provision New Department Head Account
             </h2>
           </div>
-          <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
+          <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-wider">
             Server-Side Verified
           </span>
         </div>
 
         {formError && (
-          <div className="p-3.5 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-sm flex items-start gap-2.5">
+          <div className="p-3.5 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-md flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
             <span>{formError}</span>
           </div>
         )}
 
         {failedAssignment && (
-          <div className="p-3.5 text-xs bg-[#171208] border border-[#d4af37]/50 rounded-sm space-y-3">
+          <div className="p-3.5 text-xs bg-[#171208] border border-[#d4af37]/50 rounded-md space-y-3">
             <div className="flex items-start gap-2.5 text-[#f3e5ab]">
               <ShieldAlert className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
               <div className="space-y-1">
@@ -685,7 +686,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               type="button"
               onClick={handleRetryAssignment}
               disabled={retryingAssignment}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] hover:brightness-110 rounded-sm cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] hover:bg-[#e2c258] rounded-md cursor-pointer disabled:opacity-50"
             >
               {retryingAssignment ? (
                 <>
@@ -703,14 +704,14 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         )}
 
         {formSuccess && (
-          <div className="p-3.5 text-xs text-emerald-300 bg-emerald-950/40 border border-emerald-500/40 rounded-sm flex items-start gap-2.5">
+          <div className="p-3.5 text-xs text-emerald-300 bg-emerald-950/40 border border-emerald-500/40 rounded-md flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <span>{formSuccess}</span>
           </div>
         )}
 
         {recentCredentials && (
-          <div className="p-4 bg-[#121217] border border-[#d4af37]/40 rounded-sm space-y-3">
+          <div className="p-4 bg-[#111114] border border-[#d4af37]/40 rounded-md space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase font-mono tracking-wider text-[#d4af37] font-semibold flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
@@ -719,19 +720,19 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               <button
                 type="button"
                 onClick={handleCopyCredentials}
-                className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-mono uppercase bg-[#1a1710] border border-[#d4af37]/60 text-[#f3e5ab] hover:brightness-110 rounded-sm cursor-pointer transition-all"
+                className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-mono uppercase bg-[#1a1710] border border-[#d4af37]/60 text-[#f3e5ab] hover:brightness-110 rounded-md cursor-pointer transition-all"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copied ? 'Copied!' : 'Copy Summary'}</span>
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono bg-black/40 p-3 rounded-sm border border-neutral-800">
-              <div><span className="text-neutral-500">Name:</span> <span className="text-white">{recentCredentials.name}</span></div>
-              <div><span className="text-neutral-500">Email:</span> <span className="text-white">{recentCredentials.email}</span></div>
-              <div><span className="text-neutral-500">Department:</span> <span className="text-[#d4af37]">{recentCredentials.department}</span></div>
-              <div><span className="text-neutral-500">Division:</span> <span className="text-[#f3e5ab]">{recentCredentials.section ? `${recentCredentials.section.toUpperCase()}` : 'None (Universal)'}</span></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono bg-black/40 p-3 rounded-md border border-white/[0.07]">
+              <div><span className="text-neutral-400">Name:</span> <span className="text-white">{recentCredentials.name}</span></div>
+              <div><span className="text-neutral-400">Email:</span> <span className="text-white">{recentCredentials.email}</span></div>
+              <div><span className="text-neutral-400">Department:</span> <span className="text-[#d4af37]">{recentCredentials.department}</span></div>
+              <div><span className="text-neutral-400">Division:</span> <span className="text-[#f3e5ab]">{recentCredentials.section ? `${recentCredentials.section.toUpperCase()}` : 'None (Universal)'}</span></div>
               {recentCredentials.invitationLink ? (
-                <div className="sm:col-span-2 p-2.5 bg-[#171610] border border-[#d4af37]/50 rounded-sm space-y-1">
+                <div className="sm:col-span-2 p-2.5 bg-[#171610] border border-[#d4af37]/50 rounded-md space-y-1">
                   <div className="text-[11px] text-[#f3e5ab] font-sans font-medium flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <KeyRound className="w-3.5 h-3.5 text-[#d4af37]" />
@@ -750,14 +751,14 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                       <span>Copy Link</span>
                     </button>
                   </div>
-                  <div className="text-emerald-300 font-mono text-[11px] break-all select-all bg-black/50 p-2 rounded-xs border border-neutral-800">
+                  <div className="text-emerald-300 font-mono text-[11px] break-all select-all bg-black/50 p-2 rounded-xs border border-white/[0.07]">
                     {recentCredentials.invitationLink}
                   </div>
                 </div>
               ) : (
-                <div className="sm:col-span-2"><span className="text-neutral-500">Temporary Password:</span> <span className="text-emerald-300 font-semibold select-all">{recentCredentials.password}</span></div>
+                <div className="sm:col-span-2"><span className="text-neutral-400">Temporary Password:</span> <span className="text-emerald-300 font-semibold select-all">{recentCredentials.password}</span></div>
               )}
-              <div className="sm:col-span-2 truncate"><span className="text-neutral-500">Portal Link:</span> <a href={recentCredentials.portalUrl} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">{recentCredentials.portalUrl}</a></div>
+              <div className="sm:col-span-2 truncate"><span className="text-neutral-400">Portal Link:</span> <a href={recentCredentials.portalUrl} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">{recentCredentials.portalUrl}</a></div>
             </div>
           </div>
         )}
@@ -772,13 +773,13 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               <button
                 type="button"
                 onClick={() => setAuthMethod('invite')}
-                className={`p-3 text-left rounded-sm border transition-all cursor-pointer flex items-start gap-2.5 ${
+                className={`p-3 text-left rounded-md border transition-all cursor-pointer flex items-start gap-2.5 ${
                   authMethod === 'invite'
                     ? 'bg-[#181610] border-[#d4af37] text-white shadow-xs'
-                    : 'bg-[#121217] border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                    : 'bg-[#111114] border-white/[0.07] text-neutral-400 hover:border-white/[0.1]'
                 }`}
               >
-                <KeyRound className={`w-4 h-4 mt-0.5 shrink-0 ${authMethod === 'invite' ? 'text-[#d4af37]' : 'text-neutral-500'}`} />
+                <KeyRound className={`w-4 h-4 mt-0.5 shrink-0 ${authMethod === 'invite' ? 'text-[#d4af37]' : 'text-neutral-400'}`} />
                 <div>
                   <div className="text-xs font-medium text-white flex items-center gap-1.5">
                     <span>Secure Invitation Link</span>
@@ -793,13 +794,13 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               <button
                 type="button"
                 onClick={() => setAuthMethod('password')}
-                className={`p-3 text-left rounded-sm border transition-all cursor-pointer flex items-start gap-2.5 ${
+                className={`p-3 text-left rounded-md border transition-all cursor-pointer flex items-start gap-2.5 ${
                   authMethod === 'password'
                     ? 'bg-[#181610] border-[#d4af37] text-white shadow-xs'
-                    : 'bg-[#121217] border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                    : 'bg-[#111114] border-white/[0.07] text-neutral-400 hover:border-white/[0.1]'
                 }`}
               >
-                <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${authMethod === 'password' ? 'text-[#d4af37]' : 'text-neutral-500'}`} />
+                <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${authMethod === 'password' ? 'text-[#d4af37]' : 'text-neutral-400'}`} />
                 <div>
                   <div className="text-xs font-medium text-white">Manual / Temporary Password</div>
                   <div className="text-[11px] text-neutral-400 font-light mt-0.5">
@@ -821,7 +822,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                 placeholder="e.g. Najla Rami"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
-                className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2 px-3 text-sm text-white focus:outline-none transition-colors"
+                className="w-full bg-[#101013] border border-white/[0.1] focus:border-[#d4af37] rounded-md py-2 px-3 text-sm text-white focus:outline-none transition-colors"
               />
             </div>
 
@@ -835,7 +836,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                 placeholder="head@westmun.org"
                 value={formEmail}
                 onChange={(e) => setFormEmail(e.target.value)}
-                className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2 px-3 text-sm text-white focus:outline-none transition-colors"
+                className="w-full bg-[#101013] border border-white/[0.1] focus:border-[#d4af37] rounded-md py-2 px-3 text-sm text-white focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -863,7 +864,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                     placeholder="Min. 8 characters"
                     value={formPassword}
                     onChange={(e) => setFormPassword(e.target.value)}
-                    className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2 pl-3 pr-10 text-sm text-white focus:outline-none font-mono transition-colors"
+                    className="w-full bg-[#101013] border border-white/[0.1] focus:border-[#d4af37] rounded-md py-2 pl-3 pr-10 text-sm text-white focus:outline-none font-mono transition-colors"
                   />
                   <button
                     type="button"
@@ -875,7 +876,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="p-3 bg-[#121217] border border-neutral-800 rounded-sm flex items-start gap-2.5">
+              <div className="p-3 bg-[#111114] border border-white/[0.07] rounded-md flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
                 <div className="text-xs text-neutral-300 font-light leading-relaxed">
                   A high-entropy password-setup invitation token will be generated upon creation. The head can set their password directly via the link.
@@ -890,7 +891,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               <select
                 value={formDept}
                 onChange={(e) => setFormDept(e.target.value as DepartmentKey)}
-                className="w-full bg-[#141418] border border-neutral-700 focus:border-[#d4af37] rounded-sm py-2 px-3 text-sm text-white focus:outline-none transition-colors"
+                className="w-full bg-[#101013] border border-white/[0.1] focus:border-[#d4af37] rounded-md py-2 px-3 text-sm text-white focus:outline-none transition-colors"
               >
                 {VALID_DEPARTMENTS.map((deptKey) => (
                   <option key={deptKey} value={deptKey}>
@@ -908,7 +909,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                 Gender Division {isGenderSeparated(formDept) ? '*' : '(Not Applicable)'}
               </label>
               {isGenderSeparated(formDept) ? (
-                <div className="flex items-center gap-4 p-2 bg-[#141418] border border-[#d4af37]/40 rounded-sm">
+                <div className="flex items-center gap-4 p-2 bg-[#101013] border border-[#d4af37]/40 rounded-md">
                   <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-200">
                     <input
                       type="radio"
@@ -933,7 +934,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                   </label>
                 </div>
               ) : (
-                <div className="p-2 bg-[#121217] border border-neutral-800 rounded-sm text-xs text-neutral-500 font-mono">
+                <div className="p-2 bg-[#111114] border border-white/[0.07] rounded-md text-xs text-neutral-400 font-mono">
                   Universal / Single Leadership
                 </div>
               )}
@@ -943,7 +944,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               <label className="block text-xs uppercase tracking-wider text-neutral-300 mb-1.5 font-medium">
                 Initial Account Status
               </label>
-              <div className="flex items-center gap-4 p-2 bg-[#141418] border border-neutral-700 rounded-sm">
+              <div className="flex items-center gap-4 p-2 bg-[#101013] border border-white/[0.1] rounded-md">
                 <label className="flex items-center gap-2 cursor-pointer text-xs text-emerald-300">
                   <input
                     type="radio"
@@ -972,7 +973,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             <button
               type="submit"
               disabled={creating}
-              className="w-full sm:w-auto px-6 py-2.5 text-xs font-semibold uppercase tracking-widest text-black bg-gradient-to-r from-[#e5c158] to-[#d4af37] hover:brightness-110 rounded-sm cursor-pointer transition-all inline-flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-2.5 text-xs font-semibold uppercase tracking-widest text-black bg-[#d4af37] hover:bg-[#e2c258] rounded-md cursor-pointer transition-all inline-flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {creating ? (
                 <>
@@ -988,13 +989,13 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             </button>
           </div>
         </form>
-      </div>
+      </Panel>
 
       {/* 4. Department Heads Directory */}
-      <div className="bg-[#0c0c10] border border-neutral-800 rounded-sm p-6 sm:p-7 shadow-xl space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800/80 pb-4">
+      <Panel className="space-y-4 p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.07]/80 pb-4">
           <div>
-            <h2 className="text-lg font-serif text-white tracking-tight">
+            <h2 className="text-[13.5px] font-semibold text-white tracking-tight">
               Department Heads Registry ({filteredHeads.length})
             </h2>
             <p className="text-xs text-neutral-400 font-light">
@@ -1005,20 +1006,20 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
           {/* Search & Filters */}
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search name, email…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-[#141418] border border-neutral-700 rounded-sm pl-8 pr-3 py-1 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#d4af37] w-40 sm:w-48"
+                className="bg-[#101013] border border-white/[0.1] rounded-md pl-8 pr-3 py-1 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#d4af37] w-40 sm:w-48"
               />
             </div>
 
             <select
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
-              className="bg-[#141418] border border-neutral-700 rounded-sm px-2.5 py-1 text-xs text-white focus:outline-none"
+              className="bg-[#101013] border border-white/[0.1] rounded-md px-2.5 py-1 text-xs text-white focus:outline-none"
             >
               <option value="all">All Departments</option>
               {VALID_DEPARTMENTS.map((dept) => (
@@ -1031,7 +1032,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-[#141418] border border-neutral-700 rounded-sm px-2.5 py-1 text-xs text-white focus:outline-none"
+              className="bg-[#101013] border border-white/[0.1] rounded-md px-2.5 py-1 text-xs text-white focus:outline-none"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
@@ -1047,14 +1048,14 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             <span className="text-xs font-mono">Loading Head Roster…</span>
           </div>
         ) : filteredHeads.length === 0 ? (
-          <div className="py-10 text-center text-xs text-neutral-500 font-light">
+          <div className="py-10 text-center text-xs text-neutral-400 font-light">
             No department head records match your filters.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-neutral-800 font-mono text-[10px] text-neutral-400 uppercase tracking-wider">
+                <tr className="border-b border-white/[0.06] font-mono text-[9px] text-neutral-400 uppercase tracking-[0.14em]">
                   <th className="py-3 px-3">Head Name & Email</th>
                   <th className="py-3 px-3">Department</th>
                   <th className="py-3 px-3">Division</th>
@@ -1071,10 +1072,10 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                   const isActive = h.active !== false;
 
                   return (
-                    <tr key={h.id || h.email} className="hover:bg-[#121217] transition-colors">
+                    <tr key={h.id || h.email} className="hover:bg-white/[0.025] transition-colors">
                       <td className="py-3.5 px-3">
                         <div className="font-medium text-white">
-                          {h.head_name || <span className="text-neutral-500 italic">No name registered</span>}
+                          {h.head_name || <span className="text-neutral-400 italic">No name registered</span>}
                         </div>
                         <div className="font-mono text-[11px] text-neutral-400">{h.email}</div>
                       </td>
@@ -1092,7 +1093,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                       <td className="py-3.5 px-3">
                         {h.section ? (
                           <span
-                            className={`px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase tracking-wider ${
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider ${
                               h.section === 'female'
                                 ? 'bg-purple-950/60 text-purple-300 border border-purple-500/40'
                                 : 'bg-blue-950/60 text-blue-300 border border-blue-500/40'
@@ -1101,7 +1102,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                             {h.section.toUpperCase()}
                           </span>
                         ) : (
-                          <span className="text-neutral-500 font-mono text-[11px]">All / Joint</span>
+                          <span className="text-neutral-400 font-mono text-[11px]">All / Joint</span>
                         )}
                       </td>
 
@@ -1110,7 +1111,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                           type="button"
                           onClick={() => handleToggleActive(h)}
                           title="Click to toggle active status"
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase tracking-wider cursor-pointer border transition-colors ${
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider cursor-pointer border transition-colors ${
                             isActive
                               ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'
                               : 'bg-red-950/60 text-red-300 border-red-500/40 hover:bg-red-900/60'
@@ -1136,7 +1137,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                             type="button"
                             onClick={() => openEditModal(h)}
                             title="Edit Role / Department"
-                            className="p-1.5 text-neutral-400 hover:text-[#d4af37] bg-neutral-900 hover:bg-[#1a1710] border border-neutral-800 rounded-sm transition-colors cursor-pointer"
+                            className="p-1.5 text-neutral-400 hover:text-[#d4af37] bg-neutral-900 hover:bg-[#1a1710] border border-white/[0.07] rounded-md transition-colors cursor-pointer"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
@@ -1150,7 +1151,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                               setResetResult(null);
                             }}
                             title="Reset Password"
-                            className="p-1.5 text-neutral-400 hover:text-[#e5c158] bg-neutral-900 hover:bg-[#1a1710] border border-neutral-800 rounded-sm transition-colors cursor-pointer"
+                            className="p-1.5 text-neutral-400 hover:text-[#e5c158] bg-neutral-900 hover:bg-[#1a1710] border border-white/[0.07] rounded-md transition-colors cursor-pointer"
                           >
                             <KeyRound className="w-3.5 h-3.5" />
                           </button>
@@ -1162,7 +1163,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                               setDeleteError('');
                             }}
                             title="Remove Portal Access"
-                            className="p-1.5 text-neutral-400 hover:text-red-400 bg-neutral-900 hover:bg-red-950/50 border border-neutral-800 rounded-sm transition-colors cursor-pointer"
+                            className="p-1.5 text-neutral-400 hover:text-red-400 bg-neutral-900 hover:bg-red-950/50 border border-white/[0.07] rounded-md transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1175,14 +1176,14 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             </table>
           </div>
         )}
-      </div>
+      </Panel>
 
       {/* 5. EDIT HEAD MODAL */}
       {editingHead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-          <div className="bg-[#0c0c10] border border-[#d4af37]/40 rounded-sm p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-              <h3 className="font-serif text-lg text-white">Edit Department Head Assignment</h3>
+        <div className="wm-overlay-in fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 sm:p-6">
+          <div className="bg-[#0c0c0f] border border-[#d4af37]/40 rounded-md p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
+              <h3 className="wm-serif text-lg text-white">Edit Department Head Assignment</h3>
               <button
                 type="button"
                 onClick={() => setEditingHead(null)}
@@ -1193,7 +1194,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             </div>
 
             {editError && (
-              <div className="p-2.5 bg-red-950/50 border border-red-500/40 text-red-300 text-xs rounded-sm">
+              <div className="p-2.5 bg-red-950/50 border border-red-500/40 text-red-300 text-xs rounded-md">
                 {editError}
               </div>
             )}
@@ -1207,7 +1208,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                   type="text"
                   disabled
                   value={editingHead.email}
-                  className="w-full bg-[#141418] border border-neutral-800 text-neutral-400 py-2 px-3 rounded-sm font-mono opacity-60"
+                  className="w-full bg-[#101013] border border-white/[0.07] text-neutral-400 py-2 px-3 rounded-md font-mono opacity-60"
                 />
               </div>
 
@@ -1219,7 +1220,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full bg-[#141418] border border-neutral-700 py-2 px-3 rounded-sm text-white focus:outline-none focus:border-[#d4af37]"
+                  className="w-full bg-[#101013] border border-white/[0.1] py-2 px-3 rounded-md text-white focus:outline-none focus:border-[#d4af37]"
                 />
               </div>
 
@@ -1238,7 +1239,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                       setEditSection(null);
                     }
                   }}
-                  className="w-full bg-[#141418] border border-neutral-700 py-2 px-3 rounded-sm text-white focus:outline-none focus:border-[#d4af37]"
+                  className="w-full bg-[#101013] border border-white/[0.1] py-2 px-3 rounded-md text-white focus:outline-none focus:border-[#d4af37]"
                 >
                   {VALID_DEPARTMENTS.map((deptKey) => (
                     <option key={deptKey} value={deptKey}>
@@ -1253,7 +1254,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                   <label className="block text-neutral-300 uppercase font-mono tracking-wider mb-1">
                     Gender Division *
                   </label>
-                  <div className="flex items-center gap-4 p-2 bg-[#141418] border border-neutral-700 rounded-sm">
+                  <div className="flex items-center gap-4 p-2 bg-[#101013] border border-white/[0.1] rounded-md">
                     <label className="flex items-center gap-2 cursor-pointer text-neutral-200">
                       <input
                         type="radio"
@@ -1284,7 +1285,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                 <label className="block text-neutral-300 uppercase font-mono tracking-wider mb-1">
                   Access Status
                 </label>
-                <div className="flex items-center gap-4 p-2 bg-[#141418] border border-neutral-700 rounded-sm">
+                <div className="flex items-center gap-4 p-2 bg-[#101013] border border-white/[0.1] rounded-md">
                   <label className="flex items-center gap-2 cursor-pointer text-emerald-300">
                     <input
                       type="radio"
@@ -1309,7 +1310,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-800">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.07]">
               <button
                 type="button"
                 onClick={() => setEditingHead(null)}
@@ -1321,7 +1322,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                 type="button"
                 onClick={handleSaveEdit}
                 disabled={savingEdit}
-                className="px-5 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] hover:brightness-110 rounded-sm cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] hover:bg-[#e2c258] rounded-md cursor-pointer disabled:opacity-50"
               >
                 {savingEdit ? 'Saving…' : 'Save Changes'}
               </button>
@@ -1332,12 +1333,12 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
 
       {/* 6. PASSWORD RESET MODAL */}
       {resetTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-          <div className="bg-[#0c0c10] border border-[#d4af37]/40 rounded-sm p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+        <div className="wm-overlay-in fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 sm:p-6">
+          <div className="bg-[#0c0c0f] border border-[#d4af37]/40 rounded-md p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-[#d4af37]" />
-                <h3 className="font-serif text-lg text-white">Administrative Password Reset</h3>
+                <h3 className="wm-serif text-lg text-white">Administrative Password Reset</h3>
               </div>
               <button
                 type="button"
@@ -1353,13 +1354,13 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             </p>
 
             {resetError && (
-              <div className="p-2.5 bg-red-950/50 border border-red-500/40 text-red-300 text-xs rounded-sm">
+              <div className="p-2.5 bg-red-950/50 border border-red-500/40 text-red-300 text-xs rounded-md">
                 {resetError}
               </div>
             )}
 
             {resetResult && (
-              <div className="p-3 bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs rounded-sm space-y-2">
+              <div className="p-3 bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs rounded-md space-y-2">
                 <div className="font-medium">{resetResult.message}</div>
                 {resetResult.link && (
                   <div className="space-y-1.5">
@@ -1378,7 +1379,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                         <span>{resetCopied ? 'Copied!' : 'Copy Link'}</span>
                       </button>
                     </div>
-                    <div className="p-2 bg-black/60 rounded-xs font-mono text-[10px] break-all select-all text-white border border-neutral-800">
+                    <div className="p-2 bg-black/60 rounded-xs font-mono text-[10px] break-all select-all text-white border border-white/[0.07]">
                       {resetResult.link}
                     </div>
                   </div>
@@ -1396,12 +1397,12 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                   placeholder="Min 8 characters (or leave blank for link)"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-[#141418] border border-neutral-700 py-2 px-3 rounded-sm text-white font-mono focus:outline-none focus:border-[#d4af37]"
+                  className="w-full bg-[#101013] border border-white/[0.1] py-2 px-3 rounded-md text-white font-mono focus:outline-none focus:border-[#d4af37]"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-800">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.07]">
               <button
                 type="button"
                 onClick={() => setResetTarget(null)}
@@ -1413,7 +1414,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                 type="button"
                 onClick={handleExecutePasswordReset}
                 disabled={resettingPassword}
-                className="px-5 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] hover:brightness-110 rounded-sm cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 text-xs font-semibold uppercase tracking-wider text-black bg-[#d4af37] hover:bg-[#e2c258] rounded-md cursor-pointer disabled:opacity-50"
               >
                 {resettingPassword
                   ? 'Processing…'
@@ -1428,11 +1429,11 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
 
       {/* 7. DELETE / REVOKE CONFIRMATION MODAL */}
       {deletingHead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-          <div className="bg-[#0c0c10] border border-red-500/40 rounded-sm p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center gap-2.5 text-red-400 border-b border-neutral-800 pb-3">
+        <div className="wm-overlay-in fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 sm:p-6">
+          <div className="bg-[#0c0c0f] border border-red-500/40 rounded-md p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-2.5 text-red-400 border-b border-white/[0.07] pb-3">
               <AlertCircle className="w-5 h-5" />
-              <h3 className="font-serif text-lg text-white">Revoke Portal Access?</h3>
+              <h3 className="wm-serif text-lg text-white">Revoke Portal Access?</h3>
             </div>
 
             <p className="text-xs text-neutral-300 leading-relaxed font-light">
@@ -1440,7 +1441,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               <strong className="text-white">{deletingHead.head_name || deletingHead.email}</strong>?
             </p>
 
-            <div className="p-3 bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-400 rounded-sm space-y-1">
+            <div className="p-3 bg-neutral-900 border border-white/[0.07] text-[11px] text-neutral-400 rounded-md space-y-1">
               <div>Department: <span className="text-white">{DEPARTMENTS[deletingHead.department]?.label}</span></div>
               {deletingHead.section && <div>Division: <span className="text-white">{deletingHead.section.toUpperCase()}</span></div>}
               <div className="text-[#e5c158] pt-1">
@@ -1449,12 +1450,12 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             </div>
 
             {deleteError && (
-              <div className="p-2.5 bg-red-950/50 border border-red-500/40 text-red-300 text-xs rounded-sm">
+              <div className="p-2.5 bg-red-950/50 border border-red-500/40 text-red-300 text-xs rounded-md">
                 {deleteError}
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-800">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.07]">
               <button
                 type="button"
                 onClick={() => setDeletingHead(null)}
@@ -1466,7 +1467,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
                 type="button"
                 onClick={handleConfirmDelete}
                 disabled={deleting}
-                className="px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white bg-red-700 hover:bg-red-600 rounded-sm cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white bg-red-700 hover:bg-red-600 rounded-md cursor-pointer disabled:opacity-50"
               >
                 {deleting ? 'Revoking…' : 'Revoke Authorization'}
               </button>

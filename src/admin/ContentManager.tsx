@@ -186,7 +186,7 @@ export const ContentManager: React.FC<{ section: SectionDef }> = ({ section }) =
     const id = `f-${section.id}-${f.key}`;
     const err = errors[f.key];
     const counter = f.max && typeof v === 'string' ? (
-      <span className="text-neutral-600 normal-case tracking-normal float-right">{v.length}/{f.max}</span>
+      <span className="text-neutral-400 normal-case tracking-normal float-right">{v.length}/{f.max}</span>
     ) : null;
 
     let control: React.ReactNode;
@@ -228,7 +228,7 @@ export const ContentManager: React.FC<{ section: SectionDef }> = ({ section }) =
         const shown = safeUrl(v);
         control = (
           <div className="space-y-2">
-            {f.type === 'image' && shown && <img src={shown} alt="" className="h-20 w-20 object-cover rounded-sm border border-neutral-700" referrerPolicy="no-referrer" />}
+            {f.type === 'image' && shown && <img src={shown} alt="" className="h-20 w-20 object-cover rounded-md border border-neutral-700" referrerPolicy="no-referrer" />}
             {f.type === 'file' && shown && (
               <a href={shown} target="_blank" rel="noopener noreferrer" className="text-xs text-[#d4af37] underline break-all">Current file ↗</a>
             )}
@@ -272,7 +272,7 @@ export const ContentManager: React.FC<{ section: SectionDef }> = ({ section }) =
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
-          <h2 className="text-xl font-serif text-white">{section.label}</h2>
+          <h2 className="text-xl wm-serif text-white">{section.label}</h2>
           <p className="text-xs text-neutral-400 mt-1 max-w-xl">{section.description}</p>
         </div>
         <button type="button" className={btnGold} onClick={startNew} disabled={loading}>
@@ -280,8 +280,8 @@ export const ContentManager: React.FC<{ section: SectionDef }> = ({ section }) =
         </button>
       </div>
 
-      {error && <div className="mb-4 p-3 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-sm" role="alert">{error}</div>}
-      {notice && <div className="mb-4 p-3 text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/30 rounded-sm">{notice}</div>}
+      {error && <div className="mb-4 p-3 text-xs text-red-300 bg-red-950/40 border border-red-500/40 rounded-md" role="alert">{error}</div>}
+      {notice && <div className="mb-4 p-3 text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/30 rounded-md">{notice}</div>}
 
       {editing && (
         <form onSubmit={save} className={`${cardCls} p-5 mb-6 space-y-4`}>
@@ -302,7 +302,7 @@ export const ContentManager: React.FC<{ section: SectionDef }> = ({ section }) =
       {loading ? (
         <p className="text-sm text-neutral-400 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-neutral-500 py-10 text-center border border-dashed border-neutral-800 rounded-sm">Nothing here yet. Click “Add new”.</p>
+        <p className="text-sm text-neutral-400 py-10 text-center border border-dashed border-white/[0.07] rounded-md">Nothing here yet. Click “Add new”.</p>
       ) : (
         <ul className="space-y-2">
           {rows.map((row) => {
@@ -318,14 +318,14 @@ export const ContentManager: React.FC<{ section: SectionDef }> = ({ section }) =
                 <li className={`${cardCls} p-3 flex items-center gap-3`}>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm text-white truncate">{String(row[section.titleKey] ?? '')}</div>
-                    <div className="text-[11px] text-neutral-500 truncate">
+                    <div className="text-[11px] text-neutral-400 truncate">
                       {section.subtitleKey === 'published_at'
                         ? new Date(row.published_at).toLocaleString()
                         : section.subtitleKey ? String(row[section.subtitleKey] ?? '') : ''}
                     </div>
                   </div>
-                  {row.pinned && <span className="text-[10px] font-mono uppercase px-2 py-0.5 border border-[#d4af37]/40 text-[#d4af37] rounded-sm">Pinned</span>}
-                  {row.published === false && <span className="text-[10px] font-mono uppercase px-2 py-0.5 border border-neutral-600 text-neutral-400 rounded-sm">Hidden</span>}
+                  {row.pinned && <span className="text-[10px] font-mono uppercase px-2 py-0.5 border border-[#d4af37]/40 text-[#d4af37] rounded-md">Pinned</span>}
+                  {row.published === false && <span className="text-[10px] font-mono uppercase px-2 py-0.5 border border-neutral-600 text-neutral-400 rounded-md">Hidden</span>}
                   {section.sortable && (
                     <div className="flex gap-1">
                       <button type="button" className={btnGhost} disabled={first} onClick={() => move(row, -1)} aria-label="Move up"><ArrowUp className="w-3.5 h-3.5" /></button>
