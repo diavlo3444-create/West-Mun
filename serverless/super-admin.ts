@@ -10,6 +10,12 @@ import {
   handleCreateAdmin,
   handleToggleAdmin,
   handleDeleteAdmin,
+  handleCreateTestSession,
+  handleConsumeLaunchTicket,
+  handleVerifyTestSession,
+  handleTerminateTestSession,
+  handleTestSessionData,
+  handleTestSessionUpdate,
 } from '../src/server/superAdminHandler.ts';
 
 // Robust body parser for serverless Node/Vercel environments
@@ -94,6 +100,50 @@ export default async function handler(req: any, res: any) {
         code: check.code,
         error: check.error,
       });
+    }
+
+    // =========================================================================
+    // 1b. SUPER IT TEST MODE: LOGIN AS HEAD (diavlo3444@gmail.com exclusive)
+    // =========================================================================
+    if (action === 'launch-test' || action === 'login-as-head') {
+      const body = await parseJsonBody(req);
+      const result = await handleCreateTestSession(authHeader, body, origin, req.headers);
+      return res.status(result.statusCode).json(result.body);
+    }
+
+    if (action === 'consume-ticket' || action === 'exchange-ticket') {
+      const body = await parseJsonBody(req);
+      const ticket = url.searchParams.get('ticket') || body.ticket || '';
+      const result = await handleConsumeLaunchTicket(ticket);
+      return res.status(result.statusCode).json(result.body);
+    }
+
+    if (action === 'verify-test-session') {
+      const token = url.searchParams.get('token') || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '');
+      const result = await handleVerifyTestSession(token);
+      return res.status(result.statusCode).json(result.body);
+    }
+
+    if (action === 'terminate-test-session' || action === 'exit-test') {
+      const body = await parseJsonBody(req);
+      const token = body.token || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '');
+      const result = await handleTerminateTestSession(token);
+      return res.status(result.statusCode).json(result.body);
+    }
+
+    if (action === 'test-data') {
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      const dept = url.searchParams.get('department') || undefined;
+      const sec = url.searchParams.get('section') || undefined;
+      const result = await handleTestSessionData(token, { department: dept, section: sec });
+      return res.status(result.statusCode).json(result.body);
+    }
+
+    if (action === 'test-update') {
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      const body = await parseJsonBody(req);
+      const result = await handleTestSessionUpdate(token, body);
+      return res.status(result.statusCode).json(result.body);
     }
 
     // 2. Normal Admin Accounts Management (Super Admin Exclusive)

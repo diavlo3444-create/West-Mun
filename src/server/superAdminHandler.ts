@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   HeadStore,
@@ -1744,4 +1745,590 @@ export async function handleDeleteAdmin(
     statusCode: 200,
     body: { success: true, message: 'Admin account removed successfully.' },
   };
+}
+
+// ============================================================================
+// SUPER IT TEST MODE: LOGIN AS HEAD (Exclusive to diavlo3444@gmail.com)
+// ============================================================================
+
+export interface TestSessionRecord {
+  sessionId: string;
+  adminId: string;
+  adminEmail: string;
+  headId: string;
+  headEmail: string;
+  headName: string;
+  department: DepartmentKey;
+  section: SectionKey | null;
+  createdAt: number;
+  expiresAt: number;
+  revoked: boolean;
+  userAgent?: string;
+  ip?: string;
+}
+
+export interface TestAuditLogRecord {
+  id: string;
+  timestamp: string;
+  adminEmail: string;
+  adminId: string;
+  action: 'create_test_session' | 'consume_launch_credential' | 'access_data' | 'update_record' | 'terminate_test_session';
+  headEmail: string;
+  headDepartment: string;
+  headSection: string | null;
+  sessionId: string;
+  details?: string;
+}
+
+// In-memory test sessions & single-use launch tickets (short 15m TTL)
+const activeTestSessions = new Map<string, TestSessionRecord>();
+const testLaunchTickets = new Map<string, { sessionId: string; expiresAt: number }>();
+const testAuditLogs: TestAuditLogRecord[] = [];
+
+function recordTestAuditLog(
+  action: TestAuditLogRecord['action'],
+  adminEmail: string,
+  adminId: string,
+  headEmail: string,
+  headDept: string,
+  headSec: string | null,
+  sessionId: string,
+  details?: string
+) {
+  const entry: TestAuditLogRecord = {
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    action,
+    adminEmail,
+    adminId,
+    headEmail,
+    headDepartment: headDept,
+    headSection: headSec,
+    sessionId,
+    details,
+  };
+  testAuditLogs.unshift(entry);
+  if (testAuditLogs.length > 500) testAuditLogs.pop();
+  console.log(`[AUDIT - SUPER IT TEST MODE] ${entry.timestamp} | ${action} | Admin: ${adminEmail} | Target Head: ${headEmail} (${headDept}) | Session: ${sessionId}`);
+}
+
+// Prune expired test sessions & tickets
+function pruneTestSessions() {
+  const now = Date.now();
+  for (const [token, sess] of activeTestSessions.entries()) {
+    if (sess.expiresAt <= now || sess.revoked) {
+      activeTestSessions.delete(token);
+    }
+  }
+  for (const [ticket, item] of testLaunchTickets.entries()) {
+    if (item.expiresAt <= now) {
+      testLaunchTickets.delete(ticket);
+    }
+  }
+}
+setInterval(pruneTestSessions, 5 * 60 * 1000).unref?.();
+
+/**
+ * Validates whether a token represents an active, non-expired, non-revoked Super IT Test Session.
+ */
+export function verifyTestSession(sessionToken: string): TestSessionRecord | null {
+  if (!sessionToken) return null;
+  pruneTestSessions();
+  const session = activeTestSessions.get(sessionToken);
+  if (!session) return null;
+  if (session.revoked || session.expiresAt <= Date.now()) {
+    activeTestSessions.delete(sessionToken);
+    return null;
+  }
+  return session;
+}
+
+/**
+ * 1. Create a dedicated Super IT Test Session for an authorized Super Admin.
+ * Returns a single-use launch credential that the new tab consumes immediately.
+ */
+export async function handleCreateTestSession(
+  authHeader: string | null,
+  body: any,
+  origin: string,
+  headers?: any
+): Promise<{
+  statusCode: number;
+  body: {
+    success: boolean;
+    launchUrl?: string;
+    ticket?: string;
+    expiresInSeconds?: number;
+    head?: {
+      email: string;
+      name: string;
+      department: DepartmentKey;
+      section: SectionKey | null;
+    };
+    error?: string;
+  };
+}> {
+  // Enforce server-side verification: ONLY diavlo3444@gmail.com
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user || auth.user.email?.toLowerCase().trim() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+    return {
+      statusCode: auth.statusCode === 200 ? 403 : auth.statusCode,
+      body: { success: false, error: 'Unauthorized. Test Mode is restricted exclusively to the primary IT Super Admin.' },
+    };
+  }
+
+  const targetEmail = String(body.email || '').trim().toLowerCase();
+  const targetId = String(body.id || body.headId || '').trim();
+
+  if (!targetEmail && !targetId) {
+    return { statusCode: 400, body: { success: false, error: 'Target department head identification is required.' } };
+  }
+
+  // Lookup target department head record
+  let targetHead: {
+    id: string;
+    email: string;
+    head_name: string;
+    department: DepartmentKey;
+    section: SectionKey | null;
+  } | null = null;
+
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      let query = supabaseAdmin.from('department_heads').select('*');
+      if (targetId) {
+        query = query.or(`id.eq.${targetId},user_id.eq.${targetId}`);
+      } else {
+        query = query.ilike('email', targetEmail);
+      }
+      const { data, error } = await query.maybeSingle();
+      if (!error && data) {
+        targetHead = {
+          id: data.user_id || data.id,
+          email: data.email,
+          head_name: data.head_name || 'Department Head',
+          department: data.department as DepartmentKey,
+          section: data.section as SectionKey | null,
+        };
+      }
+    } catch (err) {
+      console.warn('[handleCreateTestSession] Supabase lookup error:', err);
+    }
+  }
+
+  if (!targetHead) {
+    // Check local store
+    const local = targetId ? HeadStore.getById(targetId) : HeadStore.getByEmail(targetEmail);
+    if (local) {
+      targetHead = {
+        id: local.id,
+        email: local.email,
+        head_name: local.head_name,
+        department: local.department,
+        section: local.section,
+      };
+    }
+  }
+
+  if (!targetHead) {
+    return { statusCode: 404, body: { success: false, error: 'Department head account not found.' } };
+  }
+
+  // Generate 256-bit cryptographically secure session token and single-use launch ticket
+  const sessionToken = `test_sess_${crypto.randomBytes(32).toString('hex')}`;
+  const launchTicket = `ticket_${crypto.randomBytes(24).toString('hex')}`;
+  const now = Date.now();
+  const TTL_MS = 15 * 60 * 1000; // 15 minutes dedicated testing window
+  const TICKET_TTL_MS = 60 * 1000; // 60 seconds single-use launch window
+
+  const sessionRecord: TestSessionRecord = {
+    sessionId: sessionToken,
+    adminId: auth.user.id,
+    adminEmail: auth.user.email,
+    headId: targetHead.id,
+    headEmail: targetHead.email,
+    headName: targetHead.head_name,
+    department: targetHead.department,
+    section: targetHead.section,
+    createdAt: now,
+    expiresAt: now + TTL_MS,
+    revoked: false,
+    userAgent: headers?.['user-agent'] || '',
+    ip: headers?.['x-forwarded-for'] || '',
+  };
+
+  activeTestSessions.set(sessionToken, sessionRecord);
+  testLaunchTickets.set(launchTicket, {
+    sessionId: sessionToken,
+    expiresAt: now + TICKET_TTL_MS,
+  });
+
+  recordTestAuditLog(
+    'create_test_session',
+    auth.user.email,
+    auth.user.id,
+    targetHead.email,
+    targetHead.department,
+    targetHead.section,
+    sessionToken,
+    `Single-use ticket created; expires in 60s. Session TTL: 15m.`
+  );
+
+  // Determine canonical destination url: e.g. /head/design?test_ticket=...
+  const deptUrl = targetHead.section
+    ? `/head/${targetHead.department}/${targetHead.section}`
+    : `/head/${targetHead.department}`;
+
+  const launchUrl = `${origin}${deptUrl}?test_ticket=${encodeURIComponent(launchTicket)}`;
+
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      launchUrl,
+      ticket: launchTicket,
+      expiresInSeconds: 900,
+      head: {
+        email: targetHead.email,
+        name: targetHead.head_name,
+        department: targetHead.department,
+        section: targetHead.section,
+      },
+    },
+  };
+}
+
+/**
+ * 2. Exchange a single-use launch ticket for the active Test Session token.
+ * Single use: Ticket is immediately invalidated upon first redemption.
+ */
+export async function handleConsumeLaunchTicket(
+  ticket: string
+): Promise<{
+  statusCode: number;
+  body: {
+    success: boolean;
+    sessionToken?: string;
+    expiresAt?: string;
+    head?: {
+      id: string;
+      email: string;
+      headName: string;
+      department: DepartmentKey;
+      section: SectionKey | null;
+    };
+    adminEmail?: string;
+    error?: string;
+  };
+}> {
+  if (!ticket) {
+    return { statusCode: 400, body: { success: false, error: 'Launch ticket is required.' } };
+  }
+
+  pruneTestSessions();
+  const ticketRecord = testLaunchTickets.get(ticket);
+  if (!ticketRecord) {
+    return {
+      statusCode: 401,
+      body: {
+        success: false,
+        error: 'This launch ticket is invalid or has already been consumed. Launch tickets are strictly single-use.',
+      },
+    };
+  }
+
+  // Invalidate ticket immediately to prevent replay
+  testLaunchTickets.delete(ticket);
+
+  if (ticketRecord.expiresAt <= Date.now()) {
+    return {
+      statusCode: 401,
+      body: { success: false, error: 'This launch ticket has expired. Please launch a new session from the IT Super Admin dashboard.' },
+    };
+  }
+
+  const session = activeTestSessions.get(ticketRecord.sessionId);
+  if (!session || session.revoked || session.expiresAt <= Date.now()) {
+    return {
+      statusCode: 401,
+      body: { success: false, error: 'The test session associated with this ticket has expired or was revoked.' },
+    };
+  }
+
+  recordTestAuditLog(
+    'consume_launch_credential',
+    session.adminEmail,
+    session.adminId,
+    session.headEmail,
+    session.department,
+    session.section,
+    session.sessionId,
+    'Launch ticket redeemed into active test session token in new tab'
+  );
+
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      sessionToken: session.sessionId,
+      expiresAt: new Date(session.expiresAt).toISOString(),
+      adminEmail: session.adminEmail,
+      head: {
+        id: session.headId,
+        email: session.headEmail,
+        headName: session.headName,
+        department: session.department,
+        section: session.section,
+      },
+    },
+  };
+}
+
+/**
+ * 3. Verify an active Test Session token.
+ */
+export async function handleVerifyTestSession(
+  sessionToken: string
+): Promise<{
+  statusCode: number;
+  body: {
+    success: boolean;
+    authorized: boolean;
+    isSuperAdminTestMode: boolean;
+    adminEmail?: string;
+    head?: {
+      id: string;
+      email: string;
+      headName: string;
+      department: DepartmentKey;
+      section: SectionKey | null;
+    };
+    expiresAt?: string;
+    error?: string;
+  };
+}> {
+  const session = verifyTestSession(sessionToken);
+  if (!session) {
+    return {
+      statusCode: 401,
+      body: {
+        success: false,
+        authorized: false,
+        isSuperAdminTestMode: false,
+        error: 'Super IT Test Session expired, revoked, or invalid.',
+      },
+    };
+  }
+
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      authorized: true,
+      isSuperAdminTestMode: true,
+      adminEmail: session.adminEmail,
+      expiresAt: new Date(session.expiresAt).toISOString(),
+      head: {
+        id: session.headId,
+        email: session.headEmail,
+        headName: session.headName,
+        department: session.department,
+        section: session.section,
+      },
+    },
+  };
+}
+
+/**
+ * 4. Revoke / Terminate a Super IT Test Session.
+ */
+export async function handleTerminateTestSession(
+  sessionToken: string
+): Promise<{ statusCode: number; body: { success: boolean; message?: string } }> {
+  if (sessionToken) {
+    const session = activeTestSessions.get(sessionToken);
+    if (session) {
+      session.revoked = true;
+      activeTestSessions.delete(sessionToken);
+      recordTestAuditLog(
+        'terminate_test_session',
+        session.adminEmail,
+        session.adminId,
+        session.headEmail,
+        session.department,
+        session.section,
+        sessionToken,
+        'Test session safely terminated and revoked'
+      );
+    }
+  }
+  return {
+    statusCode: 200,
+    body: { success: true, message: 'Super IT Test Session terminated successfully.' },
+  };
+}
+
+/**
+ * 5. Privileged Data Access for Super IT Test Sessions:
+ * Grants the verified IT Super Admin full cross-department registration and data testing
+ * without weakening PostgreSQL RLS for regular department heads.
+ */
+export async function handleTestSessionData(
+  sessionToken: string,
+  params: { department?: string; section?: string | null }
+): Promise<{
+  statusCode: number;
+  body: {
+    success: boolean;
+    registrations?: any[];
+    inquiries?: any[];
+    sponsors?: any[];
+    settings?: Record<string, string>;
+    announcements?: any[];
+    allDepartments?: any[];
+    error?: string;
+  };
+}> {
+  const session = verifyTestSession(sessionToken);
+  if (!session) {
+    return {
+      statusCode: 401,
+      body: { success: false, error: 'Unauthorized: Valid Super IT Test Session required.' },
+    };
+  }
+
+  recordTestAuditLog(
+    'access_data',
+    session.adminEmail,
+    session.adminId,
+    session.headEmail,
+    params.department || session.department,
+    params.section !== undefined ? params.section : session.section,
+    sessionToken,
+    `Privileged cross-department data queried during active test session`
+  );
+
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      // 1. Team Registrations (all or filtered)
+      let regQuery = supabaseAdmin.from('team_registrations').select('*');
+      if (params.department && params.department !== 'all') {
+        if (params.department === 'media_press') {
+          regQuery = regQuery.in('team', ['media_press', 'media']);
+        } else {
+          regQuery = regQuery.eq('team', params.department);
+        }
+      }
+      if (params.section) {
+        regQuery = regQuery.eq('section', params.section);
+      }
+      const { data: registrations } = await regQuery.order('created_at', { ascending: false });
+
+      // 2. Settings
+      const { data: settingsRows } = await supabaseAdmin.from('settings').select('key,value');
+      const settingsMap: Record<string, string> = {};
+      settingsRows?.forEach((r: any) => {
+        settingsMap[r.key] = r.value;
+      });
+
+      // 3. Announcements
+      const { data: announcements } = await supabaseAdmin
+        .from('announcements')
+        .select('*')
+        .order('published_at', { ascending: false });
+
+      // 4. Inquiries & Sponsors for HR/PR testing
+      const { data: inquiries } = await supabaseAdmin
+        .from('inquiries')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      const { data: sponsors } = await supabaseAdmin
+        .from('sponsors')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      return {
+        statusCode: 200,
+        body: {
+          success: true,
+          registrations: registrations || [],
+          inquiries: inquiries || [],
+          sponsors: sponsors || [],
+          settings: settingsMap,
+          announcements: announcements || [],
+        },
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to query testing data.';
+      return { statusCode: 500, body: { success: false, error: msg } };
+    }
+  }
+
+  // Local data fallback
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      registrations: [],
+      inquiries: [],
+      sponsors: [],
+      settings: {},
+      announcements: [],
+    },
+  };
+}
+
+/**
+ * 6. Privileged Update for Super IT Test Sessions
+ */
+export async function handleTestSessionUpdate(
+  sessionToken: string,
+  body: { id: string; status: string; notes?: string }
+): Promise<{ statusCode: number; body: { success: boolean; error?: string } }> {
+  const session = verifyTestSession(sessionToken);
+  if (!session) {
+    return {
+      statusCode: 401,
+      body: { success: false, error: 'Unauthorized: Valid Super IT Test Session required.' },
+    };
+  }
+
+  recordTestAuditLog(
+    'update_record',
+    session.adminEmail,
+    session.adminId,
+    session.headEmail,
+    session.department,
+    session.section,
+    sessionToken,
+    `Record ${body.id} updated to status ${body.status}`
+  );
+
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      const { error } = await supabaseAdmin
+        .from('team_registrations')
+        .update({
+          status: body.status,
+          admin_notes: body.notes || '',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', body.id);
+
+      if (error) {
+        return { statusCode: 400, body: { success: false, error: error.message } };
+      }
+      return { statusCode: 200, body: { success: true } };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Update failed.';
+      return { statusCode: 500, body: { success: false, error: msg } };
+    }
+  }
+
+  return { statusCode: 200, body: { success: true } };
 }

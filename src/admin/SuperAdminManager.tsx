@@ -25,6 +25,7 @@ import {
   UserCheck,
   Sparkles,
   Info,
+  LogIn,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { PageHeader, Panel, StatCard, Notice } from '../dashboard/ui';
@@ -126,6 +127,10 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
   const [deletingHead, setDeletingHead] = useState<DepartmentHeadRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  // Super IT Test Mode State
+  const [launchingHeadId, setLaunchingHeadId] = useState<string | null>(null);
+  const [testLaunchError, setTestLaunchError] = useState<string | null>(null);
 
   const currentUserEmail = session?.user?.email?.toLowerCase().trim() || '';
   // Server-verified flag only. The email is displayed for context, never used
@@ -451,6 +456,39 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
       setResetError(msg);
     } finally {
       setResettingPassword(false);
+    }
+  };
+
+  // Handle Login as Head (Super IT Test Mode)
+  const handleLoginAsHead = async (head: DepartmentHeadRecord) => {
+    if (!isAuthorizedCaller || !session) return;
+    setTestLaunchError(null);
+    setLaunchingHeadId(head.id || head.email);
+
+    try {
+      const { ok, data: result } = await safeJsonFetch('/api/super-admin?action=launch-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          id: head.id || head.user_id,
+          email: head.email,
+        }),
+      });
+
+      if (!ok || !result?.launchUrl) {
+        throw new Error(result?.error || 'Failed to initialize Super IT test session.');
+      }
+
+      // Open new tab without modifying the current IT Super Admin tab session
+      window.open(result.launchUrl, '_blank', 'noopener,noreferrer');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to launch test session.';
+      setTestLaunchError(msg);
+    } finally {
+      setLaunchingHeadId(null);
     }
   };
 
@@ -1041,6 +1079,14 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
           </div>
         </div>
 
+        {testLaunchError && (
+          <div className="mb-4">
+            <Notice tone="error" title="Test Session Launch Failed">
+              {testLaunchError}
+            </Notice>
+          </div>
+        )}
+
         {/* Heads Table */}
         {loading ? (
           <div className="py-12 flex flex-col items-center justify-center gap-2 text-neutral-400">
@@ -1133,6 +1179,22 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
 
                       <td className="py-3.5 px-3 text-right">
                         <div className="inline-flex items-center gap-1.5">
+                          {/* Super IT Test Mode: Login as Head */}
+                          <button
+                            type="button"
+                            onClick={() => handleLoginAsHead(h)}
+                            disabled={launchingHeadId === (h.id || h.email)}
+                            title="Login as Head in new tab (Super IT Test Session)"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono font-medium rounded-md text-[#d4af37] bg-[#d4af37]/10 hover:bg-[#d4af37]/20 border border-[#d4af37]/35 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {launchingHeadId === (h.id || h.email) ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <LogIn className="w-3 h-3" />
+                            )}
+                            <span>Login</span>
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => openEditModal(h)}

@@ -41,6 +41,14 @@ function isPasswordSetupLinkInUrl(): boolean {
   );
 }
 
+interface TestModeState {
+  isActive: boolean;
+  adminEmail: string;
+  token: string;
+  expiresAt?: string;
+  crossDeptAccess: boolean;
+}
+
 export default function HeadPortal() {
   const [headUser, setHeadUser] = useState<{
     id: string;
@@ -52,6 +60,27 @@ export default function HeadPortal() {
 
   const [assignment, setAssignment] = useState<HeadAssignment | null>(null);
   const [accessDeniedState, setAccessDeniedState] = useState<AccessDeniedState | null>(null);
+
+  // Super IT Test Mode State
+  const [testMode, setTestMode] = useState<TestModeState | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = sessionStorage.getItem('westmun_super_it_test_session');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.token && parsed.adminEmail) {
+          return {
+            isActive: true,
+            adminEmail: parsed.adminEmail,
+            token: parsed.token,
+            expiresAt: parsed.expiresAt,
+            crossDeptAccess: true,
+          };
+        }
+      }
+    } catch {}
+    return null;
+  });
 
   // Extract path: e.g. /head, /head/design, or /head/volunteers/female
   const currentPath =
@@ -104,6 +133,108 @@ export default function HeadPortal() {
     }
 
     const verifyAccess = async () => {
+      // 0. CHECK SUPER IT TEST MODE (diavlo3444@gmail.com exclusive testing session)
+      let activeTestMode: TestModeState | null = null;
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const testTicket = urlParams.get('test_ticket');
+
+        if (testTicket) {
+          try {
+            // Exchange single-use launch ticket for session token
+            const resp = await fetch(`/api/super-admin?action=consume-ticket&ticket=${encodeURIComponent(testTicket)}`);
+            const data = await resp.json();
+            if (resp.ok && data?.success && data?.sessionToken) {
+              const testSess = {
+                token: data.sessionToken,
+                adminEmail: data.adminEmail,
+                expiresAt: data.expiresAt,
+              };
+              sessionStorage.setItem('westmun_super_it_test_session', JSON.stringify(testSess));
+              activeTestMode = {
+                isActive: true,
+                adminEmail: data.adminEmail,
+                token: data.sessionToken,
+                expiresAt: data.expiresAt,
+                crossDeptAccess: true,
+              };
+              setTestMode(activeTestMode);
+
+              // Strip ticket param from URL to prevent reuse
+              urlParams.delete('test_ticket');
+              const newSearch = urlParams.toString();
+              const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}${window.location.hash || ''}`;
+              window.history.replaceState({}, '', newUrl);
+
+              if (data.head) {
+                const dept = data.head.department as DepartmentKey;
+                const sec = data.head.section as SectionKey | null;
+                const testAssignment: HeadAssignment = {
+                  department: dept,
+                  section: sec,
+                  headName: data.head.headName || null,
+                  headEmail: data.head.email || null,
+                  roleTitle: getRoleTitle(dept, sec),
+                };
+                setHeadUser(data.head);
+                setAssignment(testAssignment);
+                setAccessDeniedState(null);
+                setLoading(false);
+                return;
+              }
+            } else {
+              setAuthError(data?.error || 'Test mode launch ticket was invalid or expired.');
+              sessionStorage.removeItem('westmun_super_it_test_session');
+              setTestMode(null);
+            }
+          } catch (ticketErr) {
+            console.error('[Head Portal] Test ticket consumption error:', ticketErr);
+          }
+        } else {
+          // Check existing session token in sessionStorage
+          const stored = sessionStorage.getItem('westmun_super_it_test_session');
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              if (parsed?.token) {
+                const verifyResp = await fetch(`/api/super-admin?action=verify-test-session&token=${encodeURIComponent(parsed.token)}`);
+                const verifyData = await verifyResp.json();
+                if (verifyResp.ok && verifyData?.authorized && verifyData?.head) {
+                  activeTestMode = {
+                    isActive: true,
+                    adminEmail: verifyData.adminEmail || parsed.adminEmail,
+                    token: parsed.token,
+                    expiresAt: verifyData.expiresAt || parsed.expiresAt,
+                    crossDeptAccess: true,
+                  };
+                  setTestMode(activeTestMode);
+                  const dept = verifyData.head.department as DepartmentKey;
+                  const sec = verifyData.head.section as SectionKey | null;
+                  const testAssignment: HeadAssignment = {
+                    department: dept,
+                    section: sec,
+                    headName: verifyData.head.headName || null,
+                    headEmail: verifyData.head.email || null,
+                    roleTitle: getRoleTitle(dept, sec),
+                  };
+                  setHeadUser(verifyData.head);
+                  setAssignment(testAssignment);
+                  setAccessDeniedState(null);
+                  setLoading(false);
+                  return;
+                } else {
+                  sessionStorage.removeItem('westmun_super_it_test_session');
+                  setTestMode(null);
+                }
+              }
+            } catch {
+              sessionStorage.removeItem('westmun_super_it_test_session');
+              setTestMode(null);
+            }
+          }
+        }
+      }
+
       // 1. Check Supabase Auth Session first
       let resolvedHead: any = null;
       let resolvedAssignment: HeadAssignment | null = null;
@@ -242,7 +373,7 @@ export default function HeadPortal() {
         return;
       }
 
-      // Check department & section authorization
+      // Check department & section authorization (bypassed if in authorized Super IT Test Mode)
       const deptMismatch = requestedDeptSlug !== dept;
       const sectionMismatch =
         isGenderSeparated(dept) &&
@@ -253,6 +384,13 @@ export default function HeadPortal() {
         requestedSectionSlug !== 'registrations' &&
         requestedSectionSlug !== 'department';
 
+      // If active test session, cross-department inspection is explicitly authorized!
+      if (activeTestMode || sessionStorage.getItem('westmun_super_it_test_session')) {
+        setAccessDeniedState(null);
+        setLoading(false);
+        return;
+      }
+
       // Missing section on gender-separated department -> update URL to exact section
       if (!deptMismatch && isGenderSeparated(dept) && !requestedSectionSlug && sec) {
         try {
@@ -262,7 +400,7 @@ export default function HeadPortal() {
         return;
       }
 
-      // Mismatch: Deny access if head attempts to open another department or gender section
+      // Mismatch: Deny access if regular head attempts to open another department or gender section
       if (deptMismatch || sectionMismatch) {
         setAccessDeniedState({
           reason: 'department_mismatch',
@@ -300,7 +438,23 @@ export default function HeadPortal() {
    * Complete sign-out helper
    */
   const handleSignOut = useCallback(async () => {
-    if (supabase) {
+    // If Super IT Test Session is active, terminate it on the server and exit safely
+    if (testMode?.token) {
+      try {
+        await fetch('/api/super-admin?action=terminate-test-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${testMode.token}`,
+          },
+          body: JSON.stringify({ token: testMode.token }),
+        });
+      } catch {}
+      sessionStorage.removeItem('westmun_super_it_test_session');
+      setTestMode(null);
+    }
+
+    if (supabase && !testMode) {
       try {
         await supabase.auth.signOut();
       } catch {}
@@ -332,7 +486,22 @@ export default function HeadPortal() {
       window.history.replaceState({}, '', '/head');
     } catch {}
     setLoading(false);
-  }, []);
+  }, [testMode]);
+
+  // Handle unload / tab close to revoke test session
+  useEffect(() => {
+    if (!testMode?.token) return;
+    const handleUnload = () => {
+      try {
+        navigator.sendBeacon?.(
+          '/api/super-admin?action=terminate-test-session',
+          JSON.stringify({ token: testMode.token })
+        );
+      } catch {}
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [testMode?.token]);
 
   // 1. Loading state while verifying credentials or restoring session
   if (loading) {
@@ -430,6 +599,7 @@ export default function HeadPortal() {
       headName={assignment.headName || undefined}
       headEmail={headUser.email}
       initialView={initialView}
+      testMode={testMode}
       onSignOut={handleSignOut}
     />
   );

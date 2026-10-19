@@ -1,5 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutDashboard, Users, Building2, Award, MessageSquare } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Users,
+  Building2,
+  Award,
+  MessageSquare,
+  ShieldAlert,
+  LogOut,
+  Layers,
+  Sparkles,
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   DEPARTMENTS,
@@ -21,12 +31,21 @@ import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 import { HeadSponsorsManager } from './HeadSponsorsManager';
 import { HeadInquiriesManager } from './HeadInquiriesManager';
 
+export interface TestModeInfo {
+  isActive: boolean;
+  adminEmail: string;
+  token: string;
+  expiresAt?: string;
+  crossDeptAccess: boolean;
+}
+
 interface DepartmentDashboardProps {
   department: DepartmentKey;
   section?: SectionKey | null;
   headName?: string;
   headEmail?: string;
   initialView?: HeadView;
+  testMode?: TestModeInfo | null;
   onSignOut: () => void;
 }
 
@@ -56,6 +75,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   headName,
   headEmail = '',
   initialView,
+  testMode,
   onSignOut,
 }) => {
   const meta = DEPARTMENTS[department];
@@ -104,14 +124,44 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   );
 
   const loadDepartmentData = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+
+    // If active Super IT Test Mode session, fetch verified testing records via test-data endpoint
+    if (testMode?.token) {
+      try {
+        const resp = await fetch(
+          `/api/super-admin?action=test-data&department=${encodeURIComponent(department)}&section=${encodeURIComponent(section || '')}`,
+          {
+            headers: {
+              Authorization: `Bearer ${testMode.token}`,
+            },
+          }
+        );
+        const data = await resp.json();
+        if (resp.ok && data?.success) {
+          setRegistrations((data.registrations as HeadRegistration[]) || []);
+          if (data.settings) setSettings(data.settings);
+          if (data.announcements) setAnnouncements(data.announcements as HeadAnnouncement[]);
+          setLoading(false);
+          return;
+        } else if (data?.error) {
+          setLoadError(data.error);
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to query test session data.';
+        setLoadError(msg);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (!supabase) {
       setLoading(false);
       setLoadError('Supabase is not configured on this deployment. Contact the IT Super Admin.');
       return;
     }
-
-    setLoading(true);
-    setLoadError('');
 
     try {
       try {
@@ -171,7 +221,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [section, teamValues]);
+  }, [department, section, teamValues, testMode]);
 
   useEffect(() => {
     loadDepartmentData();
@@ -221,6 +271,28 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     status: string,
     notes: string,
   ): Promise<{ ok: boolean; error?: string }> => {
+    // If active Super IT Test Mode session, use privileged test-update endpoint
+    if (testMode?.token) {
+      try {
+        const resp = await fetch('/api/super-admin?action=test-update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${testMode.token}`,
+          },
+          body: JSON.stringify({ id, status, notes }),
+        });
+        const data = await resp.json();
+        if (resp.ok && data?.success) {
+          return { ok: true };
+        }
+        return { ok: false, error: data?.error || 'Test update failed.' };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Network error.';
+        return { ok: false, error: msg };
+      }
+    }
+
     if (!supabase) return { ok: false, error: 'Supabase is not configured.' };
 
     try {
@@ -312,8 +384,57 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       user={user}
       onSignOut={onSignOut}
       topbarLabel={viewLabel}
-      roleBadge={isGenderDivision && section ? `${section} division` : 'Department head'}
+      roleBadge={
+        testMode?.isActive
+          ? 'Super IT Test Session'
+          : isGenderDivision && section
+          ? `${section} division`
+          : 'Department head'
+      }
     >
+      {/* ====================================================================
+          PERSISTENT SUPER IT TEST MODE BANNER (Exclusive to diavlo3444@gmail.com)
+          ==================================================================== */}
+      {testMode?.isActive && (
+        <div className="mb-5 rounded-md border-2 border-amber-500/80 bg-gradient-to-r from-amber-950/80 via-[#1a1408] to-neutral-950 p-4 shadow-xl shadow-amber-950/30">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-amber-500/50 bg-amber-500/15 text-amber-400">
+                <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[12px] font-mono font-bold tracking-wider uppercase text-amber-400">
+                    SUPER IT TEST MODE
+                  </span>
+                  <span className="text-[11px] text-neutral-400">·</span>
+                  <span className="text-[12px] font-medium text-white">
+                    Logged in as <strong className="text-amber-200">{headName || headEmail || 'Head'}</strong>
+                  </span>
+                  <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-amber-300 border border-amber-500/30">
+                    {meta.label} {section ? `(${section})` : ''}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-neutral-300">
+                  Authorized IT Super Admin testing session (<span className="font-mono text-amber-300/90">{testMode.adminEmail}</span>). Elevated testing privileges are active across all departments; normal head accounts and RLS policies remain completely isolated.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onSignOut}
+                className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/60 bg-amber-500/20 px-3.5 py-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-amber-200 hover:bg-amber-500/30 hover:border-amber-400 hover:text-white transition-colors cursor-pointer shadow-sm"
+              >
+                <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Exit Test Session</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div key={view} className="wm-page-in space-y-5">
         {loadError && (
           <Notice tone="error" title="Records could not be loaded">
