@@ -165,7 +165,7 @@ const ticket = launchRes.data?.ticket;
 const consumeRes = await callHandler('GET', `/api/super-admin?action=consume-ticket&ticket=${ticket}`, null);
 assert(consumeRes.statusCode === 200 && consumeRes.data?.success, 'single-use launch ticket exchanges for session token');
 const sessionToken = consumeRes.data?.sessionToken;
-assert(Boolean(sessionToken && sessionToken.startsWith('test_sess_')), 'valid dedicated test session token returned');
+assert(Boolean(sessionToken && (sessionToken.startsWith('wmtest_') || sessionToken.startsWith('test_sess_'))), 'valid dedicated test session token returned');
 
 // Test 5: Single-use ticket replay prevention
 const replayRes = await callHandler('GET', `/api/super-admin?action=consume-ticket&ticket=${ticket}`, null);

@@ -1631,6 +1631,75 @@ async function handleDeleteAdmin(authHeader, targetId) {
 var activeTestSessions = /* @__PURE__ */ new Map();
 var testLaunchTickets = /* @__PURE__ */ new Map();
 var testAuditLogs = [];
+var revokedTestSessionIds = /* @__PURE__ */ new Set();
+function getTestTokenSecret() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "westmun-secret-super-it-test-2027-diavlo3444";
+}
+function signTestSessionToken(session) {
+  const secret = getTestTokenSecret();
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+  const payload = {
+    v: 1,
+    type: "super_it_test_session",
+    sessionId: session.sessionId,
+    adminId: session.adminId,
+    adminEmail: session.adminEmail,
+    headId: session.headId,
+    headEmail: session.headEmail,
+    headName: session.headName,
+    department: session.department,
+    section: session.section,
+    createdAt: session.createdAt,
+    expiresAt: session.expiresAt
+  };
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto2.createHmac("sha256", secret).update(`${header}.${body}`).digest("base64url");
+  return `wmtest_${header}.${body}.${signature}`;
+}
+function verifySignedTestToken(token) {
+  if (!token || typeof token !== "string") return null;
+  const clean = token.trim();
+  if (!clean.startsWith("wmtest_")) return null;
+  const raw = clean.slice("wmtest_".length);
+  const parts = raw.split(".");
+  if (parts.length !== 3) return null;
+  const [header, body, signature] = parts;
+  const secret = getTestTokenSecret();
+  const expectedSignature = crypto2.createHmac("sha256", secret).update(`${header}.${body}`).digest("base64url");
+  const sigBuf = Buffer.from(signature);
+  const expBuf = Buffer.from(expectedSignature);
+  if (sigBuf.length !== expBuf.length || !crypto2.timingSafeEqual(sigBuf, expBuf)) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (!payload || payload.type !== "super_it_test_session") return null;
+    if (!payload.expiresAt || payload.expiresAt <= Date.now()) {
+      return null;
+    }
+    if (String(payload.adminEmail || "").toLowerCase().trim() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+      return null;
+    }
+    if (payload.sessionId && revokedTestSessionIds.has(payload.sessionId)) {
+      return null;
+    }
+    return {
+      sessionId: payload.sessionId,
+      adminId: payload.adminId,
+      adminEmail: payload.adminEmail,
+      headId: payload.headId,
+      headEmail: payload.headEmail,
+      headName: payload.headName,
+      department: payload.department,
+      section: payload.section,
+      createdAt: payload.createdAt,
+      expiresAt: payload.expiresAt,
+      revoked: false
+    };
+  } catch {
+    return null;
+  }
+}
 function recordTestAuditLog(action, adminEmail, adminId, headEmail, headDept, headSec, sessionId, details) {
   const entry = {
     id: crypto2.randomUUID(),
@@ -1665,6 +1734,8 @@ setInterval(pruneTestSessions, 5 * 60 * 1e3).unref?.();
 function verifyTestSession(sessionToken) {
   if (!sessionToken) return null;
   pruneTestSessions();
+  const signed = verifySignedTestToken(sessionToken);
+  if (signed) return signed;
   const session = activeTestSessions.get(sessionToken);
   if (!session) return null;
   if (session.revoked || session.expiresAt <= Date.now()) {
@@ -1691,10 +1762,12 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
   if (supabaseAdmin) {
     try {
       let query = supabaseAdmin.from("department_heads").select("*");
-      if (targetId) {
+      if (targetId && UUID_REGEX.test(targetId)) {
         query = query.or(`id.eq.${targetId},user_id.eq.${targetId}`);
-      } else {
+      } else if (targetEmail) {
         query = query.ilike("email", targetEmail);
+      } else if (targetId) {
+        query = query.eq("id", targetId);
       }
       const { data, error } = await query.maybeSingle();
       if (!error && data) {
@@ -1705,6 +1778,17 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
           department: data.department,
           section: data.section
         };
+      } else if (!data && targetEmail) {
+        const { data: byEmail } = await supabaseAdmin.from("department_heads").select("*").ilike("email", targetEmail).maybeSingle();
+        if (byEmail) {
+          targetHead = {
+            id: byEmail.user_id || byEmail.id,
+            email: byEmail.email,
+            head_name: byEmail.head_name || "Department Head",
+            department: byEmail.department,
+            section: byEmail.section
+          };
+        }
       }
     } catch (err) {
       console.warn("[handleCreateTestSession] Supabase lookup error:", err);
@@ -1725,13 +1809,12 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
   if (!targetHead) {
     return { statusCode: 404, body: { success: false, error: "Department head account not found." } };
   }
-  const sessionToken = `test_sess_${crypto2.randomBytes(32).toString("hex")}`;
-  const launchTicket = `ticket_${crypto2.randomBytes(24).toString("hex")}`;
+  const rawSessionId = `test_sess_${crypto2.randomBytes(16).toString("hex")}`;
   const now = Date.now();
   const TTL_MS = 15 * 60 * 1e3;
   const TICKET_TTL_MS = 60 * 1e3;
   const sessionRecord = {
-    sessionId: sessionToken,
+    sessionId: rawSessionId,
     adminId: auth.user.id,
     adminEmail: auth.user.email,
     headId: targetHead.id,
@@ -1745,7 +1828,10 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
     userAgent: headers?.["user-agent"] || "",
     ip: headers?.["x-forwarded-for"] || ""
   };
+  const sessionToken = signTestSessionToken(sessionRecord);
+  const launchTicket = `ticket_${crypto2.randomBytes(24).toString("hex")}`;
   activeTestSessions.set(sessionToken, sessionRecord);
+  activeTestSessions.set(rawSessionId, sessionRecord);
   testLaunchTickets.set(launchTicket, {
     sessionId: sessionToken,
     expiresAt: now + TICKET_TTL_MS
@@ -1757,19 +1843,21 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
     targetHead.email,
     targetHead.department,
     targetHead.section,
-    sessionToken,
-    `Single-use ticket created; expires in 60s. Session TTL: 15m.`
+    rawSessionId,
+    `Cryptographically signed test session generated. TTL: 15m.`
   );
   const deptUrl = targetHead.section ? `/head/${targetHead.department}/${targetHead.section}` : `/head/${targetHead.department}`;
-  const launchUrl = `${origin}${deptUrl}?test_ticket=${encodeURIComponent(launchTicket)}`;
+  const launchUrl = `${origin}${deptUrl}?test_token=${encodeURIComponent(sessionToken)}&test_ticket=${encodeURIComponent(launchTicket)}`;
   return {
     statusCode: 200,
     body: {
       success: true,
       launchUrl,
       ticket: launchTicket,
+      sessionToken,
       expiresInSeconds: 900,
       head: {
+        id: targetHead.id,
         email: targetHead.email,
         name: targetHead.head_name,
         department: targetHead.department,
@@ -1782,55 +1870,80 @@ async function handleConsumeLaunchTicket(ticket) {
   if (!ticket) {
     return { statusCode: 400, body: { success: false, error: "Launch ticket is required." } };
   }
+  const signed = verifySignedTestToken(ticket);
+  if (signed) {
+    recordTestAuditLog(
+      "consume_launch_credential",
+      signed.adminEmail,
+      signed.adminId,
+      signed.headEmail,
+      signed.department,
+      signed.section,
+      signed.sessionId,
+      "Signed launch credential verified and accepted in new tab"
+    );
+    return {
+      statusCode: 200,
+      body: {
+        success: true,
+        sessionToken: ticket,
+        expiresAt: new Date(signed.expiresAt).toISOString(),
+        adminEmail: signed.adminEmail,
+        head: {
+          id: signed.headId,
+          email: signed.headEmail,
+          headName: signed.headName,
+          department: signed.department,
+          section: signed.section
+        }
+      }
+    };
+  }
   pruneTestSessions();
   const ticketRecord = testLaunchTickets.get(ticket);
-  if (!ticketRecord) {
-    return {
-      statusCode: 401,
-      body: {
-        success: false,
-        error: "This launch ticket is invalid or has already been consumed. Launch tickets are strictly single-use."
-      }
-    };
+  if (ticketRecord) {
+    testLaunchTickets.delete(ticket);
+    if (ticketRecord.expiresAt <= Date.now()) {
+      return {
+        statusCode: 401,
+        body: { success: false, error: "This launch ticket has expired. Please launch a new session from the IT Super Admin dashboard." }
+      };
+    }
+    const session = activeTestSessions.get(ticketRecord.sessionId);
+    if (session && !session.revoked && session.expiresAt > Date.now()) {
+      recordTestAuditLog(
+        "consume_launch_credential",
+        session.adminEmail,
+        session.adminId,
+        session.headEmail,
+        session.department,
+        session.section,
+        session.sessionId,
+        "Launch ticket redeemed into active test session token in new tab"
+      );
+      return {
+        statusCode: 200,
+        body: {
+          success: true,
+          sessionToken: session.sessionId,
+          expiresAt: new Date(session.expiresAt).toISOString(),
+          adminEmail: session.adminEmail,
+          head: {
+            id: session.headId,
+            email: session.headEmail,
+            headName: session.headName,
+            department: session.department,
+            section: session.section
+          }
+        }
+      };
+    }
   }
-  testLaunchTickets.delete(ticket);
-  if (ticketRecord.expiresAt <= Date.now()) {
-    return {
-      statusCode: 401,
-      body: { success: false, error: "This launch ticket has expired. Please launch a new session from the IT Super Admin dashboard." }
-    };
-  }
-  const session = activeTestSessions.get(ticketRecord.sessionId);
-  if (!session || session.revoked || session.expiresAt <= Date.now()) {
-    return {
-      statusCode: 401,
-      body: { success: false, error: "The test session associated with this ticket has expired or was revoked." }
-    };
-  }
-  recordTestAuditLog(
-    "consume_launch_credential",
-    session.adminEmail,
-    session.adminId,
-    session.headEmail,
-    session.department,
-    session.section,
-    session.sessionId,
-    "Launch ticket redeemed into active test session token in new tab"
-  );
   return {
-    statusCode: 200,
+    statusCode: 401,
     body: {
-      success: true,
-      sessionToken: session.sessionId,
-      expiresAt: new Date(session.expiresAt).toISOString(),
-      adminEmail: session.adminEmail,
-      head: {
-        id: session.headId,
-        email: session.headEmail,
-        headName: session.headName,
-        department: session.department,
-        section: session.section
-      }
+      success: false,
+      error: "This launch ticket is invalid or has already been consumed. Launch tickets are strictly single-use."
     }
   };
 }
@@ -1853,6 +1966,7 @@ async function handleVerifyTestSession(sessionToken) {
       success: true,
       authorized: true,
       isSuperAdminTestMode: true,
+      sessionToken,
       adminEmail: session.adminEmail,
       expiresAt: new Date(session.expiresAt).toISOString(),
       head: {
@@ -1867,18 +1981,24 @@ async function handleVerifyTestSession(sessionToken) {
 }
 async function handleTerminateTestSession(sessionToken) {
   if (sessionToken) {
+    const verified = verifyTestSession(sessionToken);
+    if (verified?.sessionId) {
+      revokedTestSessionIds.add(verified.sessionId);
+    }
     const session = activeTestSessions.get(sessionToken);
     if (session) {
       session.revoked = true;
       activeTestSessions.delete(sessionToken);
+    }
+    if (verified) {
       recordTestAuditLog(
         "terminate_test_session",
-        session.adminEmail,
-        session.adminId,
-        session.headEmail,
-        session.department,
-        session.section,
-        sessionToken,
+        verified.adminEmail,
+        verified.adminId,
+        verified.headEmail,
+        verified.department,
+        verified.section,
+        verified.sessionId,
         "Test session safely terminated and revoked"
       );
     }

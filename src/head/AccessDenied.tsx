@@ -7,7 +7,7 @@ export interface AccessDeniedProps {
   email?: string;
   userId?: string;
   onSignOut: () => void;
-  reason?: 'no_assignment' | 'department_mismatch';
+  reason?: 'no_assignment' | 'department_mismatch' | 'admin_not_head';
   authorizedDepartment?: DepartmentKey;
   authorizedSection?: SectionKey | null;
   requestedDepartment?: string;
@@ -27,6 +27,7 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
   onGoToAuthorizedDashboard,
 }) => {
   const isMismatch = reason === 'department_mismatch' && authorizedDepartment;
+  const isAdminNotHead = reason === 'admin_not_head';
   const authDeptMeta = authorizedDepartment ? DEPARTMENTS[authorizedDepartment] : null;
   const reqDeptLabel =
     requestedDepartment && isDepartmentKey(requestedDepartment)
@@ -40,20 +41,41 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
         <div className="p-6 sm:p-8">
           <div className="text-center">
             <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-rose-400/25 bg-rose-400/[0.07] text-rose-300">
-              {isMismatch ? (
+              {isMismatch || isAdminNotHead ? (
                 <ShieldAlert className="h-5 w-5" aria-hidden="true" />
               ) : (
                 <ShieldX className="h-5 w-5" aria-hidden="true" />
               )}
             </span>
-            <h1 className="wm-serif mt-4 text-[26px] text-white">Access denied</h1>
+            <h1 className="wm-serif mt-4 text-[26px] text-white">
+              {isAdminNotHead ? 'Administrator Session' : 'Access denied'}
+            </h1>
             <p className="mt-1 text-[9.5px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-              {isMismatch ? 'Unauthorized department route' : 'No active head assignment'}
+              {isAdminNotHead
+                ? 'IT Super Admin / Organiser Account'
+                : isMismatch
+                ? 'Unauthorized department route'
+                : 'No active head assignment'}
             </p>
           </div>
 
           <div className="mt-6">
-            {isMismatch ? (
+            {isAdminNotHead ? (
+              <div className="space-y-3">
+                <p className="text-[11.5px] leading-relaxed text-neutral-300">
+                  You are signed in as an administrator (<span className="font-mono text-[#d4af37]">{email}</span>).
+                </p>
+                <div className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/[0.05] p-3 text-[11px] text-neutral-300 space-y-2">
+                  <div className="font-semibold text-white flex items-center gap-1.5">
+                    <span>How to test department head portals:</span>
+                  </div>
+                  <p className="text-[10.5px] text-neutral-400">
+                    Administrator accounts are stored in <code className="text-[#d4af37] font-mono">public.admins</code>, not <code className="text-[#d4af37] font-mono">public.department_heads</code>.
+                    To test a department portal, open the <strong>IT Super Admin</strong> panel and click <strong>Login</strong> beside any department head account.
+                  </p>
+                </div>
+              </div>
+            ) : isMismatch ? (
               <div className="space-y-3">
                 <p className="text-[11.5px] leading-relaxed text-neutral-400">
                   You are signed in as an authorized department head, but your assignment does not
@@ -103,7 +125,7 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
             )}
           </div>
 
-          {!isMismatch && (
+          {!isMismatch && !isAdminNotHead && (
             <Notice tone="info" className="mt-4">
               <span className="inline-flex items-start gap-2">
                 <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-400" aria-hidden="true" />
@@ -116,7 +138,12 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
           )}
 
           <div className="mt-6 flex flex-col gap-2 border-t border-white/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">
-            {isMismatch && onGoToAuthorizedDashboard ? (
+            {isAdminNotHead ? (
+              <a href="/admin" className={btnPrimary}>
+                Go to IT Super Admin Dashboard
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            ) : isMismatch && onGoToAuthorizedDashboard ? (
               <button type="button" onClick={onGoToAuthorizedDashboard} className={btnPrimary}>
                 Go to my dashboard
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />

@@ -7,6 +7,7 @@ import {
   getDepartmentDashboardUrl,
   getRoleTitle,
   lookupHeadAssignment,
+  isDepartmentKey,
   type HeadAssignment,
   type DepartmentKey,
   type SectionKey,
@@ -15,7 +16,7 @@ import { supabase, supabaseConfigured } from '../lib/supabase';
 import { Loader2, Shield } from 'lucide-react';
 
 interface AccessDeniedState {
-  reason: 'no_assignment' | 'department_mismatch';
+  reason: 'no_assignment' | 'department_mismatch' | 'admin_not_head';
   email?: string;
   userId?: string;
   requestedDept?: string;
@@ -137,58 +138,84 @@ export default function HeadPortal() {
       let activeTestMode: TestModeState | null = null;
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
-        const testTicket = urlParams.get('test_ticket');
+        const testTicketOrToken = urlParams.get('test_token') || urlParams.get('test_ticket');
 
-        if (testTicket) {
+        if (testTicketOrToken) {
           try {
-            // Exchange single-use launch ticket for session token
-            const resp = await fetch(`/api/super-admin?action=consume-ticket&ticket=${encodeURIComponent(testTicket)}`);
-            const data = await resp.json();
-            if (resp.ok && data?.success && data?.sessionToken) {
+            // First attempt: verify signed test token directly
+            let verifyResp = await fetch(
+              `/api/super-admin?action=verify-test-session&token=${encodeURIComponent(testTicketOrToken)}`
+            );
+            let verifyData = await verifyResp.json().catch(() => ({}));
+
+            // Fallback: exchange single-use launch ticket if not verified as direct token
+            if (!verifyResp.ok || !verifyData?.authorized) {
+              const consumeResp = await fetch(
+                `/api/super-admin?action=consume-ticket&ticket=${encodeURIComponent(testTicketOrToken)}`
+              );
+              const consumeData = await consumeResp.json().catch(() => ({}));
+              if (consumeResp.ok && consumeData?.success) {
+                verifyResp = consumeResp;
+                verifyData = consumeData;
+              }
+            }
+
+            if (verifyResp.ok && (verifyData?.authorized || verifyData?.success) && verifyData?.head) {
+              const sessionToken = verifyData.sessionToken || testTicketOrToken;
               const testSess = {
-                token: data.sessionToken,
-                adminEmail: data.adminEmail,
-                expiresAt: data.expiresAt,
+                token: sessionToken,
+                adminEmail: verifyData.adminEmail || 'diavlo3444@gmail.com',
+                expiresAt: verifyData.expiresAt,
               };
               sessionStorage.setItem('westmun_super_it_test_session', JSON.stringify(testSess));
               activeTestMode = {
                 isActive: true,
-                adminEmail: data.adminEmail,
-                token: data.sessionToken,
-                expiresAt: data.expiresAt,
+                adminEmail: verifyData.adminEmail || 'diavlo3444@gmail.com',
+                token: sessionToken,
+                expiresAt: verifyData.expiresAt,
                 crossDeptAccess: true,
               };
               setTestMode(activeTestMode);
 
-              // Strip ticket param from URL to prevent reuse
+              // Strip ticket/token params from URL to prevent reuse
+              urlParams.delete('test_token');
               urlParams.delete('test_ticket');
               const newSearch = urlParams.toString();
               const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}${window.location.hash || ''}`;
               window.history.replaceState({}, '', newUrl);
 
-              if (data.head) {
-                const dept = data.head.department as DepartmentKey;
-                const sec = data.head.section as SectionKey | null;
-                const testAssignment: HeadAssignment = {
-                  department: dept,
-                  section: sec,
-                  headName: data.head.headName || null,
-                  headEmail: data.head.email || null,
-                  roleTitle: getRoleTitle(dept, sec),
-                };
-                setHeadUser(data.head);
-                setAssignment(testAssignment);
-                setAccessDeniedState(null);
-                setLoading(false);
-                return;
-              }
+              const dept = verifyData.head.department as DepartmentKey;
+              const sec = verifyData.head.section as SectionKey | null;
+              const testAssignment: HeadAssignment = {
+                department: dept,
+                section: sec,
+                headName: verifyData.head.headName || null,
+                headEmail: verifyData.head.email || null,
+                roleTitle: getRoleTitle(dept, sec),
+              };
+              setHeadUser(verifyData.head);
+              setAssignment(testAssignment);
+              setAccessDeniedState(null);
+              setLoading(false);
+              return;
             } else {
-              setAuthError(data?.error || 'Test mode launch ticket was invalid or expired.');
+              setAuthError(verifyData?.error || 'Super IT test session token was invalid or expired.');
               sessionStorage.removeItem('westmun_super_it_test_session');
               setTestMode(null);
+              // Clean ticket from URL
+              urlParams.delete('test_token');
+              urlParams.delete('test_ticket');
+              const newSearch = urlParams.toString();
+              const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}${window.location.hash || ''}`;
+              window.history.replaceState({}, '', newUrl);
+              setLoading(false);
+              return; // Stop here! Do NOT fall through to checking Supabase admin account!
             }
           } catch (ticketErr) {
-            console.error('[Head Portal] Test ticket consumption error:', ticketErr);
+            console.error('[Head Portal] Test session initialization error:', ticketErr);
+            setAuthError('Failed to initialize Super IT test session.');
+            setLoading(false);
+            return;
           }
         } else {
           // Check existing session token in sessionStorage
@@ -197,12 +224,14 @@ export default function HeadPortal() {
             try {
               const parsed = JSON.parse(stored);
               if (parsed?.token) {
-                const verifyResp = await fetch(`/api/super-admin?action=verify-test-session&token=${encodeURIComponent(parsed.token)}`);
-                const verifyData = await verifyResp.json();
+                const verifyResp = await fetch(
+                  `/api/super-admin?action=verify-test-session&token=${encodeURIComponent(parsed.token)}`
+                );
+                const verifyData = await verifyResp.json().catch(() => ({}));
                 if (verifyResp.ok && verifyData?.authorized && verifyData?.head) {
                   activeTestMode = {
                     isActive: true,
-                    adminEmail: verifyData.adminEmail || parsed.adminEmail,
+                    adminEmail: verifyData.adminEmail || parsed.adminEmail || 'diavlo3444@gmail.com',
                     token: parsed.token,
                     expiresAt: verifyData.expiresAt || parsed.expiresAt,
                     crossDeptAccess: true,
@@ -235,7 +264,7 @@ export default function HeadPortal() {
         }
       }
 
-      // 1. Check Supabase Auth Session first
+      // 1. Check Supabase Auth Session (for normal department heads)
       let resolvedHead: any = null;
       let resolvedAssignment: HeadAssignment | null = null;
       let deniedInfo: AccessDeniedState | null = null;
@@ -284,8 +313,10 @@ export default function HeadPortal() {
               };
               setAuthError(lookup.message || 'Access denied for this department head account.');
             } else if (lookup.status === 'not_found') {
+              const emailLower = (supaUser.email || '').toLowerCase().trim();
+              const isSuper = emailLower === 'diavlo3444@gmail.com' || emailLower === 'yousefasaifi@gmail.com';
               deniedInfo = {
-                reason: 'no_assignment',
+                reason: isSuper ? 'admin_not_head' : 'no_assignment',
                 email: supaUser.email,
                 userId: supaUser.id,
               };
@@ -592,10 +623,21 @@ export default function HeadPortal() {
       ? ('department' as const)
       : undefined;
 
+  // In Super IT Test Mode, if navigating to a specific department URL, allow testing that department
+  const activeDept =
+    testMode?.isActive && requestedDeptSlug && isDepartmentKey(requestedDeptSlug)
+      ? (requestedDeptSlug as DepartmentKey)
+      : assignment.department;
+
+  const activeSec =
+    testMode?.isActive && requestedDeptSlug && isDepartmentKey(requestedDeptSlug)
+      ? (isGenderSeparated(activeDept) ? (requestedSectionSlug as SectionKey) || 'male' : null)
+      : assignment.section;
+
   return (
     <DepartmentDashboard
-      department={assignment.department}
-      section={assignment.section}
+      department={activeDept}
+      section={activeSec}
       headName={assignment.headName || undefined}
       headEmail={headUser.email}
       initialView={initialView}
