@@ -12,6 +12,7 @@ import {
   Flame,
   type LucideIcon,
 } from 'lucide-react';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 
 export type DepartmentKey =
   | 'design'
@@ -270,7 +271,6 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
   }
 
   // 2. Supabase fallback if configured
-  const { supabase, supabaseConfigured } = await import('../lib/supabase');
   if (!supabaseConfigured || !supabase || !userId) {
     return {
       status: 'not_found',
@@ -282,7 +282,7 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
     // RLS still restricts this to the caller's own row.
     const { data, error } = await supabase
       .from('department_heads')
-      .select('department, section, active, head_name, email')
+      .select('user_id, id, department, section, active, head_name, email')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -292,6 +292,19 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
         code: error.code,
         message: error.message,
       });
+
+      // Distinguish auth session / expired errors
+      if (
+        /auth session missing|jwt expired|invalid claim|unauthorized/i.test(
+          error.message || ''
+        )
+      ) {
+        return {
+          status: 'permission_denied',
+          code: 'SESSION_EXPIRED',
+          message: 'Your authenticated session has expired. Please sign in again.',
+        };
+      }
 
       // Distinguish RLS / permission denial
       const isPermission =
@@ -334,9 +347,23 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
       return { status: 'not_found' };
     }
 
+    // Explicitly verify the authenticated user ID matches the row's user_id or id
+    const rowUserId = (data as any).user_id || (data as any).id;
+    if (rowUserId && rowUserId !== userId) {
+      return {
+        status: 'not_found',
+        message: 'Department head assignment does not match authenticated user ID.',
+      };
+    }
+
     // Suspended heads keep their row but must lose portal access.
     if (data.active === false) {
-      return { status: 'not_found' };
+      return {
+        status: 'permission_denied',
+        code: 'ACCOUNT_DEACTIVATED',
+        message:
+          'Your department head account has been deactivated. Please contact the Secretariat (diavlo3444@gmail.com).',
+      };
     }
 
     // Validate department

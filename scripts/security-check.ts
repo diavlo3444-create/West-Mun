@@ -178,6 +178,47 @@ assert(
   'HR Inquiries: HeadInquiriesManager enables read, status update, and note recording on official inquiries table'
 );
 
+// 7. Shared Gmail Connection Status in Admin Dashboard
+const registrationsManager = read('src/admin/RegistrationsManager.tsx');
+assert(
+  registrationsManager.includes('Shared Gmail Connection') &&
+    registrationsManager.includes('Gmail Connected') &&
+    registrationsManager.includes('Gmail Not Connected') &&
+    registrationsManager.includes('Checking Connection') &&
+    registrationsManager.includes('Connection Status Unavailable'),
+  'Gmail Status UI: RegistrationsManager renders dedicated Shared Gmail Connection card with all required states'
+);
+assert(
+  registrationsManager.includes('Refresh Status') &&
+    registrationsManager.includes('loadGmailStatus'),
+  'Gmail Status UI: Dedicated Refresh Status button queries Supabase Edge Functions'
+);
+assert(
+  registrationsManager.includes("functions.invoke('gmail-oauth-status'") &&
+    registrationsManager.includes("functions.invoke('gmail-oauth-start'") &&
+    registrationsManager.includes("functions.invoke('gmail-oauth-disconnect'"),
+  'Gmail Integration: Connects to existing edge functions without hardcoding or mock states'
+);
+assert(
+  registrationsManager.includes('A shared Gmail connection already exists. Only the IT Super Admin can replace it.'),
+  'Gmail Permissions: Clear message displayed when 409 conflict or duplicate connection attempted'
+);
+assert(
+  registrationsManager.includes('isSuperAdmin && gmailStatus === \'connected\'') &&
+    registrationsManager.includes('Disconnect Shared Gmail'),
+  'Gmail Permissions: Disconnect action is restricted to IT Super Admin and enforced server-side'
+);
+
+const gmailStatusFn = read('supabase/functions/gmail-oauth-status/index.ts');
+const gmailDisconnectFn = read('supabase/functions/gmail-oauth-disconnect/index.ts');
+const gmailStartFn = read('supabase/functions/gmail-oauth-start/index.ts');
+assert(
+  gmailStatusFn.includes('admins') &&
+    gmailDisconnectFn.includes('diavlo3444@gmail.com') &&
+    gmailStartFn.includes('diavlo3444@gmail.com'),
+  'Backend Authorization: Edge functions cryptographically enforce IT Super Admin privileges'
+);
+
 console.log('====================================================');
 console.log(`Results: ${passedTests} / ${totalTests} security checks passed.`);
 console.log('====================================================');

@@ -27,7 +27,16 @@ import { Notice, btnPrimary, inputCls, labelCls } from '../dashboard/ui';
 export { type HeadAssignment };
 
 export interface HeadLoginProps {
-  onSuccess?: (assignment: HeadAssignment) => void;
+  onSuccess?: (
+    assignment: HeadAssignment,
+    headUser?: {
+      id: string;
+      email: string;
+      headName?: string;
+      department: DepartmentKey;
+      section: SectionKey | null;
+    }
+  ) => void;
   authError?: string;
 }
 
@@ -43,6 +52,12 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
     email?: string;
     userId?: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   // Forgot-password request state
   const [forgotMode, setForgotMode] = useState(false);
@@ -145,7 +160,16 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
   /**
    * Redirect user to their specific department and section dashboard
    */
-  const navigateToDashboard = (assignment: HeadAssignment) => {
+  const navigateToDashboard = (
+    assignment: HeadAssignment,
+    headUser?: {
+      id: string;
+      email: string;
+      headName?: string;
+      department: DepartmentKey;
+      section: SectionKey | null;
+    }
+  ) => {
     // Reset unlock session key so fresh login displays the cinematic unlock sequence
     try {
       const sessionUnlockKey = `wm_head_unlocked_${assignment.department}_${assignment.section || 'main'}`;
@@ -153,7 +177,7 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
     } catch {}
 
     if (onSuccess) {
-      onSuccess(assignment);
+      onSuccess(assignment, headUser);
       return;
     }
 
@@ -191,7 +215,17 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
         const lookup = await lookupHeadAssignment(supaData.user.id);
         if (lookup.status === 'success' && lookup.assignment) {
           setBusy(false);
-          navigateToDashboard(lookup.assignment);
+          const resolvedUser = {
+            id: supaData.user.id,
+            email: lookup.assignment.headEmail || supaData.user.email || cleanEmail,
+            headName:
+              lookup.assignment.headName ||
+              (supaData.user.user_metadata?.full_name as string | undefined) ||
+              '',
+            department: lookup.assignment.department,
+            section: lookup.assignment.section,
+          };
+          navigateToDashboard(lookup.assignment, resolvedUser);
           return;
         }
 

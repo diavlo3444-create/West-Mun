@@ -30,6 +30,6 @@ export const supabaseConfigured = Boolean(rawUrl && rawKey && /^https:\/\//.test
 
 export const supabase: SupabaseClient | null = supabaseConfigured
   ? createClient(rawUrl as string, rawKey as string, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     })
   : null;

@@ -34,6 +34,9 @@ type HeadView = 'overview' | 'registrations' | 'department' | 'sponsors' | 'inqu
 
 function explainAccessError(error: { code?: string; message?: string } | null | undefined): string {
   if (!error) return '';
+  if (/auth session missing|jwt expired|session expired|invalid claim/i.test(error.message || '')) {
+    return 'Your session has expired. Please sign in again to access department records.';
+  }
   if (
     error.code === '42501' ||
     error.code === 'PGRST301' ||

@@ -45,8 +45,9 @@ export default function HeadPortal() {
   const requestedDeptSlug = segments[1];
   const requestedSectionSlug = segments[2];
 
-  // For /head route, loading starts as false so login form displays immediately
-  const [loading, setLoading] = useState(!isBaseHead);
+  // For /head route or protected routes, start with loading=true while verifying session
+  const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState('');
 
   /**
    * Handle session verification and route authorization via Supabase Auth & /api/head-auth
@@ -54,10 +55,25 @@ export default function HeadPortal() {
   useEffect(() => {
     let active = true;
 
+    // Listen to real-time Supabase Auth state changes
+    let authSub: { subscription: { unsubscribe: () => void } } | null = null;
+    if (supabase) {
+      const { data } = supabase.auth.onAuthStateChange((event, s) => {
+        if (!active) return;
+        if (event === 'SIGNED_OUT' || !s) {
+          setHeadUser(null);
+          setAssignment(null);
+          setLoading(false);
+        }
+      });
+      authSub = data;
+    }
+
     const verifyAccess = async () => {
       // 1. Check Supabase Auth Session first
       let resolvedHead: any = null;
       let resolvedAssignment: HeadAssignment | null = null;
+      let deniedInfo: AccessDeniedState | null = null;
 
       if (supabase && supabaseConfigured) {
         try {
@@ -77,6 +93,19 @@ export default function HeadPortal() {
                 department: lookup.assignment.department,
                 section: lookup.assignment.section,
               };
+            } else if (lookup.status === 'permission_denied') {
+              deniedInfo = {
+                reason: 'no_assignment',
+                email: supaUser.email,
+                userId: supaUser.id,
+              };
+              setAuthError(lookup.message || 'Access denied for this department head account.');
+            } else if (lookup.status === 'not_found') {
+              deniedInfo = {
+                reason: 'no_assignment',
+                email: supaUser.email,
+                userId: supaUser.id,
+              };
             }
           }
         } catch (err) {
@@ -90,7 +119,7 @@ export default function HeadPortal() {
         !import.meta.env.PROD && typeof window !== 'undefined'
           ? sessionStorage.getItem('westmun_head_session')
           : null;
-      if (!resolvedHead && token) {
+      if (!resolvedHead && !deniedInfo && token) {
         try {
           const resp = await fetch('/api/head-auth?action=session', {
             headers: { Authorization: `Bearer ${token}` },
@@ -105,6 +134,7 @@ export default function HeadPortal() {
                 department: dept,
                 section: sec,
                 headName: data.head.headName || null,
+                headEmail: data.head.email || null,
                 roleTitle: getRoleTitle(dept, sec),
               };
               resolvedHead = data.head;
@@ -119,45 +149,64 @@ export default function HeadPortal() {
 
       if (!active) return;
 
-      // -------------------------------------------------------------
-      // Case A: User is on the base Head Portal route (/head)
-      // -------------------------------------------------------------
-      if (isBaseHead) {
-        if (!resolvedHead || !resolvedAssignment) {
-          if (active) setLoading(false);
-          return;
-        }
-
-        setHeadUser(resolvedHead);
-        setAssignment(resolvedAssignment);
-        const targetUrl = getDepartmentDashboardUrl(resolvedAssignment.department, resolvedAssignment.section);
-        window.location.replace(targetUrl);
+      if (deniedInfo) {
+        setAccessDeniedState(deniedInfo);
+        setLoading(false);
         return;
       }
 
       // -------------------------------------------------------------
-      // Case B: User requested a protected department URL (/head/:dept)
+      // Case 1: Unauthenticated
       // -------------------------------------------------------------
       if (!resolvedHead || !resolvedAssignment) {
-        window.location.replace('/head');
+        setHeadUser(null);
+        setAssignment(null);
+        if (!isBaseHead) {
+          try {
+            window.history.replaceState({}, '', '/head');
+          } catch {}
+          setAuthError('Your session has expired or authentication is required. Please sign in.');
+        }
+        setLoading(false);
         return;
       }
+
+      // -------------------------------------------------------------
+      // Case 2: Authenticated Department Head
+      // -------------------------------------------------------------
+      setHeadUser(resolvedHead);
+      setAssignment(resolvedAssignment);
 
       const dept = resolvedAssignment.department;
       const sec = resolvedAssignment.section;
+      const canonicalTarget = getDepartmentDashboardUrl(dept, sec);
 
-      setHeadUser(resolvedHead);
-      setAssignment(resolvedAssignment);
+      // On base /head route, redirect smoothly to canonical department URL
+      if (isBaseHead) {
+        try {
+          window.history.replaceState({}, '', canonicalTarget);
+        } catch {}
+        setLoading(false);
+        return;
+      }
 
       // Check department & section authorization
       const deptMismatch = requestedDeptSlug !== dept;
       const sectionMismatch =
         isGenderSeparated(dept) &&
-        requestedSectionSlug !== sec;
+        requestedSectionSlug &&
+        requestedSectionSlug !== sec &&
+        requestedSectionSlug !== 'sponsors' &&
+        requestedSectionSlug !== 'inquiries' &&
+        requestedSectionSlug !== 'registrations' &&
+        requestedSectionSlug !== 'department';
 
-      // Missing section on gender-separated department -> redirect to exact section
+      // Missing section on gender-separated department -> update URL to exact section
       if (!deptMismatch && isGenderSeparated(dept) && !requestedSectionSlug && sec) {
-        window.location.replace(getDepartmentDashboardUrl(dept, sec));
+        try {
+          window.history.replaceState({}, '', canonicalTarget);
+        } catch {}
+        setLoading(false);
         return;
       }
 
@@ -183,6 +232,7 @@ export default function HeadPortal() {
 
     return () => {
       active = false;
+      authSub?.subscription?.unsubscribe();
     };
   }, [isBaseHead, requestedDeptSlug, requestedSectionSlug]);
 
@@ -217,23 +267,14 @@ export default function HeadPortal() {
     setHeadUser(null);
     setAssignment(null);
     setAccessDeniedState(null);
-    window.location.assign('/head');
+    setAuthError('');
+    try {
+      window.history.replaceState({}, '', '/head');
+    } catch {}
+    setLoading(false);
   }, []);
 
-  // 1. When visiting /head: Always display Head Portal sign-in form immediately
-  if (isBaseHead) {
-    return (
-      <HeadLogin
-        onSuccess={(newAssign) => {
-          setAssignment(newAssign);
-          const target = getDepartmentDashboardUrl(newAssign.department, newAssign.section);
-          window.location.assign(target);
-        }}
-      />
-    );
-  }
-
-  // 2. Loading state for protected department routes
+  // 1. Loading state while verifying credentials or restoring session
   if (loading) {
     return (
       <div className="wm-app flex min-h-screen flex-col items-center justify-center px-4 py-12">
@@ -250,7 +291,7 @@ export default function HeadPortal() {
     );
   }
 
-  // 3. Access Denied (department/section mismatch)
+  // 2. Access Denied (department/section mismatch or unregistered user)
   if (accessDeniedState) {
     return (
       <AccessDenied
@@ -268,7 +309,10 @@ export default function HeadPortal() {
                   assignment.department,
                   assignment.section
                 );
-                window.location.assign(canonical);
+                try {
+                  window.history.pushState({}, '', canonical);
+                } catch {}
+                setAccessDeniedState(null);
               }
             : undefined
         }
@@ -277,20 +321,35 @@ export default function HeadPortal() {
     );
   }
 
-  // 4. Not logged in on protected route -> fallback to HeadLogin
+  // 3. Not logged in -> Render HeadLogin
   if (!headUser || !assignment) {
     return (
       <HeadLogin
-        onSuccess={(newAssign) => {
+        authError={authError}
+        onSuccess={(newAssign, user) => {
+          setAuthError('');
+          const resolved = user || {
+            id: '',
+            email: newAssign.headEmail || '',
+            headName: newAssign.headName || '',
+            department: newAssign.department,
+            section: newAssign.section,
+          };
+          setHeadUser(resolved);
           setAssignment(newAssign);
+          setAccessDeniedState(null);
+          setLoading(false);
+
           const target = getDepartmentDashboardUrl(newAssign.department, newAssign.section);
-          window.location.assign(target);
+          try {
+            window.history.pushState({}, '', target);
+          } catch {}
         }}
       />
     );
   }
 
-  // 5. Authorized department head -> Render Department Dashboard
+  // 4. Authorized department head -> Render Department Dashboard
   const initialView =
     requestedSectionSlug === 'sponsors'
       ? ('sponsors' as const)

@@ -34,6 +34,7 @@ import {
   Notice,
   PageHeader,
   Panel,
+  PanelHeader,
   SegmentedTabs,
   Skeleton,
   StatusBadge,
@@ -134,8 +135,12 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | 'delete' | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
   const [gmailBusy, setGmailBusy] = useState(false);
-  const [gmailStatus, setGmailStatus] = useState('loading');
+  const [gmailStatus, setGmailStatus] = useState<
+    'loading' | 'connected' | 'not_connected' | 'reconnect_required' | 'configuration_error' | 'error'
+  >('loading');
   const [gmailAddress, setGmailAddress] = useState<string | null>(null);
+  const [gmailConnectedAt, setGmailConnectedAt] = useState<string | null>(null);
+  const [gmailErrorMessage, setGmailErrorMessage] = useState<string>('');
   const [disconnectBusy, setDisconnectBusy] = useState(false);
   const [emailBusy, setEmailBusy] = useState(false);
   const [gmailNotice, setGmailNotice] = useState<{ tone: 'success' | 'error' | 'info'; text: string } | null>(null);
@@ -163,26 +168,87 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   }, []);
 
   const loadGmailStatus = async () => {
-    if (!supabase) { setGmailStatus("error"); return; }
-    try { const result = await supabase.functions.invoke("gmail-oauth-status", { body: {} });
-      if (result.error || !result.data) { setGmailStatus("error"); return; }
-      setGmailStatus(result.data.status || (result.data.connected ? "connected" : "not_connected"));
-      setGmailAddress(typeof result.data.email === "string" ? result.data.email : null);
-      if (result.data.message && result.data.status !== "connected") setGmailNotice({ tone: "error", text: result.data.message });
-    } catch { setGmailStatus("error"); }
+    if (!supabase) {
+      setGmailStatus('error');
+      setGmailErrorMessage('Supabase client is not available.');
+      return;
+    }
+    setGmailStatus('loading');
+    setGmailErrorMessage('');
+    try {
+      const result = await supabase.functions.invoke('gmail-oauth-status', { body: {} });
+      if (result.error) {
+        let msg = '';
+        try {
+          const body = await (result.error as any)?.context?.json();
+          if (body?.message) msg = body.message;
+          else if (body?.error) msg = body.error;
+        } catch {}
+        if (!msg) {
+          msg = result.error.message || 'Edge function error occurred.';
+        }
+        setGmailStatus('error');
+        setGmailErrorMessage(msg);
+        return;
+      }
+      if (!result.data) {
+        setGmailStatus('error');
+        setGmailErrorMessage('No data returned from backend.');
+        return;
+      }
+      const data = result.data;
+      if (data.status === 'connected' || data.connected === true) {
+        setGmailStatus('connected');
+        setGmailAddress(typeof data.email === 'string' ? data.email : null);
+        setGmailConnectedAt(typeof data.connected_at === 'string' ? data.connected_at : null);
+      } else if (data.status === 'not_connected') {
+        setGmailStatus('not_connected');
+        setGmailAddress(null);
+        setGmailConnectedAt(null);
+      } else if (data.status === 'reconnect_required') {
+        setGmailStatus('reconnect_required');
+        setGmailAddress(typeof data.email === 'string' ? data.email : null);
+        setGmailConnectedAt(null);
+        setGmailErrorMessage(data.message || 'Google authorization was revoked or expired. An authorized admin must reconnect.');
+      } else if (data.status === 'configuration_error') {
+        setGmailStatus('configuration_error');
+        setGmailConnectedAt(null);
+        setGmailErrorMessage(data.message || 'Gmail server configuration is incomplete.');
+      } else {
+        setGmailStatus('error');
+        setGmailConnectedAt(null);
+        setGmailErrorMessage(data.message || data.error || 'Could not verify Gmail status.');
+      }
+    } catch (err: any) {
+      setGmailStatus('error');
+      setGmailErrorMessage(err?.message || 'Could not reach Supabase Edge Functions.');
+    }
   };
   React.useEffect(() => { void loadGmailStatus(); }, []);
 
   const disconnectGmail = async () => {
     if (!supabase || !isSuperAdmin || disconnectBusy) return;
-    if (!window.confirm("Disconnect the shared Gmail account for every admin? Acceptance emails will stop until it is reconnected.")) return;
+    if (!window.confirm('Disconnect the shared Gmail account for every admin? Acceptance emails will stop until it is reconnected.')) return;
     setDisconnectBusy(true);
     try {
-      const result = await supabase.functions.invoke("gmail-oauth-disconnect", { body: { confirm: true } });
-      if (result.error || !result.data?.success) setGmailNotice({ tone: "error", text: result.data?.error || result.error?.message || "Could not disconnect shared Gmail." });
-      else { setGmailNotice({ tone: "info", text: "Shared Gmail disconnected for all admins." }); await loadGmailStatus(); }
-    } catch { setGmailNotice({ tone: "error", text: "Could not disconnect shared Gmail." }); }
-    finally { setDisconnectBusy(false); }
+      const result = await supabase.functions.invoke('gmail-oauth-disconnect', { body: { confirm: true } });
+      if (result.error || !result.data?.success) {
+        let msg = '';
+        try {
+          const body = await (result.error as any)?.context?.json();
+          if (body?.error) msg = body.error;
+        } catch {}
+        if (!msg) msg = result.data?.error || result.error?.message || 'Could not disconnect shared Gmail.';
+        setGmailNotice({ tone: 'error', text: msg });
+      } else {
+        setGmailNotice({ tone: 'info', text: 'Shared Gmail disconnected for all admins.' });
+        await loadGmailStatus();
+      }
+    } catch {
+      setGmailNotice({ tone: 'error', text: 'Could not disconnect shared Gmail.' });
+    } finally {
+      setDisconnectBusy(false);
+    }
   };
 
   const connectGmail = async () => {
@@ -192,7 +258,21 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('gmail-oauth-start', { body: {} });
       if (invokeError || !data?.authorization_url) {
-        setGmailNotice({ tone: 'error', text: data?.error || invokeError?.message || 'Could not start Gmail authorization.' });
+        let errText = '';
+        try {
+          const body = await (invokeError as any)?.context?.json();
+          if (body?.error) errText = body.error;
+          else if (body?.message) errText = body.message;
+        } catch {}
+        if (!errText) {
+          errText = data?.error || invokeError?.message || '';
+        }
+        if (errText.includes('already exists') || (invokeError as any)?.context?.status === 409) {
+          errText = 'A shared Gmail connection already exists. Only the IT Super Admin can replace it.';
+        } else if (!errText || errText.includes('non-2xx')) {
+          errText = 'Could not start Gmail authorization. Check server configuration and try again.';
+        }
+        setGmailNotice({ tone: 'error', text: errText });
         return;
       }
       window.location.assign(data.authorization_url);
@@ -489,10 +569,6 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         description="Review every application in one place. Decisions and private notes are written straight to Supabase."
         actions={
           <>
-            <button type="button" onClick={connectGmail} className={btnGhost} disabled={gmailBusy || gmailStatus === "loading" || gmailStatus === "connected" || gmailStatus === "configuration_error" || (gmailStatus === "reconnect_required" && !isSuperAdmin)}>
-              {gmailBusy || gmailStatus === "loading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Mail className="h-3.5 w-3.5" aria-hidden="true" /> }
-              {gmailStatus === "reconnect_required" ? "Reconnect Gmail" : "Connect Gmail"}
-            </button>
             <button type="button" onClick={onRefresh} className={btnSecondary} disabled={loading}>
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
               Refresh
@@ -515,34 +591,283 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
           {error}
         </Notice>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-white/[0.08] bg-white/[0.02] px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-neutral-400">Shared Gmail connection</p>
-          <p className={"mt-1 text-xs font-medium " + (gmailStatus === "connected" ? "text-emerald-300" : "text-amber-300")}>
-            {gmailStatus === "connected" ? "Gmail Connected" : gmailStatus === "loading" ? "Checking Gmail connection…" : gmailStatus === "reconnect_required" ? "Gmail authorization expired or revoked — reconnect required" : gmailStatus === "configuration_error" ? "Gmail configuration error — check OAuth settings" : gmailStatus === "not_connected" ? "Gmail Not Connected" : "Could not verify Gmail status"}
-          </p>
-          {gmailStatus === "connected" && gmailAddress && <p className="mt-0.5 text-[11px] text-neutral-300">{gmailAddress}</p>}
-          <p className="mt-1 text-[10px] text-neutral-400">One encrypted backend connection is shared by authorized admins. Acceptance emails are never sent automatically.</p>
+
+      {/* Dedicated Card: Shared Gmail Connection */}
+      <Panel className="border-white/[0.09] bg-gradient-to-b from-[#121217] to-[#0c0c0f]">
+        <PanelHeader
+          eyebrow="Integration"
+          title="Shared Gmail Connection"
+          description="One encrypted backend connection is shared by all authorized admins. Acceptance emails are never sent automatically."
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void loadGmailStatus()}
+                className={btnSecondary}
+                disabled={gmailStatus === 'loading'}
+                title="Refresh Gmail status from backend"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${gmailStatus === 'loading' ? 'animate-spin' : ''}`}
+                  aria-hidden="true"
+                />
+                <span>Refresh Status</span>
+              </button>
+              {isSuperAdmin && gmailStatus === 'connected' && (
+                <button
+                  type="button"
+                  onClick={disconnectGmail}
+                  className={btnDanger}
+                  disabled={disconnectBusy}
+                  title="Disconnect the shared Gmail account for all admins"
+                >
+                  {disconnectBusy ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      <span>Disconnecting…</span>
+                    </>
+                  ) : (
+                    <span>Disconnect Shared Gmail</span>
+                  )}
+                </button>
+              )}
+            </div>
+          }
+        />
+
+        <div className="p-5">
+          {/* State 1: Checking Connection */}
+          {gmailStatus === 'loading' && (
+            <div className="flex items-center gap-3.5 py-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#d4af37]" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold text-neutral-200">Checking Connection…</p>
+                <p className="mt-0.5 text-[11px] text-neutral-400">
+                  Querying the Supabase Edge Function for shared Gmail credentials.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* State 2: Gmail Connected */}
+          {gmailStatus === 'connected' && (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <span className="relative flex h-3.5 w-3.5 mt-0.5 sm:mt-0 shrink-0 items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                </span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-emerald-400">Gmail Connected</span>
+                    {gmailAddress && (
+                      <span className="rounded border border-emerald-500/30 bg-emerald-950/40 px-2 py-0.5 font-mono text-xs text-emerald-200">
+                        {gmailAddress}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] text-neutral-400">
+                    Acceptance emails are ready to send manually from the delegate dossier.
+                    {gmailConnectedAt && (
+                      <span className="ml-1 text-neutral-400">
+                        Connected on{' '}
+                        {new Date(gmailConnectedAt).toLocaleDateString(undefined, {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                        .
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {!isSuperAdmin && (
+                <div className="rounded border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[10.5px] font-mono text-neutral-400">
+                  Shared connection active · Managed by IT Super Admin
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* State 3: Gmail Not Connected */}
+          {gmailStatus === 'not_connected' && (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <span className="h-3 w-3 mt-0.5 sm:mt-0 shrink-0 rounded-full bg-neutral-600 ring-2 ring-neutral-800"></span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-neutral-300">Gmail Not Connected</span>
+                    <span className="rounded border border-neutral-700 bg-neutral-800/60 px-1.5 py-0.2 font-mono text-[10px] text-neutral-400">
+                      Inactive
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-neutral-400">
+                    No shared Gmail account is currently linked. Connect an account to enable manual acceptance emails.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={connectGmail}
+                  className={btnPrimary}
+                  disabled={gmailBusy}
+                >
+                  {gmailBusy ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-black" aria-hidden="true" />
+                      <span>Connecting…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-3.5 w-3.5 text-black" aria-hidden="true" />
+                      <span>Connect Gmail</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* State 4: Connection Status Unavailable */}
+          {gmailStatus === 'error' && (
+            <div className="rounded-md border border-rose-500/25 bg-rose-950/20 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" aria-hidden="true" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-rose-300">Connection Status Unavailable</span>
+                      <span className="rounded border border-rose-500/30 bg-rose-950/40 px-1.5 py-0.2 font-mono text-[10px] text-rose-300">
+                        Error
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-rose-200/80">
+                      {gmailErrorMessage || 'Could not verify the shared Gmail connection with the Supabase Edge Function.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => void loadGmailStatus()}
+                    className={btnSecondary}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Retry</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* State 5: Reconnect Required */}
+          {gmailStatus === 'reconnect_required' && (
+            <div className="rounded-md border border-amber-500/25 bg-amber-950/20 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" aria-hidden="true" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-amber-300">Reconnect Required</span>
+                      <span className="rounded border border-amber-500/30 bg-amber-950/40 px-1.5 py-0.2 font-mono text-[10px] text-amber-300">
+                        Expired / Revoked
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-amber-200/80">
+                      {gmailErrorMessage || 'Google authorization was revoked or expired. An authorized admin must reconnect.'}
+                    </p>
+                    {gmailAddress && (
+                      <p className="mt-1 font-mono text-[10.5px] text-neutral-400">
+                        Previous account: <span className="text-neutral-300">{gmailAddress}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {isSuperAdmin ? (
+                  <button
+                    type="button"
+                    onClick={connectGmail}
+                    className={btnPrimary}
+                    disabled={gmailBusy}
+                  >
+                    {gmailBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-black" />
+                    ) : (
+                      <Mail className="h-3.5 w-3.5 text-black" />
+                    )}
+                    <span>Reconnect Gmail</span>
+                  </button>
+                ) : (
+                  <div className="text-[10.5px] font-mono text-neutral-400">
+                    Contact IT Super Admin to reconnect
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* State 6: Configuration Incomplete */}
+          {gmailStatus === 'configuration_error' && (
+            <div className="rounded-md border border-rose-500/25 bg-rose-950/20 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" aria-hidden="true" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-rose-300">Configuration Incomplete</span>
+                      <span className="rounded border border-rose-500/30 bg-rose-950/40 px-1.5 py-0.2 font-mono text-[10px] text-rose-300">
+                        Missing Secrets
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-rose-200/80">
+                      {gmailErrorMessage || 'Gmail server configuration is incomplete on Supabase Edge Functions (GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, etc.).'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void loadGmailStatus()}
+                  className={btnSecondary}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Retry</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {gmailNotice && (
+            <div
+              className={`mt-4 rounded-md border p-3 text-xs ${
+                gmailNotice.tone === 'success'
+                  ? 'border-emerald-500/30 bg-emerald-950/25 text-emerald-200'
+                  : gmailNotice.tone === 'error'
+                    ? 'border-rose-500/30 bg-rose-950/25 text-rose-200'
+                    : 'border-[#d4af37]/30 bg-neutral-900 text-neutral-200'
+              }`}
+              role="status"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span>{gmailNotice.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setGmailNotice(null)}
+                  className="text-neutral-400 hover:text-white"
+                  aria-label="Dismiss notice"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => void loadGmailStatus()} className={btnSecondary} disabled={gmailStatus === "loading"}>Refresh status</button>
-          {isSuperAdmin && gmailStatus === "connected" && <button type="button" onClick={disconnectGmail} className={btnGhost} disabled={disconnectBusy}>{disconnectBusy ? "Disconnecting…" : "Disconnect shared Gmail"}</button>}
-        </div>
-      </div>
-      {gmailNotice && (
-        <div
-          className={`rounded-md border p-3 text-xs ${
-            gmailNotice.tone === 'success'
-              ? 'border-emerald-500/30 bg-emerald-950/25 text-emerald-200'
-              : gmailNotice.tone === 'error'
-                ? 'border-rose-500/30 bg-rose-950/25 text-rose-200'
-                : 'border-[#d4af37]/30 bg-neutral-900 text-neutral-200'
-          }`}
-          role="status"
-        >
-          {gmailNotice.text}
-        </div>
-      )}
+      </Panel>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <SegmentedTabs<StatusTab>
