@@ -205,6 +205,15 @@ export default function HeadPortal() {
       } catch {}
       sessionStorage.removeItem('westmun_head_session');
     }
+    if (typeof window !== 'undefined') {
+      try {
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.startsWith('wm_head_unlocked_')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } catch {}
+    }
     setHeadUser(null);
     setAssignment(null);
     setAccessDeniedState(null);

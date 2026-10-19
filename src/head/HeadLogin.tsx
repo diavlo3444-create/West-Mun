@@ -146,6 +146,12 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
    * Redirect user to their specific department and section dashboard
    */
   const navigateToDashboard = (assignment: HeadAssignment) => {
+    // Reset unlock session key so fresh login displays the cinematic unlock sequence
+    try {
+      const sessionUnlockKey = `wm_head_unlocked_${assignment.department}_${assignment.section || 'main'}`;
+      sessionStorage.removeItem(sessionUnlockKey);
+    } catch {}
+
     if (onSuccess) {
       onSuccess(assignment);
       return;

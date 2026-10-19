@@ -17,6 +17,7 @@ import {
 } from './HeadOverview';
 import { HeadRegistrations } from './HeadRegistrations';
 import { HeadDepartment } from './HeadDepartment';
+import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 
 interface DepartmentDashboardProps {
   department: DepartmentKey;
@@ -60,6 +61,28 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [focusRecord, setFocusRecord] = useState<HeadRegistration | null>(null);
+
+  // One-time unlock animation per login/session for this department head
+  const sessionUnlockKey = `wm_head_unlocked_${department}_${section || 'main'}`;
+  const [showUnlockAnimation, setShowUnlockAnimation] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return sessionStorage.getItem(sessionUnlockKey) !== 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleUnlockComplete = useCallback(() => {
+    try {
+      sessionStorage.setItem(sessionUnlockKey, 'true');
+    } catch {}
+    setShowUnlockAnimation(false);
+  }, [sessionUnlockKey]);
+
+  const handleReplayUnlock = useCallback(() => {
+    setShowUnlockAnimation(true);
+  }, []);
 
   const teamValues = useMemo(
     () => (department === 'media_press' ? ['media_press', 'media'] : [department]),
@@ -272,6 +295,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
             onRefresh={loadDepartmentData}
             onOpenRegistrations={() => setView('registrations')}
             onReview={openReview}
+            onReplayUnlock={handleReplayUnlock}
           />
         )}
 
@@ -300,8 +324,17 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
             onOpenRegistrations={() => setView('registrations')}
           />
         )}
-
       </div>
+
+      {showUnlockAnimation && (
+        <GoldenKeyUnlock
+          department={department}
+          section={section}
+          headName={headName}
+          headEmail={headEmail}
+          onComplete={handleUnlockComplete}
+        />
+      )}
     </DashboardShell>
   );
 };

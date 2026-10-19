@@ -12,6 +12,7 @@ import {
   Unlock,
   CalendarDays,
   ChevronRight,
+  Key,
 } from 'lucide-react';
 import {
   EmptyState,
@@ -79,6 +80,7 @@ interface HeadOverviewProps {
   onRefresh: () => void;
   onOpenRegistrations: () => void;
   onReview: (record: HeadRegistration) => void;
+  onReplayUnlock?: () => void;
 }
 
 function initials(name?: string): string {
@@ -107,6 +109,7 @@ export const HeadOverview: React.FC<HeadOverviewProps> = ({
   onRefresh,
   onOpenRegistrations,
   onReview,
+  onReplayUnlock,
 }) => {
   const Icon = meta.icon;
   const recent = registrations.slice(0, 6);
@@ -142,7 +145,7 @@ export const HeadOverview: React.FC<HeadOverviewProps> = ({
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Department command"
+        eyebrow={headName ? `Welcome back, ${headName}` : 'Department command'}
         title={meta.label}
         description={
           section
@@ -175,6 +178,17 @@ export const HeadOverview: React.FC<HeadOverviewProps> = ({
         }
         actions={
           <>
+            {onReplayUnlock && (
+              <button
+                type="button"
+                onClick={onReplayUnlock}
+                className={btnSecondary}
+                title="Replay cinematic golden key unlock sequence"
+              >
+                <Key className="h-3.5 w-3.5 text-[#d4af37]" aria-hidden="true" />
+                Unlock Intro
+              </button>
+            )}
             <button type="button" onClick={onRefresh} className={btnSecondary} disabled={loading}>
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
               Refresh
