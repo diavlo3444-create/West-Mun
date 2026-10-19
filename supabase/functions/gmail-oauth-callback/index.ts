@@ -83,9 +83,16 @@ Deno.serve(async (req) => {
     }
     const tokens = await tokenResponse.json();
     if (typeof tokens.refresh_token !== "string" || !tokens.refresh_token) return redirect(siteUrl, "refresh-token-missing");
+    let connectedEmail: string | null = null;
+    if (typeof tokens.access_token === "string") {
+      try {
+        const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: "Bearer " + tokens.access_token } });
+        if (profileResponse.ok) { const profile = await profileResponse.json(); if (typeof profile.email === "string" && profile.email.includes("@")) connectedEmail = profile.email.toLowerCase(); }
+      } catch { /* Email display is optional. Never log tokens. */ }
+    }
     const encrypted = await encryptToken(tokens.refresh_token, encryptionSecret);
     const { error: saveError } = await db.from("gmail_oauth_credentials").upsert({
-      singleton: true, encrypted_refresh_token: encrypted, connected_by: stateRow.user_id, updated_at: now,
+      singleton: true, encrypted_refresh_token: encrypted, connected_by: stateRow.user_id, connected_email: connectedEmail, updated_at: now,
     }, { onConflict: "singleton" });
     if (saveError) return redirect(siteUrl, "token-save-failed");
     return redirect(siteUrl, "connected");

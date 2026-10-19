@@ -61,6 +61,7 @@ interface RegistrationsManagerProps {
   onRefresh: () => void;
   selectedApp?: { app: any; type: 'delegate' | 'team' } | null;
   onClearSelectedApp?: () => void;
+  isSuperAdmin?: boolean;
 }
 
 type StatusTab = 'all' | 'pending' | 'approved' | 'rejected' | 'waitlisted';
@@ -108,6 +109,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   onRefresh,
   selectedApp,
   onClearSelectedApp,
+  isSuperAdmin = false,
 }) => {
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -132,6 +134,8 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | 'delete' | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
   const [gmailBusy, setGmailBusy] = useState(false);
+  const [gmailStatus, setGmailStatus] = useState('loading');
+  const [gmailAddress, setGmailAddress] = useState<string | null>(null);
   const [emailBusy, setEmailBusy] = useState(false);
   const [gmailNotice, setGmailNotice] = useState<{ tone: 'success' | 'error' | 'info'; text: string } | null>(null);
 
@@ -157,6 +161,17 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     window.history.replaceState({}, '', url.toString());
   }, []);
 
+  const loadGmailStatus = async () => {
+    if (!supabase) { setGmailStatus("error"); return; }
+    try { const result = await supabase.functions.invoke("gmail-oauth-status", { body: {} });
+      if (result.error || !result.data) { setGmailStatus("error"); return; }
+      setGmailStatus(result.data.status || (result.data.connected ? "connected" : "not_connected"));
+      setGmailAddress(typeof result.data.email === "string" ? result.data.email : null);
+      if (result.data.message && result.data.status !== "connected") setGmailNotice({ tone: "error", text: result.data.message });
+    } catch { setGmailStatus("error"); }
+  };
+  React.useEffect(() => { void loadGmailStatus(); }, []);
+
   const connectGmail = async () => {
     if (!supabase || gmailBusy) return;
     setGmailBusy(true);
@@ -164,7 +179,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('gmail-oauth-start', { body: {} });
       if (invokeError || !data?.authorization_url) {
-        setGmailNotice({ tone: 'error', text: invokeError?.message || data?.error || 'Could not start Gmail authorization.' });
+        setGmailNotice({ tone: 'error', text: data?.error || invokeError?.message || 'Could not start Gmail authorization.' });
         return;
       }
       window.location.assign(data.authorization_url);
@@ -461,9 +476,9 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         description="Review every application in one place. Decisions and private notes are written straight to Supabase."
         actions={
           <>
-            <button type="button" onClick={connectGmail} className={btnGhost} disabled={gmailBusy}>
-              {gmailBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Mail className="h-3.5 w-3.5" aria-hidden="true" />}
-              Connect Gmail
+            <button type="button" onClick={connectGmail} className={btnGhost} disabled={gmailBusy || gmailStatus === "loading" || gmailStatus === "connected" || gmailStatus === "configuration_error"}>
+              {gmailBusy || gmailStatus === "loading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Mail className="h-3.5 w-3.5" aria-hidden="true" /> }
+              {gmailStatus === "reconnect_required" ? "Reconnect Gmail" : "Connect Gmail"}
             </button>
             <button type="button" onClick={onRefresh} className={btnSecondary} disabled={loading}>
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
@@ -487,6 +502,17 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
           {error}
         </Notice>
       )}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-neutral-400">Shared Gmail connection</p>
+          <p className={"mt-1 text-xs font-medium " + (gmailStatus === "connected" ? "text-emerald-300" : "text-amber-300")}>
+            {gmailStatus === "connected" ? "Gmail Connected" : gmailStatus === "loading" ? "Checking Gmail connection…" : gmailStatus === "reconnect_required" ? "Gmail authorization expired or revoked — reconnect required" : gmailStatus === "configuration_error" ? "Gmail configuration error — check OAuth settings" : gmailStatus === "not_connected" ? "Gmail Not Connected" : "Could not verify Gmail status"}
+          </p>
+          {gmailStatus === "connected" && gmailAddress && <p className="mt-0.5 text-[11px] text-neutral-300">{gmailAddress}</p>}
+          <p className="mt-1 text-[10px] text-neutral-400">One encrypted backend connection is shared by authorized admins. Acceptance emails are never sent automatically.</p>
+        </div>
+        <button type="button" onClick={() => void loadGmailStatus()} className={btnSecondary} disabled={gmailStatus === "loading"}>Refresh status</button>
+      </div>
       {gmailNotice && (
         <div
           className={`rounded-md border p-3 text-xs ${

@@ -1,0 +1,22 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+const headers=(o:string)=>({"Access-Control-Allow-Origin":o,"Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info","Access-Control-Allow-Methods":"POST, OPTIONS","Vary":"Origin"});
+const json=(b:unknown,s=200,o="")=>new Response(JSON.stringify(b),{status:s,headers:{"Content-Type":"application/json","Cache-Control":"no-store",...headers(o)}});
+function dec(v:string){const s=v.replace(/-/g,"+").replace(/_/g,"/");return Uint8Array.from(atob(s+"=".repeat((4-s.length%4)%4)),c=>c.charCodeAt(0));}
+async function decrypt(v:string,s:string){const p=v.split(":");if(p.length!==3||p[0]!=="v1")throw new Error("bad token");const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));const k=await crypto.subtle.importKey("raw",b,"AES-GCM",false,["decrypt"]);return new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:dec(p[1])},k,dec(p[2])));}
+Deno.serve(async(req)=>{
+const site=Deno.env.get("WESTMUN_SITE_URL")?.replace(/\/$/,""),origin=req.headers.get("origin")??"";
+if(req.method==="OPTIONS")return site&&origin===site?new Response(null,{status:204,headers:headers(site)}):new Response(null,{status:403});
+if(req.method!=="POST")return json({error:"Method not allowed."},405,site||origin);if(!site||origin!==site)return json({error:"Origin not allowed."},403,site||origin);
+const url=Deno.env.get("SUPABASE_URL"),service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),id=Deno.env.get("GMAIL_CLIENT_ID"),secret=Deno.env.get("GMAIL_CLIENT_SECRET"),enc=Deno.env.get("GMAIL_TOKEN_ENCRYPTION_KEY");
+if(!url||!service||!id||!secret||!enc)return json({status:"configuration_error",connected:false,message:"Gmail server configuration is incomplete."},503,site);
+const bearer=(req.headers.get("authorization")??"").match(/^Bearer\s+(.+)$/i);if(!bearer)return json({error:"Sign in as an authorized admin."},401,site);
+const db=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}}),auth=await db.auth.getUser(bearer[1]);if(auth.error||!auth.data.user)return json({error:"Invalid or expired session."},401,site);
+const admin=await db.from("admins").select("user_id").eq("user_id",auth.data.user.id).maybeSingle();if(admin.error||!admin.data)return json({error:"Only authorized admins can view Gmail status."},403,site);
+const stored=await db.from("gmail_oauth_credentials").select("encrypted_refresh_token,connected_email,connected_at").eq("singleton",true).maybeSingle();if(stored.error)return json({status:"error",connected:false,message:"Could not read shared Gmail state."},500,site);
+if(!stored.data?.encrypted_refresh_token)return json({status:"not_connected",connected:false,email:null},200,site);
+let refresh:string;try{refresh=await decrypt(stored.data.encrypted_refresh_token,enc);}catch{return json({status:"configuration_error",connected:false,message:"Stored Gmail token could not be decrypted. Verify GMAIL_TOKEN_ENCRYPTION_KEY."},500,site);}
+const token=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:id,client_secret:secret,refresh_token:refresh,grant_type:"refresh_token"})});
+if(!token.ok){let e="unknown";try{e=(await token.json()).error??"unknown";}catch{}if(e==="invalid_grant")return json({status:"reconnect_required",connected:false,email:stored.data.connected_email??null,message:"Google authorization was revoked or expired. An authorized admin must reconnect."},200,site);if(e==="invalid_client")return json({status:"configuration_error",connected:false,message:"Google rejected the OAuth client. Check GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET."},200,site);return json({status:"error",connected:false,message:"Google could not verify the shared Gmail connection."},502,site);}
+const t=await token.json();let email=stored.data.connected_email??null;if(typeof t.access_token==="string"){try{const p=await fetch("https://openidconnect.googleapis.com/v1/userinfo",{headers:{Authorization:"Bearer "+t.access_token}});if(p.ok){const d=await p.json();if(typeof d.email==="string"&&d.email.includes("@"))email=d.email.toLowerCase();}}catch{}}
+if(email&&email!==stored.data.connected_email)await db.from("gmail_oauth_credentials").update({connected_email:email}).eq("singleton",true);
+return json({status:"connected",connected:true,email,connected_at:stored.data.connected_at},200,site);});

@@ -36,6 +36,11 @@ Deno.serve(async (req) => {
   const { data: adminRow, error: adminError } = await adminClient.from("admins").select("user_id").eq("user_id", userData.user.id).maybeSingle();
   if (adminError || !adminRow) return json({ error: "Only authorized WEST MUN admins can connect Gmail." }, 403, siteUrl);
 
+  // A saved singleton is shared by every admin; do not silently overwrite it.
+  const { data: existing, error: existingError } = await adminClient.from("gmail_oauth_credentials").select("singleton").eq("singleton", true).maybeSingle();
+  if (existingError) return json({ error: "Could not check the shared Gmail connection." }, 500, siteUrl);
+  if (existing && userData.user.email?.toLowerCase() !== "diavlo3444@gmail.com") return json({ error: "A shared Gmail connection already exists. Only the IT Super Admin can replace it." }, 409, siteUrl);
+
   const nonceBytes = crypto.getRandomValues(new Uint8Array(32));
   const nonce = b64url(nonceBytes);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -55,7 +60,7 @@ Deno.serve(async (req) => {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/gmail.send",
+    scope: "https://www.googleapis.com/auth/gmail.send openid email",
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",

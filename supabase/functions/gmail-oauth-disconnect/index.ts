@@ -1,0 +1,9 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+const SUPER_ADMIN="diavlo3444@gmail.com";
+const h=(o:string)=>({"Access-Control-Allow-Origin":o,"Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info","Access-Control-Allow-Methods":"POST, OPTIONS","Vary":"Origin"});
+const j=(b:unknown,s=200,o="")=>new Response(JSON.stringify(b),{status:s,headers:{"Content-Type":"application/json","Cache-Control":"no-store",...h(o)}});
+Deno.serve(async(req)=>{const site=Deno.env.get("WESTMUN_SITE_URL")?.replace(/\/$/,""),origin=req.headers.get("origin")??"";
+if(req.method==="OPTIONS")return site&&origin===site?new Response(null,{status:204,headers:h(site)}):new Response(null,{status:403});if(req.method!=="POST")return j({error:"Method not allowed."},405,site||origin);if(!site||origin!==site)return j({error:"Origin not allowed."},403,site||origin);
+const url=Deno.env.get("SUPABASE_URL"),service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(!url||!service)return j({error:"Server authentication is not configured."},503,site);const bearer=(req.headers.get("authorization")??"").match(/^Bearer\s+(.+)$/i);if(!bearer)return j({error:"Sign in as IT Super Admin."},401,site);
+const db=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}}),auth=await db.auth.getUser(bearer[1]);if(auth.error||!auth.data.user)return j({error:"Invalid or expired session."},401,site);if(auth.data.user.email?.toLowerCase()!==SUPER_ADMIN)return j({error:"Only IT Super Admin can disconnect shared Gmail."},403,site);
+let body;try{body=await req.json();}catch{return j({error:"Confirmation required."},400,site);}if(body.confirm!==true)return j({error:"Explicit confirmation required."},400,site);const result=await db.from("gmail_oauth_credentials").delete().eq("singleton",true);if(result.error)return j({error:"Could not disconnect shared Gmail."},500,site);return j({success:true},200,site);});

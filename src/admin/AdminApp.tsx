@@ -626,6 +626,7 @@ export default function AdminApp() {
             onRefresh={loadData}
             selectedApp={inspectTarget}
             onClearSelectedApp={() => setInspectTarget(null)}
+            isSuperAdmin={Boolean(isAdmin && isSuperAdmin)}
           />
         )}
 
