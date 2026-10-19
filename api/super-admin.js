@@ -1339,6 +1339,307 @@ async function handleDeleteHead(authHeader, headId) {
     return { statusCode: 400, body: { success: false, error: msg } };
   }
 }
+var localAdminsStore = /* @__PURE__ */ new Map([
+  [
+    "11111111-1111-4111-8111-111111111111",
+    {
+      user_id: "11111111-1111-4111-8111-111111111111",
+      email: SUPER_ADMIN_EMAIL,
+      full_name: "IT Super Admin",
+      role: "super_admin",
+      active: true,
+      created_at: (/* @__PURE__ */ new Date("2026-01-01T00:00:00Z")).toISOString()
+    }
+  ]
+]);
+async function handleListAdmins(authHeader) {
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user) {
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      const { data: adminRows, error: adminErr } = await supabaseAdmin.from("admins").select("*").order("created_at", { ascending: false });
+      if (adminErr) {
+        return { statusCode: 400, body: { success: false, error: adminErr.message } };
+      }
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1e3 }).catch(() => ({ data: null }));
+      const userMap = new Map((usersData?.users || []).map((u) => [u.id, u]));
+      const admins = (adminRows || []).map((row) => {
+        const authUser = userMap.get(row.user_id);
+        const email = String(row.email || authUser?.email || "").trim().toLowerCase();
+        const isSuper = email === SUPER_ADMIN_EMAIL.toLowerCase() || row.role === "super_admin";
+        return {
+          user_id: row.user_id,
+          email,
+          full_name: row.full_name || authUser?.user_metadata?.full_name || (isSuper ? "IT Super Admin" : "Admin Organiser"),
+          role: isSuper ? "super_admin" : "admin",
+          active: row.active !== false,
+          created_at: row.created_at || authUser?.created_at || (/* @__PURE__ */ new Date()).toISOString(),
+          updated_at: row.updated_at,
+          last_sign_in_at: authUser?.last_sign_in_at || null
+        };
+      });
+      if (!admins.some((a) => a.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
+        admins.unshift({
+          user_id: auth.user.id,
+          email: SUPER_ADMIN_EMAIL,
+          full_name: "IT Super Admin",
+          role: "super_admin",
+          active: true,
+          created_at: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      }
+      return { statusCode: 200, body: { success: true, admins } };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to list admin accounts.";
+      return { statusCode: 400, body: { success: false, error: msg } };
+    }
+  }
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      admins: Array.from(localAdminsStore.values())
+    }
+  };
+}
+async function handleCreateAdmin(authHeader, body) {
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user) {
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
+  }
+  const cleanName = String(body.fullName || body.name || "").trim();
+  const cleanEmail = String(body.email || "").trim().toLowerCase();
+  const cleanPassword = String(body.password || "").trim();
+  if (!cleanName || cleanName.length < 2 || cleanName.length > 100) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: "Full name must be between 2 and 100 characters." }
+    };
+  }
+  const emailRe = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRe.test(cleanEmail) || cleanEmail.length > 120) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: "Please provide a valid email address." }
+    };
+  }
+  if (cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: "Cannot create or modify the primary IT Super Admin account." }
+    };
+  }
+  if (!cleanPassword || cleanPassword.length < 8) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: "Password must be at least 8 characters long." }
+    };
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      const { data: existingAdminRow } = await supabaseAdmin.from("admins").select("user_id, email").ilike("email", cleanEmail).maybeSingle();
+      if (existingAdminRow) {
+        return {
+          statusCode: 400,
+          body: {
+            success: false,
+            code: "ADMIN_EXISTS",
+            error: `An administrator account with email "${cleanEmail}" already exists.`
+          }
+        };
+      }
+      let authUserId;
+      const { data: usersList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1e3 }).catch(() => ({ data: null }));
+      const existingAuth = (usersList?.users || []).find(
+        (u) => u.email?.toLowerCase().trim() === cleanEmail
+      );
+      if (existingAuth) {
+        authUserId = existingAuth.id;
+        const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+          password: cleanPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: cleanName,
+            role: "admin"
+          }
+        });
+        if (updateErr) {
+          return { statusCode: 400, body: { success: false, error: updateErr.message } };
+        }
+      } else {
+        const { data: createData, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+          email: cleanEmail,
+          password: cleanPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: cleanName,
+            role: "admin"
+          }
+        });
+        if (createErr || !createData?.user) {
+          return {
+            statusCode: 400,
+            body: {
+              success: false,
+              error: createErr?.message || "Failed to create user in Supabase Auth."
+            }
+          };
+        }
+        authUserId = createData.user.id;
+      }
+      const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+      const insertPayload = {
+        user_id: authUserId,
+        email: cleanEmail,
+        full_name: cleanName,
+        role: "admin",
+        // Strict normal Admin
+        active: true,
+        updated_at: nowIso
+      };
+      const { error: insertErr } = await supabaseAdmin.from("admins").upsert(insertPayload, { onConflict: "user_id" });
+      if (insertErr) {
+        if (insertErr.code === "PGRST204" || insertErr.message?.includes("column")) {
+          const { error: fallbackErr } = await supabaseAdmin.from("admins").upsert({ user_id: authUserId, email: cleanEmail }, { onConflict: "user_id" });
+          if (fallbackErr) {
+            return { statusCode: 400, body: { success: false, error: fallbackErr.message } };
+          }
+        } else {
+          return { statusCode: 400, body: { success: false, error: insertErr.message } };
+        }
+      }
+      const { data: verifiedRow } = await supabaseAdmin.from("admins").select("*").eq("user_id", authUserId).maybeSingle();
+      const createdAdmin2 = {
+        user_id: authUserId,
+        email: cleanEmail,
+        full_name: cleanName,
+        role: "admin",
+        active: true,
+        created_at: verifiedRow?.created_at || nowIso
+      };
+      return {
+        statusCode: 201,
+        body: {
+          success: true,
+          message: `Administrator account for ${cleanName} (${cleanEmail}) has been created successfully.`,
+          admin: createdAdmin2
+        }
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to provision admin account in Supabase.";
+      return { statusCode: 400, body: { success: false, error: msg } };
+    }
+  }
+  const newId = globalThis.crypto.randomUUID();
+  const createdAdmin = {
+    user_id: newId,
+    email: cleanEmail,
+    full_name: cleanName,
+    role: "admin",
+    active: true,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  localAdminsStore.set(newId, createdAdmin);
+  return {
+    statusCode: 201,
+    body: {
+      success: true,
+      message: `[Dev Fallback] Admin account for ${cleanName} created.`,
+      admin: createdAdmin
+    }
+  };
+}
+async function handleToggleAdmin(authHeader, targetId, body) {
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user) {
+    return { statusCode: auth.statusCode, body: { success: false, error: auth.error } };
+  }
+  if (!targetId) {
+    return { statusCode: 400, body: { success: false, error: "Admin user ID is required." } };
+  }
+  if (targetId === auth.user.id) {
+    return { statusCode: 400, body: { success: false, error: "Super Admin cannot deactivate their own account." } };
+  }
+  const active = Boolean(body.active);
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      const { data: targetAdmin } = await supabaseAdmin.from("admins").select("email").eq("user_id", targetId).maybeSingle();
+      if (targetAdmin && targetAdmin.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        return { statusCode: 400, body: { success: false, error: "Primary IT Super Admin account cannot be deactivated." } };
+      }
+      const { error: updateErr } = await supabaseAdmin.from("admins").update({ active, updated_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("user_id", targetId);
+      if (updateErr) {
+        return { statusCode: 400, body: { success: false, error: updateErr.message } };
+      }
+      return {
+        statusCode: 200,
+        body: {
+          success: true,
+          active,
+          message: `Admin account has been ${active ? "reactivated" : "deactivated"}.`
+        }
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to update admin status.";
+      return { statusCode: 400, body: { success: false, error: msg } };
+    }
+  }
+  const localTarget = localAdminsStore.get(targetId);
+  if (localTarget) {
+    localTarget.active = active;
+  }
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      active,
+      message: `Admin account has been ${active ? "reactivated" : "deactivated"}.`
+    }
+  };
+}
+async function handleDeleteAdmin(authHeader, targetId) {
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user) {
+    return { statusCode: auth.statusCode, body: { success: false, error: auth.error } };
+  }
+  if (!targetId) {
+    return { statusCode: 400, body: { success: false, error: "Admin user ID is required." } };
+  }
+  if (targetId === auth.user.id) {
+    return { statusCode: 400, body: { success: false, error: "Super Admin cannot delete their own account." } };
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      const { data: targetAdmin } = await supabaseAdmin.from("admins").select("email").eq("user_id", targetId).maybeSingle();
+      if (targetAdmin && targetAdmin.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        return { statusCode: 400, body: { success: false, error: "Primary IT Super Admin account cannot be deleted." } };
+      }
+      const { error: deleteErr } = await supabaseAdmin.from("admins").delete().eq("user_id", targetId);
+      if (deleteErr) {
+        return { statusCode: 400, body: { success: false, error: deleteErr.message } };
+      }
+      await supabaseAdmin.auth.admin.deleteUser(targetId).catch(() => null);
+      return {
+        statusCode: 200,
+        body: { success: true, message: "Admin account removed successfully." }
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to delete admin record.";
+      return { statusCode: 400, body: { success: false, error: msg } };
+    }
+  }
+  localAdminsStore.delete(targetId);
+  return {
+    statusCode: 200,
+    body: { success: true, message: "Admin account removed successfully." }
+  };
+}
 
 // serverless/super-admin.ts
 async function parseJsonBody(req) {
@@ -1399,6 +1700,7 @@ async function handler(req, res) {
     const origin = `${proto}://${host}`;
     const url = new URL(req.url || "/", origin);
     const action = url.searchParams.get("action") || "";
+    const scope = url.searchParams.get("scope") || url.searchParams.get("target") || "";
     const headId = url.searchParams.get("id") || "";
     if (action === "session" || action === "verify" || url.pathname.endsWith("/verify")) {
       const check = await verifyAdminCaller(authHeader);
@@ -1411,6 +1713,30 @@ async function handler(req, res) {
         code: check.code,
         error: check.error
       });
+    }
+    if (scope === "admins" || action.startsWith("admin-")) {
+      if (method === "GET") {
+        const result = await handleListAdmins(authHeader);
+        return res.status(result.statusCode).json(result.body);
+      }
+      if (method === "POST") {
+        const body = await parseJsonBody(req);
+        const result = await handleCreateAdmin(authHeader, body);
+        return res.status(result.statusCode).json(result.body);
+      }
+      if (method === "PATCH" || method === "PUT") {
+        const body = await parseJsonBody(req);
+        const targetId = headId || body.id || body.user_id;
+        const result = await handleToggleAdmin(authHeader, targetId, body);
+        return res.status(result.statusCode).json(result.body);
+      }
+      if (method === "DELETE") {
+        const body = await parseJsonBody(req);
+        const targetId = headId || body.id || body.user_id;
+        const result = await handleDeleteAdmin(authHeader, targetId);
+        return res.status(result.statusCode).json(result.body);
+      }
+      return res.status(405).json({ success: false, error: "Method not allowed" });
     }
     if (method === "GET") {
       const result = await handleListHeads(authHeader);

@@ -6,6 +6,10 @@ import {
   handleUpdateHead,
   handleResetPassword,
   handleDeleteHead,
+  handleListAdmins,
+  handleCreateAdmin,
+  handleToggleAdmin,
+  handleDeleteAdmin,
 } from '../src/server/superAdminHandler.ts';
 
 // Robust body parser for serverless Node/Vercel environments
@@ -73,6 +77,7 @@ export default async function handler(req: any, res: any) {
 
     const url = new URL(req.url || '/', origin);
     const action = url.searchParams.get('action') || '';
+    const scope = url.searchParams.get('scope') || url.searchParams.get('target') || '';
     const headId = url.searchParams.get('id') || '';
 
     // 1. Session / identity verification (any organiser in public.admins).
@@ -91,7 +96,33 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // 2. Head Accounts Management - List
+    // 2. Normal Admin Accounts Management (Super Admin Exclusive)
+    if (scope === 'admins' || action.startsWith('admin-')) {
+      if (method === 'GET') {
+        const result = await handleListAdmins(authHeader);
+        return res.status(result.statusCode).json(result.body);
+      }
+      if (method === 'POST') {
+        const body = await parseJsonBody(req);
+        const result = await handleCreateAdmin(authHeader, body);
+        return res.status(result.statusCode).json(result.body);
+      }
+      if (method === 'PATCH' || method === 'PUT') {
+        const body = await parseJsonBody(req);
+        const targetId = headId || body.id || body.user_id;
+        const result = await handleToggleAdmin(authHeader, targetId, body);
+        return res.status(result.statusCode).json(result.body);
+      }
+      if (method === 'DELETE') {
+        const body = await parseJsonBody(req);
+        const targetId = headId || body.id || body.user_id;
+        const result = await handleDeleteAdmin(authHeader, targetId);
+        return res.status(result.statusCode).json(result.body);
+      }
+      return res.status(405).json({ success: false, error: 'Method not allowed' });
+    }
+
+    // 3. Head Accounts Management - List
     if (method === 'GET') {
       const result = await handleListHeads(authHeader);
       return res.status(result.statusCode).json(result.body);

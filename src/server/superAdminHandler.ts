@@ -1320,3 +1320,438 @@ export async function handleDeleteHead(
     return { statusCode: 400, body: { success: false, error: msg } };
   }
 }
+
+// ===========================================================================
+// ADMIN ACCOUNTS MANAGEMENT (Super Admin Exclusive)
+// ===========================================================================
+
+export interface AdminAccountRecord {
+  user_id: string;
+  email: string;
+  full_name: string;
+  role: 'super_admin' | 'admin';
+  active: boolean;
+  created_at: string;
+  updated_at?: string;
+  last_sign_in_at?: string | null;
+}
+
+// In-memory / local fallback store for development and automated mock testing
+const localAdminsStore = new Map<string, AdminAccountRecord>([
+  [
+    '11111111-1111-4111-8111-111111111111',
+    {
+      user_id: '11111111-1111-4111-8111-111111111111',
+      email: SUPER_ADMIN_EMAIL,
+      full_name: 'IT Super Admin',
+      role: 'super_admin',
+      active: true,
+      created_at: new Date('2026-01-01T00:00:00Z').toISOString(),
+    },
+  ],
+]);
+
+export async function handleListAdmins(authHeader?: string | null): Promise<{
+  statusCode: number;
+  body: { success: boolean; admins?: AdminAccountRecord[]; error?: string; code?: string };
+}> {
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user) {
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      // 1. Fetch public.admins
+      const { data: adminRows, error: adminErr } = await supabaseAdmin
+        .from('admins')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (adminErr) {
+        return { statusCode: 400, body: { success: false, error: adminErr.message } };
+      }
+
+      // 2. Fetch users from Auth to obtain last_sign_in_at & metadata fallback
+      const { data: usersData } = await supabaseAdmin.auth.admin
+        .listUsers({ page: 1, perPage: 1000 })
+        .catch(() => ({ data: null }));
+      const userMap = new Map((usersData?.users || []).map((u: any) => [u.id, u]));
+
+      const admins: AdminAccountRecord[] = (adminRows || []).map((row: any) => {
+        const authUser = userMap.get(row.user_id);
+        const email = String(row.email || authUser?.email || '').trim().toLowerCase();
+        const isSuper = email === SUPER_ADMIN_EMAIL.toLowerCase() || row.role === 'super_admin';
+
+        return {
+          user_id: row.user_id,
+          email,
+          full_name:
+            row.full_name ||
+            authUser?.user_metadata?.full_name ||
+            (isSuper ? 'IT Super Admin' : 'Admin Organiser'),
+          role: isSuper ? 'super_admin' : 'admin',
+          active: row.active !== false,
+          created_at: row.created_at || authUser?.created_at || new Date().toISOString(),
+          updated_at: row.updated_at,
+          last_sign_in_at: authUser?.last_sign_in_at || null,
+        };
+      });
+
+      // Ensure Super Admin is always present in list even if not seeded yet
+      if (!admins.some((a) => a.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
+        admins.unshift({
+          user_id: auth.user.id,
+          email: SUPER_ADMIN_EMAIL,
+          full_name: 'IT Super Admin',
+          role: 'super_admin',
+          active: true,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      return { statusCode: 200, body: { success: true, admins } };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to list admin accounts.';
+      return { statusCode: 400, body: { success: false, error: msg } };
+    }
+  }
+
+  // Local fallback
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      admins: Array.from(localAdminsStore.values()),
+    },
+  };
+}
+
+export async function handleCreateAdmin(
+  authHeader: string | null,
+  body: any
+): Promise<{
+  statusCode: number;
+  body: {
+    success: boolean;
+    message?: string;
+    admin?: AdminAccountRecord;
+    error?: string;
+    code?: string;
+  };
+}> {
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user) {
+    return { statusCode: auth.statusCode, body: { success: false, code: auth.code, error: auth.error } };
+  }
+
+  const cleanName = String(body.fullName || body.name || '').trim();
+  const cleanEmail = String(body.email || '').trim().toLowerCase();
+  const cleanPassword = String(body.password || '').trim();
+
+  if (!cleanName || cleanName.length < 2 || cleanName.length > 100) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: 'Full name must be between 2 and 100 characters.' },
+    };
+  }
+
+  const emailRe = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRe.test(cleanEmail) || cleanEmail.length > 120) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: 'Please provide a valid email address.' },
+    };
+  }
+
+  if (cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: 'Cannot create or modify the primary IT Super Admin account.' },
+    };
+  }
+
+  if (!cleanPassword || cleanPassword.length < 8) {
+    return {
+      statusCode: 400,
+      body: { success: false, error: 'Password must be at least 8 characters long.' },
+    };
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      // 1. Check if admin already exists in public.admins
+      const { data: existingAdminRow } = await supabaseAdmin
+        .from('admins')
+        .select('user_id, email')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
+
+      if (existingAdminRow) {
+        return {
+          statusCode: 400,
+          body: {
+            success: false,
+            code: 'ADMIN_EXISTS',
+            error: `An administrator account with email "${cleanEmail}" already exists.`,
+          },
+        };
+      }
+
+      // 2. Check if user already exists in auth.users
+      let authUserId: string;
+      const { data: usersList } = await supabaseAdmin.auth.admin
+        .listUsers({ page: 1, perPage: 1000 })
+        .catch(() => ({ data: null }));
+      const existingAuth = (usersList?.users || []).find(
+        (u: any) => u.email?.toLowerCase().trim() === cleanEmail
+      );
+
+      if (existingAuth) {
+        authUserId = existingAuth.id;
+        const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+          password: cleanPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: cleanName,
+            role: 'admin',
+          },
+        });
+        if (updateErr) {
+          return { statusCode: 400, body: { success: false, error: updateErr.message } };
+        }
+      } else {
+        const { data: createData, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+          email: cleanEmail,
+          password: cleanPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: cleanName,
+            role: 'admin',
+          },
+        });
+
+        if (createErr || !createData?.user) {
+          return {
+            statusCode: 400,
+            body: {
+              success: false,
+              error: createErr?.message || 'Failed to create user in Supabase Auth.',
+            },
+          };
+        }
+        authUserId = createData.user.id;
+      }
+
+      // 3. Upsert into public.admins with normal Admin role
+      const nowIso = new Date().toISOString();
+      const insertPayload: any = {
+        user_id: authUserId,
+        email: cleanEmail,
+        full_name: cleanName,
+        role: 'admin', // Strict normal Admin
+        active: true,
+        updated_at: nowIso,
+      };
+
+      const { error: insertErr } = await supabaseAdmin
+        .from('admins')
+        .upsert(insertPayload, { onConflict: 'user_id' });
+
+      if (insertErr) {
+        // Fallback for pre-migration schema
+        if (insertErr.code === 'PGRST204' || insertErr.message?.includes('column')) {
+          const { error: fallbackErr } = await supabaseAdmin
+            .from('admins')
+            .upsert({ user_id: authUserId, email: cleanEmail }, { onConflict: 'user_id' });
+          if (fallbackErr) {
+            return { statusCode: 400, body: { success: false, error: fallbackErr.message } };
+          }
+        } else {
+          return { statusCode: 400, body: { success: false, error: insertErr.message } };
+        }
+      }
+
+      // 4. Verify persistence
+      const { data: verifiedRow } = await supabaseAdmin
+        .from('admins')
+        .select('*')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+
+      const createdAdmin: AdminAccountRecord = {
+        user_id: authUserId,
+        email: cleanEmail,
+        full_name: cleanName,
+        role: 'admin',
+        active: true,
+        created_at: verifiedRow?.created_at || nowIso,
+      };
+
+      return {
+        statusCode: 201,
+        body: {
+          success: true,
+          message: `Administrator account for ${cleanName} (${cleanEmail}) has been created successfully.`,
+          admin: createdAdmin,
+        },
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to provision admin account in Supabase.';
+      return { statusCode: 400, body: { success: false, error: msg } };
+    }
+  }
+
+  // Local fallback
+  const newId = globalThis.crypto.randomUUID();
+  const createdAdmin: AdminAccountRecord = {
+    user_id: newId,
+    email: cleanEmail,
+    full_name: cleanName,
+    role: 'admin',
+    active: true,
+    created_at: new Date().toISOString(),
+  };
+  localAdminsStore.set(newId, createdAdmin);
+
+  return {
+    statusCode: 201,
+    body: {
+      success: true,
+      message: `[Dev Fallback] Admin account for ${cleanName} created.`,
+      admin: createdAdmin,
+    },
+  };
+}
+
+export async function handleToggleAdmin(
+  authHeader: string | null,
+  targetId: string,
+  body: any
+): Promise<{ statusCode: number; body: { success: boolean; active?: boolean; message?: string; error?: string } }> {
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user) {
+    return { statusCode: auth.statusCode, body: { success: false, error: auth.error } };
+  }
+
+  if (!targetId) {
+    return { statusCode: 400, body: { success: false, error: 'Admin user ID is required.' } };
+  }
+
+  if (targetId === auth.user.id) {
+    return { statusCode: 400, body: { success: false, error: 'Super Admin cannot deactivate their own account.' } };
+  }
+
+  const active = Boolean(body.active);
+  const supabaseAdmin = getSupabaseAdmin();
+
+  if (supabaseAdmin) {
+    try {
+      const { data: targetAdmin } = await supabaseAdmin
+        .from('admins')
+        .select('email')
+        .eq('user_id', targetId)
+        .maybeSingle();
+
+      if (targetAdmin && targetAdmin.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        return { statusCode: 400, body: { success: false, error: 'Primary IT Super Admin account cannot be deactivated.' } };
+      }
+
+      const { error: updateErr } = await supabaseAdmin
+        .from('admins')
+        .update({ active, updated_at: new Date().toISOString() })
+        .eq('user_id', targetId);
+
+      if (updateErr) {
+        return { statusCode: 400, body: { success: false, error: updateErr.message } };
+      }
+
+      return {
+        statusCode: 200,
+        body: {
+          success: true,
+          active,
+          message: `Admin account has been ${active ? 'reactivated' : 'deactivated'}.`,
+        },
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update admin status.';
+      return { statusCode: 400, body: { success: false, error: msg } };
+    }
+  }
+
+  // Local fallback
+  const localTarget = localAdminsStore.get(targetId);
+  if (localTarget) {
+    localTarget.active = active;
+  }
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      active,
+      message: `Admin account has been ${active ? 'reactivated' : 'deactivated'}.`,
+    },
+  };
+}
+
+export async function handleDeleteAdmin(
+  authHeader: string | null,
+  targetId: string
+): Promise<{ statusCode: number; body: { success: boolean; message?: string; error?: string } }> {
+  const auth = await verifySuperAdminCaller(authHeader);
+  if (!auth.authorized || !auth.user) {
+    return { statusCode: auth.statusCode, body: { success: false, error: auth.error } };
+  }
+
+  if (!targetId) {
+    return { statusCode: 400, body: { success: false, error: 'Admin user ID is required.' } };
+  }
+
+  if (targetId === auth.user.id) {
+    return { statusCode: 400, body: { success: false, error: 'Super Admin cannot delete their own account.' } };
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+  if (supabaseAdmin) {
+    try {
+      const { data: targetAdmin } = await supabaseAdmin
+        .from('admins')
+        .select('email')
+        .eq('user_id', targetId)
+        .maybeSingle();
+
+      if (targetAdmin && targetAdmin.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        return { statusCode: 400, body: { success: false, error: 'Primary IT Super Admin account cannot be deleted.' } };
+      }
+
+      const { error: deleteErr } = await supabaseAdmin
+        .from('admins')
+        .delete()
+        .eq('user_id', targetId);
+
+      if (deleteErr) {
+        return { statusCode: 400, body: { success: false, error: deleteErr.message } };
+      }
+
+      await supabaseAdmin.auth.admin.deleteUser(targetId).catch(() => null);
+
+      return {
+        statusCode: 200,
+        body: { success: true, message: 'Admin account removed successfully.' },
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete admin record.';
+      return { statusCode: 400, body: { success: false, error: msg } };
+    }
+  }
+
+  // Local fallback
+  localAdminsStore.delete(targetId);
+  return {
+    statusCode: 200,
+    body: { success: true, message: 'Admin account removed successfully.' },
+  };
+}
