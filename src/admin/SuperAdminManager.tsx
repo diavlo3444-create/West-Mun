@@ -482,8 +482,25 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
         throw new Error(result?.error || 'Failed to initialize Super IT test session.');
       }
 
+      // Synchronize to storage so the new tab inherits the test credentials instantly
+      if (result.sessionToken) {
+        const testSess = {
+          token: result.sessionToken,
+          adminEmail: 'diavlo3444@gmail.com',
+          expiresAt: Date.now() + 15 * 60 * 1000,
+        };
+        try {
+          localStorage.setItem('westmun_super_it_test_session', JSON.stringify(testSess));
+          sessionStorage.setItem('westmun_super_it_test_session', JSON.stringify(testSess));
+        } catch {}
+      }
+
       // Open new tab without modifying the current IT Super Admin tab session
-      window.open(result.launchUrl, '_blank', 'noopener,noreferrer');
+      const opened = window.open(result.launchUrl, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        // If popup blocker blocked window.open, navigate directly
+        window.location.href = result.launchUrl;
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to launch test session.';
       setTestLaunchError(msg);

@@ -2209,7 +2209,9 @@ export async function handleConsumeLaunchTicket(
         statusCode: 200,
         body: {
           success: true,
-          sessionToken: session.sessionId,
+          sessionToken: ticketRecord.sessionId?.startsWith('wmtest_')
+            ? ticketRecord.sessionId
+            : signTestSessionToken(session),
           expiresAt: new Date(session.expiresAt).toISOString(),
           adminEmail: session.adminEmail,
           head: {
