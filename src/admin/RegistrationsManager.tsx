@@ -136,6 +136,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   const [gmailBusy, setGmailBusy] = useState(false);
   const [gmailStatus, setGmailStatus] = useState('loading');
   const [gmailAddress, setGmailAddress] = useState<string | null>(null);
+  const [disconnectBusy, setDisconnectBusy] = useState(false);
   const [emailBusy, setEmailBusy] = useState(false);
   const [gmailNotice, setGmailNotice] = useState<{ tone: 'success' | 'error' | 'info'; text: string } | null>(null);
 
@@ -171,6 +172,18 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     } catch { setGmailStatus("error"); }
   };
   React.useEffect(() => { void loadGmailStatus(); }, []);
+
+  const disconnectGmail = async () => {
+    if (!supabase || !isSuperAdmin || disconnectBusy) return;
+    if (!window.confirm("Disconnect the shared Gmail account for every admin? Acceptance emails will stop until it is reconnected.")) return;
+    setDisconnectBusy(true);
+    try {
+      const result = await supabase.functions.invoke("gmail-oauth-disconnect", { body: { confirm: true } });
+      if (result.error || !result.data?.success) setGmailNotice({ tone: "error", text: result.data?.error || result.error?.message || "Could not disconnect shared Gmail." });
+      else { setGmailNotice({ tone: "info", text: "Shared Gmail disconnected for all admins." }); await loadGmailStatus(); }
+    } catch { setGmailNotice({ tone: "error", text: "Could not disconnect shared Gmail." }); }
+    finally { setDisconnectBusy(false); }
+  };
 
   const connectGmail = async () => {
     if (!supabase || gmailBusy) return;
@@ -511,7 +524,10 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
           {gmailStatus === "connected" && gmailAddress && <p className="mt-0.5 text-[11px] text-neutral-300">{gmailAddress}</p>}
           <p className="mt-1 text-[10px] text-neutral-400">One encrypted backend connection is shared by authorized admins. Acceptance emails are never sent automatically.</p>
         </div>
-        <button type="button" onClick={() => void loadGmailStatus()} className={btnSecondary} disabled={gmailStatus === "loading"}>Refresh status</button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => void loadGmailStatus()} className={btnSecondary} disabled={gmailStatus === "loading"}>Refresh status</button>
+          {isSuperAdmin && gmailStatus === "connected" && <button type="button" onClick={disconnectGmail} className={btnGhost} disabled={disconnectBusy}>{disconnectBusy ? "Disconnecting…" : "Disconnect shared Gmail"}</button>}
+        </div>
       </div>
       {gmailNotice && (
         <div
