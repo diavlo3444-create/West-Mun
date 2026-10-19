@@ -29,6 +29,7 @@ export const SponsorsSection: React.FC = React.memo(() => {
                   <span className="text-sm font-serif text-white">{sp.name}</span>
                 )}
                 {sp.tier && <span className="text-[10px] font-mono uppercase tracking-widest text-[#d4af37]">{sp.tier}</span>}
+                {sp.description && <p className="text-[11px] text-neutral-400 mt-1 line-clamp-2 leading-relaxed">{sp.description}</p>}
               </div>
             );
             return href ? (

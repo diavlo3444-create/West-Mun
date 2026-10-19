@@ -13,6 +13,8 @@ import {
   CalendarDays,
   ChevronRight,
   Key,
+  Award,
+  Mail,
 } from 'lucide-react';
 import {
   EmptyState,
@@ -81,6 +83,8 @@ interface HeadOverviewProps {
   onOpenRegistrations: () => void;
   onReview: (record: HeadRegistration) => void;
   onReplayUnlock?: () => void;
+  onOpenSponsors?: () => void;
+  onOpenInquiries?: () => void;
 }
 
 function initials(name?: string): string {
@@ -110,6 +114,8 @@ export const HeadOverview: React.FC<HeadOverviewProps> = ({
   onOpenRegistrations,
   onReview,
   onReplayUnlock,
+  onOpenSponsors,
+  onOpenInquiries,
 }) => {
   const Icon = meta.icon;
   const recent = registrations.slice(0, 6);
@@ -200,6 +206,58 @@ export const HeadOverview: React.FC<HeadOverviewProps> = ({
           </>
         }
       />
+
+      {meta.key === 'pr' && onOpenSponsors && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-[10px] border border-[#d4af37]/40 bg-[#d4af37]/[0.06] shadow-lg">
+          <div className="flex items-center gap-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#d4af37]/40 bg-[#d4af37]/20 text-[#d4af37]">
+              <Award className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-white tracking-wide">
+                Sponsors & Partners Portal
+              </h3>
+              <p className="text-xs text-neutral-300 mt-0.5">
+                Manage partner logos, tiers, descriptions, and homepage priority display order.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenSponsors}
+            className={btnPrimary}
+          >
+            <span>Open Sponsors Management</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {meta.key === 'hr' && onOpenInquiries && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-[10px] border border-sky-500/40 bg-sky-950/[0.15] shadow-lg">
+          <div className="flex items-center gap-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/20 text-sky-400">
+              <Mail className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-white tracking-wide">
+                Secretariat Inquiries & Messages
+              </h3>
+              <p className="text-xs text-neutral-300 mt-0.5">
+                Review incoming communications, filter by status, and coordinate delegate support.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenInquiries}
+            className={btnSecondary}
+          >
+            <span>Open Inquiries Management</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {!isOpen && (
         <Notice tone="warning" title="Registration is currently closed">

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutDashboard, Users, Building2 } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, Award, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   DEPARTMENTS,
@@ -18,16 +18,19 @@ import {
 import { HeadRegistrations } from './HeadRegistrations';
 import { HeadDepartment } from './HeadDepartment';
 import { GoldenKeyUnlock } from './GoldenKeyUnlock';
+import { HeadSponsorsManager } from './HeadSponsorsManager';
+import { HeadInquiriesManager } from './HeadInquiriesManager';
 
 interface DepartmentDashboardProps {
   department: DepartmentKey;
   section?: SectionKey | null;
   headName?: string;
   headEmail?: string;
+  initialView?: HeadView;
   onSignOut: () => void;
 }
 
-type HeadView = 'overview' | 'registrations' | 'department';
+type HeadView = 'overview' | 'registrations' | 'department' | 'sponsors' | 'inquiries';
 
 function explainAccessError(error: { code?: string; message?: string } | null | undefined): string {
   if (!error) return '';
@@ -49,12 +52,20 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   section,
   headName,
   headEmail = '',
+  initialView,
   onSignOut,
 }) => {
   const meta = DEPARTMENTS[department];
   const isGenderDivision = isGenderSeparated(department);
+  const isPr = department === 'pr';
+  const isHr = department === 'hr';
 
-  const [view, setView] = useState<HeadView>('overview');
+  const [view, setView] = useState<HeadView>(() => {
+    if (initialView === 'sponsors' && isPr) return 'sponsors';
+    if (initialView === 'inquiries' && isHr) return 'inquiries';
+    if (initialView === 'registrations' || initialView === 'department') return initialView;
+    return 'overview';
+  });
   const [registrations, setRegistrations] = useState<HeadRegistration[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [announcements, setAnnouncements] = useState<HeadAnnouncement[]>([]);
@@ -234,19 +245,31 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     setView('registrations');
   };
 
+  const navItems = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending },
+    ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
+    ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
+    { id: 'department', label: 'Assignment', icon: Building2 },
+  ];
+
   const navGroups: NavGroup[] = [
     {
       label: 'My department',
-      items: [
-        { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-        { id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending },
-        { id: 'department', label: 'Assignment', icon: Building2 },
-      ],
+      items: navItems,
     },
   ];
 
   const viewLabel =
-    view === 'overview' ? 'Overview' : view === 'registrations' ? 'Applications' : 'Assignment';
+    view === 'overview'
+      ? 'Overview'
+      : view === 'registrations'
+      ? 'Applications'
+      : view === 'sponsors'
+      ? 'Sponsors & Partners'
+      : view === 'inquiries'
+      ? 'Inquiries & Messages'
+      : 'Assignment';
 
   const displayName =
     (headName && headName.trim()) || headEmail.split('@')[0] || 'Department head';
@@ -296,6 +319,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
             onOpenRegistrations={() => setView('registrations')}
             onReview={openReview}
             onReplayUnlock={handleReplayUnlock}
+            onOpenSponsors={isPr ? () => setView('sponsors') : undefined}
+            onOpenInquiries={isHr ? () => setView('inquiries') : undefined}
           />
         )}
 
@@ -311,6 +336,14 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
             initialRecord={focusRecord}
             onConsumeInitial={() => setFocusRecord(null)}
           />
+        )}
+
+        {view === 'sponsors' && isPr && (
+          <HeadSponsorsManager headName={headName} headEmail={headEmail} />
+        )}
+
+        {view === 'inquiries' && isHr && (
+          <HeadInquiriesManager headName={headName} headEmail={headEmail} />
         )}
 
         {view === 'department' && (

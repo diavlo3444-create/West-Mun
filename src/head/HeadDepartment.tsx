@@ -220,17 +220,32 @@ export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
             {
               icon: Database,
               title: 'Visible records',
-              copy: `Only team_registrations where team matches ${meta.label}${section ? ` and section is ${section}` : ''}.`,
+              copy:
+                meta.key === 'pr'
+                  ? `team_registrations for ${meta.label} plus all sponsor records in public.sponsors.`
+                  : meta.key === 'hr'
+                  ? `team_registrations for ${meta.label} plus all contact submissions in public.inquiries.`
+                  : `Only team_registrations where team matches ${meta.label}${section ? ` and section is ${section}` : ''}.`,
             },
             {
               icon: UserCheck,
               title: 'Permitted actions',
-              copy: 'Read candidate records in scope, update status and internal notes. Deletion and account management are not permitted.',
+              copy:
+                meta.key === 'pr'
+                  ? 'Review PR candidates; create, edit, reorder, publish, and delete sponsor records; upload logos to the site-files bucket.'
+                  : meta.key === 'hr'
+                  ? 'Review HR candidates; view, search, and filter public inquiries; mark tickets as read or resolved; record internal notes.'
+                  : 'Read candidate records in scope, update status and internal notes. Deletion and account management are not permitted.',
             },
             {
               icon: KeyRound,
               title: 'Shared database',
-              copy: 'Delegates, inquiries, admins and other departments remain outside your scope even through the Supabase API.',
+              copy:
+                meta.key === 'pr'
+                  ? 'Inquiries, delegates, admins, and other departments remain strictly outside your scope in PostgreSQL RLS.'
+                  : meta.key === 'hr'
+                  ? 'Sponsors, delegates, admins, and other departments remain strictly outside your scope in PostgreSQL RLS.'
+                  : 'Delegates, inquiries, admins and other departments remain outside your scope even through the Supabase API.',
             },
           ].map((item) => {
             const Icon = item.icon;

@@ -17,7 +17,17 @@ export interface ScheduleSessionRow {
 }
 export interface FaqRow { id: string; question: string; answer: string }
 export interface DocumentRow { id: string; title: string; description: string; category: string; file_url: string }
-export interface SponsorRow { id: string; name: string; tier: string; logo_url: string; website_url: string }
+export interface SponsorRow {
+  id: string;
+  name: string;
+  tier: string;
+  logo_url: string;
+  website_url: string;
+  description?: string;
+  sort_order?: number;
+  published?: boolean;
+  created_at?: string;
+}
 export interface AnnouncementRow { id: string; title: string; body: string; pinned: boolean; published_at: string }
 
 export type Settings = Record<string, string>;

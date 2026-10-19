@@ -291,12 +291,24 @@ export default function HeadPortal() {
   }
 
   // 5. Authorized department head -> Render Department Dashboard
+  const initialView =
+    requestedSectionSlug === 'sponsors'
+      ? ('sponsors' as const)
+      : requestedSectionSlug === 'inquiries'
+      ? ('inquiries' as const)
+      : requestedSectionSlug === 'registrations'
+      ? ('registrations' as const)
+      : requestedSectionSlug === 'department'
+      ? ('department' as const)
+      : undefined;
+
   return (
     <DepartmentDashboard
       department={assignment.department}
       section={assignment.section}
       headName={assignment.headName || undefined}
       headEmail={headUser.email}
+      initialView={initialView}
       onSignOut={handleSignOut}
     />
   );

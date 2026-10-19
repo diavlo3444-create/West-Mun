@@ -49,6 +49,8 @@ const clientFiles = [
   'src/admin/SuperAdminManager.tsx',
   'src/head/HeadLogin.tsx',
   'src/head/departments.ts',
+  'src/head/HeadSponsorsManager.tsx',
+  'src/head/HeadInquiriesManager.tsx',
   'src/lib/supabase.ts',
 ];
 const clientSource = clientFiles.map(read).join('\n');
@@ -134,6 +136,46 @@ assert(
 assert(
   localRoutes.includes('timingSafeEqual'),
   'Authentication Hardening: Local password comparison is constant-time'
+);
+
+// 6. PR Sponsors & HR Inquiries Role-Based Access Control
+const prHrMigration = read('supabase/migration_pr_hr_permissions.sql');
+assert(
+  prHrMigration.includes('is_pr_head()') &&
+    prHrMigration.includes('is_hr_head()') &&
+    prHrMigration.includes('sponsors update access') &&
+    prHrMigration.includes('inquiries update access'),
+  'Database Security: migration_pr_hr_permissions.sql enforces SECURITY DEFINER functions and RLS policies'
+);
+assert(
+  prHrMigration.includes("bucket_id = 'site-files'") &&
+    prHrMigration.includes('public.is_pr_head()'),
+  'Storage Security: PR heads are permitted to upload logos to the public site-files bucket'
+);
+
+const headDashboard = read('src/head/DepartmentDashboard.tsx');
+assert(
+  headDashboard.includes('HeadSponsorsManager') &&
+    headDashboard.includes('HeadInquiriesManager') &&
+    headDashboard.includes("isPr ? [{ id: 'sponsors'") &&
+    headDashboard.includes("isHr ? [{ id: 'inquiries'"),
+  'Access Isolation: Sponsors tab is rendered exclusively for PR and Inquiries tab exclusively for HR'
+);
+
+const sponsorsManager = read('src/head/HeadSponsorsManager.tsx');
+assert(
+  sponsorsManager.includes('safeUrl') &&
+    sponsorsManager.includes("from('sponsors')") &&
+    sponsorsManager.includes("storage.from('site-files')"),
+  'PR Sponsors: HeadSponsorsManager validates URLs and targets the official sponsors table and storage bucket'
+);
+
+const inquiriesManager = read('src/head/HeadInquiriesManager.tsx');
+assert(
+  inquiriesManager.includes("from('inquiries')") &&
+    inquiriesManager.includes('handleUpdateStatus') &&
+    inquiriesManager.includes('admin_notes'),
+  'HR Inquiries: HeadInquiriesManager enables read, status update, and note recording on official inquiries table'
 );
 
 console.log('====================================================');

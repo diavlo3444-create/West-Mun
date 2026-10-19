@@ -218,6 +218,7 @@ export const SECTIONS: SectionDef[] = [
       { key: 'tier', label: 'Tier', type: 'text', max: 60, suggestions: ['Title Sponsor', 'Gold', 'Silver', 'Partner'] },
       { key: 'logo_url', label: 'Logo', type: 'image', max: 600 },
       { key: 'website_url', label: 'Website', type: 'url', max: 600, placeholder: 'https://example.com' },
+      { key: 'description', label: 'Description', type: 'textarea', max: 1500, placeholder: 'Brief overview of partnership or sponsor involvement' },
       PUBLISHED,
     ],
   },
@@ -326,5 +327,6 @@ export const TYPE_LABELS: Record<string, string> = { single_delegate: 'Single de
 export const INQUIRY_STATUSES: Array<{ value: string; label: string }> = [
   { value: 'new', label: 'New' },
   { value: 'read', label: 'Read' },
+  { value: 'resolved', label: 'Resolved' },
   { value: 'archived', label: 'Archived' },
 ];
