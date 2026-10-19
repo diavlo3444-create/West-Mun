@@ -63,7 +63,24 @@ Deno.serve(async (req) => {
         redirect_uri: redirectUri, grant_type: "authorization_code",
       }),
     });
-    if (!tokenResponse.ok) return redirect(siteUrl, "token-exchange-failed");
+    if (!tokenResponse.ok) {
+      // Log only Google's machine-readable error code and HTTP status. Never log the
+      // authorization code, client credentials, token response, or token values.
+      let googleError = "unknown";
+      try {
+        const errorBody = await tokenResponse.json();
+        if (typeof errorBody?.error === "string" && /^[a-zA-Z0-9_]+$/.test(errorBody.error)) {
+          googleError = errorBody.error;
+        }
+      } catch {
+        // Keep the diagnostic generic if Google did not return valid JSON.
+      }
+      console.error("[gmail-oauth-callback] Google token exchange rejected", {
+        status: tokenResponse.status,
+        google_error: googleError,
+      });
+      return redirect(siteUrl, "token-exchange-failed");
+    }
     const tokens = await tokenResponse.json();
     if (typeof tokens.refresh_token !== "string" || !tokens.refresh_token) return redirect(siteUrl, "refresh-token-missing");
     const encrypted = await encryptToken(tokens.refresh_token, encryptionSecret);
