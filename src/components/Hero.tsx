@@ -353,6 +353,12 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     });
   }
 
+  const prefersReducedMotionRef = useRef<boolean>(
+    typeof window !== 'undefined'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false
+  );
+
   // Cached layout metrics to completely eliminate getBoundingClientRect on scroll
   const trackHeightRef = useRef<number>(0);
   const viewportHeightRef = useRef<number>(0);
@@ -362,15 +368,15 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
   const lastDomStateRef = useRef({
     s1Opacity: -1,
     s1Y: -999,
-    s1Display: '',
+    s1Vis: '',
     s1PointerEvents: '',
     s2Opacity: -1,
     s2Y: -999,
-    s2Display: '',
+    s2Vis: '',
     s2PointerEvents: '',
     s3Opacity: -1,
     s3Y: -999,
-    s3Display: '',
+    s3Vis: '',
     s3PointerEvents: '',
     indOpacity: -1,
     indY: -999,
@@ -413,25 +419,26 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
   // Apply visual updates directly to GPU-accelerated CSS properties with change deadbands
   const applyVisuals = useCallback((p: number) => {
     const last = lastDomStateRef.current;
+    const isReduced = prefersReducedMotionRef.current;
 
     // Stage 1: Brand & Opening Headline (Visible 0.0 -> ~0.36)
     const stage1Opacity = p <= 0.22 ? 1 : Math.max(0, 1 - (p - 0.22) / 0.16);
-    const stage1Y = p * -50;
-    const stage1Display = stage1Opacity > 0.01 ? 'block' : 'none';
+    const stage1Y = isReduced ? 0 : p * -45;
+    const stage1Vis = stage1Opacity > 0.005 ? 'visible' : 'hidden';
     const stage1Pointer = stage1Opacity > 0.02 ? 'auto' : 'none';
 
     if (stage1Ref.current) {
-      if (Math.abs(stage1Opacity - last.s1Opacity) >= 0.005) {
+      if (Math.abs(stage1Opacity - last.s1Opacity) >= 0.003) {
         stage1Ref.current.style.opacity = stage1Opacity.toFixed(3);
         last.s1Opacity = stage1Opacity;
       }
-      if (Math.abs(stage1Y - last.s1Y) >= 0.2) {
+      if (Math.abs(stage1Y - last.s1Y) >= 0.1) {
         stage1Ref.current.style.transform = `translate3d(0, ${stage1Y.toFixed(1)}px, 0)`;
         last.s1Y = stage1Y;
       }
-      if (stage1Display !== last.s1Display) {
-        stage1Ref.current.style.display = stage1Display;
-        last.s1Display = stage1Display;
+      if (stage1Vis !== last.s1Vis) {
+        stage1Ref.current.style.visibility = stage1Vis;
+        last.s1Vis = stage1Vis;
       }
       if (stage1Pointer !== last.s1PointerEvents) {
         stage1Ref.current.style.pointerEvents = stage1Pointer;
@@ -441,31 +448,31 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
 
     // Stage 2: Dispatch & Typewriter Card (Peaks 0.35-0.58)
     let stage2Opacity = 0;
-    if (p < 0.2) {
+    if (p < 0.20) {
       stage2Opacity = 0;
     } else if (p < 0.35) {
-      stage2Opacity = (p - 0.2) / 0.15;
+      stage2Opacity = (p - 0.20) / 0.15;
     } else if (p <= 0.58) {
       stage2Opacity = 1;
     } else if (p <= 0.72) {
       stage2Opacity = Math.max(0, 1 - (p - 0.58) / 0.14);
     }
-    const stage2Y = (1 - stage2Opacity) * 20;
-    const stage2Display = stage2Opacity > 0.01 ? 'block' : 'none';
+    const stage2Y = isReduced ? 0 : (1 - stage2Opacity) * 20;
+    const stage2Vis = stage2Opacity > 0.005 ? 'visible' : 'hidden';
     const stage2Pointer = stage2Opacity > 0.02 ? 'auto' : 'none';
 
     if (stage2Ref.current) {
-      if (Math.abs(stage2Opacity - last.s2Opacity) >= 0.005) {
+      if (Math.abs(stage2Opacity - last.s2Opacity) >= 0.003) {
         stage2Ref.current.style.opacity = stage2Opacity.toFixed(3);
         last.s2Opacity = stage2Opacity;
       }
-      if (Math.abs(stage2Y - last.s2Y) >= 0.2) {
+      if (Math.abs(stage2Y - last.s2Y) >= 0.1) {
         stage2Ref.current.style.transform = `translate3d(0, ${stage2Y.toFixed(1)}px, 0)`;
         last.s2Y = stage2Y;
       }
-      if (stage2Display !== last.s2Display) {
-        stage2Ref.current.style.display = stage2Display;
-        last.s2Display = stage2Display;
+      if (stage2Vis !== last.s2Vis) {
+        stage2Ref.current.style.visibility = stage2Vis;
+        last.s2Vis = stage2Vis;
       }
       if (stage2Pointer !== last.s2PointerEvents) {
         stage2Ref.current.style.pointerEvents = stage2Pointer;
@@ -484,22 +491,22 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     } else if (p <= 1.0) {
       stage3Opacity = Math.max(0, 1 - (p - 0.88) / 0.12);
     }
-    const stage3Y = (1 - stage3Opacity) * 20;
-    const stage3Display = stage3Opacity > 0.01 ? 'block' : 'none';
+    const stage3Y = isReduced ? 0 : (1 - stage3Opacity) * 20;
+    const stage3Vis = stage3Opacity > 0.005 ? 'visible' : 'hidden';
     const stage3Pointer = stage3Opacity > 0.02 ? 'auto' : 'none';
 
     if (stage3Ref.current) {
-      if (Math.abs(stage3Opacity - last.s3Opacity) >= 0.005) {
+      if (Math.abs(stage3Opacity - last.s3Opacity) >= 0.003) {
         stage3Ref.current.style.opacity = stage3Opacity.toFixed(3);
         last.s3Opacity = stage3Opacity;
       }
-      if (Math.abs(stage3Y - last.s3Y) >= 0.2) {
+      if (Math.abs(stage3Y - last.s3Y) >= 0.1) {
         stage3Ref.current.style.transform = `translate3d(0, ${stage3Y.toFixed(1)}px, 0)`;
         last.s3Y = stage3Y;
       }
-      if (stage3Display !== last.s3Display) {
-        stage3Ref.current.style.display = stage3Display;
-        last.s3Display = stage3Display;
+      if (stage3Vis !== last.s3Vis) {
+        stage3Ref.current.style.visibility = stage3Vis;
+        last.s3Vis = stage3Vis;
       }
       if (stage3Pointer !== last.s3PointerEvents) {
         stage3Ref.current.style.pointerEvents = stage3Pointer;
@@ -675,6 +682,15 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
       }
     };
 
+    const motionQuery = typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    const handleMotionChange = (e: MediaQueryListEvent) => {
+      prefersReducedMotionRef.current = e.matches;
+      applyVisuals(currentProgressRef.current);
+    };
+    if (motionQuery) {
+      motionQuery.addEventListener('change', handleMotionChange);
+    }
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', handleResize, { passive: true });
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -683,6 +699,9 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
     applyVisuals(0);
 
     return () => {
+      if (motionQuery) {
+        motionQuery.removeEventListener('change', handleMotionChange);
+      }
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -744,17 +763,17 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
 
         {/* Synchronized Hero Content Container - Visually centered for desktop and mobile */}
         <div className="relative z-10 h-full w-full max-w-5xl mx-auto px-5 sm:px-8 md:px-12 flex flex-col justify-center items-center pb-20 sm:pb-24 md:pb-0 pt-16 md:pt-0 text-center">
-          <div className="w-full max-w-3xl relative mx-auto flex flex-col items-center text-center">
+          <div className="w-full max-w-3xl relative mx-auto grid grid-cols-1 grid-rows-1 place-items-center text-center">
             {/* ========================================================
                 STAGE 1: Opening & Grand Headline (Scroll p: 0.0 -> 0.35)
                ======================================================== */}
             <div
               ref={stage1Ref}
-              className="w-full flex flex-col items-center text-center will-change-[opacity,transform] pointer-events-auto"
+              className="w-full col-start-1 row-start-1 flex flex-col items-center text-center will-change-[opacity,transform] pointer-events-auto"
               style={{
                 opacity: 1,
                 transform: 'translate3d(0, 0px, 0)',
-                display: 'block',
+                visibility: 'visible',
               }}
             >
               <div className="inline-flex items-center justify-center gap-2 mb-4 px-3.5 py-1 bg-[#0c0c0e]/95 border border-[#d4af37]/40 rounded-sm shadow-[0_0_15px_rgba(212,175,55,0.15)]">
@@ -790,11 +809,11 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
                ======================================================== */}
             <div
               ref={stage2Ref}
-              className="w-full flex flex-col items-center text-center will-change-[opacity,transform] pointer-events-none"
+              className="w-full col-start-1 row-start-1 flex flex-col items-center text-center will-change-[opacity,transform] pointer-events-none"
               style={{
                 opacity: 0,
                 transform: 'translate3d(0, 20px, 0)',
-                display: 'none',
+                visibility: 'hidden',
               }}
             >
               <div className="inline-flex items-center justify-center gap-2 mb-3">
@@ -841,11 +860,11 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
                ======================================================== */}
             <div
               ref={stage3Ref}
-              className="w-full flex flex-col items-center text-center will-change-[opacity,transform] pointer-events-none"
+              className="w-full col-start-1 row-start-1 flex flex-col items-center text-center will-change-[opacity,transform] pointer-events-none"
               style={{
                 opacity: 0,
                 transform: 'translate3d(0, 20px, 0)',
-                display: 'none',
+                visibility: 'hidden',
               }}
             >
               <div className="inline-flex items-center justify-center gap-2 mb-3 px-3 py-1 bg-[#141418] border border-[#d4af37]/30 rounded-sm text-xs text-[#f3e5ab] font-medium uppercase tracking-wider">

@@ -39,11 +39,7 @@ export const ConferenceHighlights: React.FC = React.memo(() => {
 
   return (
     <section id="highlights" ref={ref} className="section-content-visibility relative z-20 py-24 bg-[#0a0a0c] text-white border-t border-neutral-900">
-      <div
-        className={`max-w-7xl mx-auto px-5 sm:px-8 md:px-12 transition-[opacity,transform] duration-1000 ease-out will-change-[opacity,transform] ${
-          isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        }`}
-      >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
           <div>
             <div className="flex items-center gap-2 mb-3">

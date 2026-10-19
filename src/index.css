@@ -82,6 +82,8 @@ body {
   background-size: 280% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  transform: translateZ(0);
+  backface-visibility: hidden;
   animation: metallicLightSweep 7.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
@@ -100,6 +102,8 @@ body {
   background-size: 280% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  transform: translateZ(0);
+  backface-visibility: hidden;
   animation: metallicLightSweep 7.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
@@ -161,10 +165,9 @@ body {
   }
 }
 
-/* Content visibility optimization: Skips offscreen layout, paint, and keyframe calculations */
+/* Section render containment: isolates paint and style boundaries without content-visibility scroll jumps */
 .section-content-visibility {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 700px;
+  contain: paint style;
 }
 
 /* =====================================================================
