@@ -64,6 +64,12 @@ export default function HeadPortal() {
           setHeadUser(null);
           setAssignment(null);
           setLoading(false);
+        } else if (
+          event === 'SIGNED_IN' ||
+          event === 'TOKEN_REFRESHED' ||
+          event === 'INITIAL_SESSION'
+        ) {
+          verifyAccess();
         }
       });
       authSub = data;
@@ -78,7 +84,17 @@ export default function HeadPortal() {
       if (supabase && supabaseConfigured) {
         try {
           const { data: supaSessionData } = await supabase.auth.getSession();
-          const supaUser = supaSessionData?.session?.user;
+          let supaSession = supaSessionData?.session;
+
+          // If session exists and access token is expired, attempt token refresh
+          if (supaSession?.expires_at && supaSession.expires_at * 1000 < Date.now()) {
+            const { data: refreshData } = await supabase.auth.refreshSession();
+            if (refreshData?.session) {
+              supaSession = refreshData.session;
+            }
+          }
+
+          const supaUser = supaSession?.user;
           if (supaUser) {
             const lookup = await lookupHeadAssignment(supaUser.id);
             if (lookup.status === 'success' && lookup.assignment) {
@@ -94,6 +110,14 @@ export default function HeadPortal() {
                 section: lookup.assignment.section,
               };
             } else if (lookup.status === 'permission_denied') {
+              if (lookup.code === 'SESSION_EXPIRED') {
+                // If the session expired, prompt to sign in rather than showing permanent Access Denied
+                setHeadUser(null);
+                setAssignment(null);
+                setAuthError('Your session has expired. Please sign in again.');
+                setLoading(false);
+                return;
+              }
               deniedInfo = {
                 reason: 'no_assignment',
                 email: supaUser.email,
@@ -328,13 +352,15 @@ export default function HeadPortal() {
         authError={authError}
         onSuccess={(newAssign, user) => {
           setAuthError('');
-          const resolved = user || {
-            id: '',
-            email: newAssign.headEmail || '',
-            headName: newAssign.headName || '',
-            department: newAssign.department,
-            section: newAssign.section,
-          };
+          const resolved = user
+            ? { ...user, section: user.section ?? null }
+            : {
+                id: '',
+                email: newAssign.headEmail || '',
+                headName: newAssign.headName || '',
+                department: newAssign.department,
+                section: newAssign.section ?? null,
+              };
           setHeadUser(resolved);
           setAssignment(newAssign);
           setAccessDeniedState(null);

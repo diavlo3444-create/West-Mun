@@ -280,23 +280,60 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
   try {
     // Query public.department_heads using `user_id = session.user.id`.
     // RLS still restricts this to the caller's own row.
-    const { data, error } = await supabase
+    let data: any = null;
+    let queryError: any = null;
+
+    const res = await supabase
       .from('department_heads')
       .select('user_id, id, department, section, active, head_name, email')
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (error) {
+    if (res.error) {
+      // Check if user_id column does not exist in schema cache or query failed
+      if (
+        /user_id/i.test(res.error.message || '') ||
+        res.error.code === '42703' ||
+        res.error.code === 'PGRST204'
+      ) {
+        const idFallback = await supabase
+          .from('department_heads')
+          .select('id, department, section, active, head_name, email')
+          .eq('id', userId)
+          .maybeSingle();
+        if (!idFallback.error) {
+          data = idFallback.data;
+        } else {
+          queryError = idFallback.error;
+        }
+      } else {
+        queryError = res.error;
+      }
+    } else if (res.data) {
+      data = res.data;
+    } else {
+      // If no row found by user_id, check by id in case of legacy schema where user_id was null
+      const idFallback = await supabase
+        .from('department_heads')
+        .select('user_id, id, department, section, active, head_name, email')
+        .eq('id', userId)
+        .maybeSingle();
+      if (!idFallback.error && idFallback.data) {
+        data = idFallback.data;
+      }
+    }
+
+    if (queryError) {
       // Safe diagnostic logging (no passwords, tokens, or personal info)
       console.error('[Head Authorization] Query failed:', {
-        code: error.code,
-        message: error.message,
+        code: queryError.code,
+        message: queryError.message,
       });
 
       // Distinguish auth session / expired errors
       if (
-        /auth session missing|jwt expired|invalid claim|unauthorized/i.test(
-          error.message || ''
+        /auth session missing|jwt expired|session expired|invalid claim|unauthorized/i.test(
+          queryError.message || ''
         )
       ) {
         return {
@@ -308,37 +345,37 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
 
       // Distinguish RLS / permission denial
       const isPermission =
-        error.code === '42501' ||
-        error.code === 'PGRST301' ||
-        error.message?.toLowerCase().includes('permission') ||
-        error.message?.toLowerCase().includes('policy') ||
-        error.message?.toLowerCase().includes('row-level security');
+        queryError.code === '42501' ||
+        queryError.code === 'PGRST301' ||
+        queryError.message?.toLowerCase().includes('permission') ||
+        queryError.message?.toLowerCase().includes('policy') ||
+        queryError.message?.toLowerCase().includes('row-level security');
 
       if (isPermission) {
         return {
           status: 'permission_denied',
-          code: error.code,
-          message: error.message || 'Row Level Security policy blocked reading department_heads.',
+          code: queryError.code,
+          message: queryError.message || 'Row Level Security policy blocked reading department_heads.',
         };
       }
 
       // Distinguish network / connection errors
       const isNetwork =
-        error.message?.toLowerCase().includes('failed to fetch') ||
-        error.message?.toLowerCase().includes('network') ||
-        error.message?.toLowerCase().includes('timeout');
+        queryError.message?.toLowerCase().includes('failed to fetch') ||
+        queryError.message?.toLowerCase().includes('network') ||
+        queryError.message?.toLowerCase().includes('timeout');
 
       if (isNetwork) {
         return {
           status: 'network_error',
-          message: error.message || 'Network connection failed.',
+          message: queryError.message || 'Network connection failed.',
         };
       }
 
       return {
         status: 'permission_denied',
-        code: error.code,
-        message: error.message || 'Database error occurred during authorization lookup.',
+        code: queryError.code,
+        message: queryError.message || 'Database error occurred during authorization lookup.',
       };
     }
 
@@ -352,7 +389,6 @@ export async function lookupHeadAssignment(userId?: string): Promise<HeadLookupR
     if (rowUserId && rowUserId !== userId) {
       return {
         status: 'not_found',
-        message: 'Department head assignment does not match authenticated user ID.',
       };
     }
 

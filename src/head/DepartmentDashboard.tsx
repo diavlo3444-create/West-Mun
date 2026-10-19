@@ -114,6 +114,16 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     setLoadError('');
 
     try {
+      try {
+        const { data: sessData } = await supabase.auth.getSession();
+        if (
+          sessData?.session?.expires_at &&
+          sessData.session.expires_at * 1000 < Date.now() + 60000
+        ) {
+          await supabase.auth.refreshSession();
+        }
+      } catch {}
+
       // Scope is already enforced by RLS; the explicit filters keep the query
       // aligned with the head's exact department and section as well.
       let query = supabase.from('team_registrations').select('*').in('team', teamValues);
@@ -212,6 +222,16 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     notes: string,
   ): Promise<{ ok: boolean; error?: string }> => {
     if (!supabase) return { ok: false, error: 'Supabase is not configured.' };
+
+    try {
+      const { data: sessData } = await supabase.auth.getSession();
+      if (
+        sessData?.session?.expires_at &&
+        sessData.session.expires_at * 1000 < Date.now() + 60000
+      ) {
+        await supabase.auth.refreshSession();
+      }
+    } catch {}
 
     let updateQuery = supabase
       .from('team_registrations')

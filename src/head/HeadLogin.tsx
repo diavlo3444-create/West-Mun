@@ -89,7 +89,7 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
 
       const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
       const linkType = params.get('type') || hashParams.get('type') || '';
-      const isAuthLink = linkType === 'invite' || linkType === 'recovery';
+      const isAuthLink = linkType === 'invite' || linkType === 'recovery' || linkType === 'signup';
 
       if (isAuthLink) {
         setIsSupabaseRecovery(true);
@@ -99,25 +99,54 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
       if (!supabase || !supabaseConfigured) return;
 
       try {
-        // PKCE links arrive as ?code=...
+        // 1. Check if a session already exists (e.g. from detectSessionInUrl)
+        const { data: currentSession } = await supabase.auth.getSession();
+        if (currentSession?.session) {
+          if (isAuthLink) {
+            setIsSupabaseRecovery(true);
+            setResetToken('supabase_auth_recovery');
+          }
+          return;
+        }
+
+        // 2. PKCE links arrive as ?code=...
         const code = params.get('code');
         if (code) {
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
           if (!alive) return;
-          if (!exchangeError && data.session) {
+          if (!exchangeError && data?.session) {
             setIsSupabaseRecovery(true);
             setResetToken('supabase_auth_recovery');
+            return;
           }
-        } else if (hashParams.get('access_token') && hashParams.get('refresh_token')) {
-          // Implicit-flow links arrive with tokens in the URL hash.
-          const { error: sessionError } = await supabase.auth.setSession({
+        }
+
+        // 3. Token hash links arrive as ?token_hash=...
+        const tokenHash = params.get('token_hash');
+        if (tokenHash) {
+          const { data, error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: (linkType as any) || 'recovery',
+          });
+          if (!alive) return;
+          if (!verifyError && data?.session) {
+            setIsSupabaseRecovery(true);
+            setResetToken('supabase_auth_recovery');
+            return;
+          }
+        }
+
+        // 4. Implicit-flow links arrive with tokens in the URL hash.
+        if (hashParams.get('access_token') && hashParams.get('refresh_token')) {
+          const { data, error: sessionError } = await supabase.auth.setSession({
             access_token: hashParams.get('access_token') as string,
             refresh_token: hashParams.get('refresh_token') as string,
           });
           if (!alive) return;
-          if (!sessionError) {
+          if (!sessionError && data?.session) {
             setIsSupabaseRecovery(true);
             setResetToken('supabase_auth_recovery');
+            return;
           }
         }
       } catch {
@@ -223,7 +252,7 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
               (supaData.user.user_metadata?.full_name as string | undefined) ||
               '',
             department: lookup.assignment.department,
-            section: lookup.assignment.section,
+            section: lookup.assignment.section ?? null,
           };
           navigateToDashboard(lookup.assignment, resolvedUser);
           return;
@@ -366,13 +395,38 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
     // 1. If this is a Supabase Auth invitation or recovery link
     if (isSupabaseRecovery && supabase) {
       try {
+        // Ensure active session exists before calling updateUser, or attempt refresh
+        const { data: currentSess } = await supabase.auth.getSession();
+        if (!currentSess?.session) {
+          const { data: refreshed } = await supabase.auth.refreshSession();
+          if (!refreshed?.session) {
+            setResettingPassword(false);
+            setError(
+              'Your password setup session has expired or the link is invalid. Please request a new invitation from the IT Super Admin (diavlo3444@gmail.com).',
+            );
+            return;
+          }
+        }
+
         const { data: updateData, error: updateErr } = await supabase.auth.updateUser({
           password: newPassword,
         });
 
         setResettingPassword(false);
 
-        if (updateErr) throw new Error(updateErr.message);
+        if (updateErr) {
+          if (
+            /auth session missing|jwt expired|session expired|invalid claim/i.test(
+              updateErr.message || ''
+            )
+          ) {
+            setError(
+              'Your password setup session has expired. Please request a new invitation link from the IT Super Admin (diavlo3444@gmail.com).',
+            );
+            return;
+          }
+          throw new Error(updateErr.message);
+        }
 
         setResetSuccess('Password updated. Opening your department dashboard…');
         setResetToken(null);
@@ -390,8 +444,11 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
         return;
       } catch (supaErr: unknown) {
         setResettingPassword(false);
-        const msg =
+        const rawMsg =
           supaErr instanceof Error ? supaErr.message : 'Failed to update password with Supabase Auth.';
+        const msg = /auth session missing|jwt expired|session expired/i.test(rawMsg)
+          ? 'Your password setup session has expired. Please request a new invitation link from the IT Super Admin (diavlo3444@gmail.com).'
+          : rawMsg;
         setError(msg);
         return;
       }
