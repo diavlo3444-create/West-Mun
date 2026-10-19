@@ -115,7 +115,12 @@ const server = createServer(async (req, res) => {
   }
 
   if (path.startsWith('/auth/v1/admin/users/') && req.method === 'PUT') {
-    return json(res, 200, {});
+    const uid = path.split('/').pop();
+    const body = await readBody(req);
+    const user = state.users.find((u) => u.id === uid);
+    if (user) Object.assign(user, body);
+    state.authAdminUpdates = (state.authAdminUpdates || []).concat([{ uid, body }]);
+    return json(res, 200, user || {});
   }
 
   // --- PostgREST: admins ---
@@ -164,6 +169,13 @@ const server = createServer(async (req, res) => {
     const row = state.heads.find((h) => h.user_id === uid);
     if (row) Object.assign(row, body);
     return json(res, 200, row ? [row] : []);
+  }
+
+  if (path === '/rest/v1/department_heads' && req.method === 'DELETE') {
+    const uid = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
+    const before = state.heads.length;
+    state.heads = state.heads.filter((h) => h.user_id !== uid);
+    return json(res, 200, before === state.heads.length ? [] : [{ user_id: uid }]);
   }
 
   return json(res, 404, { message: `Unhandled ${req.method} ${path}` });
@@ -398,6 +410,14 @@ r = await call('POST', '/api/super-admin?action=reset-password&id=' + AFFECTED, 
   body: { newPassword: 'short' },
 });
 check('short password reset is rejected', r.status === 400 && r.body?.code === 'WEAK_PASSWORD', r);
+
+r = await call('DELETE', '/api/super-admin?id=' + AFFECTED, { token: 'token-super' });
+check('authorized super admin can delete a head assignment', r.status === 200 && r.body?.success === true, r);
+check('deletion removes only the department_heads row', !state.heads.some((h) => h.user_id === AFFECTED), state.heads);
+check('deleting a head assignment does not ban or update the Auth user', !(state.authAdminUpdates || []).some((entry) => entry.uid === AFFECTED && Object.hasOwn(entry.body || {}, 'ban_duration')), state.authAdminUpdates);
+check('deleting a head assignment preserves the Auth user', state.users.some((u) => u.id === AFFECTED), state.users);
+r = await call('DELETE', '/api/super-admin?id=' + AFFECTED, { token: 'token-admin' });
+check('non-super-admin cannot delete a head assignment', r.status === 403, r);
 
 // ---------------------------------------------------------------------------
 // 4. Configuration fails closed
