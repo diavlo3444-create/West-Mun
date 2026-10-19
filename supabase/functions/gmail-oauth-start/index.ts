@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = (origin: string) => ({
   "Access-Control-Allow-Origin": origin,
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Vary": "Origin",
 });
@@ -14,7 +14,11 @@ const sha256Hex = async (value: string) => Array.from(new Uint8Array(await crypt
 Deno.serve(async (req) => {
   const siteUrl = Deno.env.get("WESTMUN_SITE_URL")?.replace(/\/$/, "");
   const origin = req.headers.get("origin") ?? "";
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(siteUrl || origin) });
+  if (req.method === "OPTIONS") {
+    // Preflight is allowed only for the exact configured production origin.
+    if (!siteUrl || origin !== siteUrl) return new Response(null, { status: 403, headers: { "Vary": "Origin" } });
+    return new Response(null, { status: 204, headers: corsHeaders(siteUrl) });
+  }
   if (req.method !== "POST") return json({ error: "Method not allowed." }, 405, siteUrl || origin);
   if (!siteUrl || origin !== siteUrl) return json({ error: "Origin not allowed." }, 403, siteUrl || origin);
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
