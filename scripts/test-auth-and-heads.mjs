@@ -418,12 +418,12 @@ r = await call('PATCH', '/api/super-admin?id=' + AFFECTED, {
 check('deactivating a department-head assignment succeeds without an Auth ban', r.status === 200 && r.body?.success === true, r);
 check('assignment deactivation does not change Auth ban state', !(state.authAdminUpdates || []).some((entry) => entry.uid === AFFECTED && Object.hasOwn(entry.body || {}, 'ban_duration')), state.authAdminUpdates);
 
-r = await call('DELETE', '/api/super-admin?id=' + AFFECTED, { token: 'token-super' });
+r = await call('DELETE', '/api/super-admin?id=' + AFFECTED, { token: 'token-super', body: {} });
 check('authorized super admin can delete a head assignment', r.status === 200 && r.body?.success === true, r);
 check('deletion removes only the department_heads row', !state.heads.some((h) => h.user_id === AFFECTED), state.heads);
 check('deleting a head assignment does not ban or update the Auth user', !(state.authAdminUpdates || []).some((entry) => entry.uid === AFFECTED && Object.hasOwn(entry.body || {}, 'ban_duration')), state.authAdminUpdates);
 check('deleting a head assignment preserves the Auth user', state.users.some((u) => u.id === AFFECTED), state.users);
-r = await call('DELETE', '/api/super-admin?id=' + AFFECTED, { token: 'token-admin' });
+r = await call('DELETE', '/api/super-admin?id=' + AFFECTED, { token: 'token-admin', body: {} });
 check('non-super-admin cannot delete a head assignment', r.status === 403, r);
 
 // ---------------------------------------------------------------------------
