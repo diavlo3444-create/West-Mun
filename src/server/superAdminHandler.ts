@@ -1013,16 +1013,9 @@ export async function handleUpdateHead(
         };
       }
 
-      // Update Supabase Auth user metadata / ban duration if active status changed
-      if (body.active === false) {
-        await supabaseAdmin.auth.admin.updateUserById(headId, {
-          ban_duration: '876000h', // 100 years suspension
-        });
-      } else if (body.active === true) {
-        await supabaseAdmin.auth.admin.updateUserById(headId, {
-          ban_duration: 'none',
-        });
-      }
+      // Assignment active status controls portal authorization only.
+      // Supabase Auth bans/unbans must use a separate explicit suspension action;
+      // editing or deactivating an assignment must never change Auth account status.
 
       if (body.fullName !== undefined || body.department !== undefined) {
         const { error: metaErr } = await supabaseAdmin.auth.admin.updateUserById(headId, {
