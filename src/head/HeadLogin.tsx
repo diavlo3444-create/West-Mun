@@ -428,19 +428,25 @@ export const HeadLogin: React.FC<HeadLoginProps> = ({ onSuccess, authError }) =>
           throw new Error(updateErr.message);
         }
 
-        setResetSuccess('Password updated. Opening your department dashboard…');
+        // A recovery/invitation link creates a temporary session. Password setup
+        // is not a completed sign-in: clear the link, end that temporary session,
+        // and require the recipient to authenticate with the password they chose.
+        const accountEmail = updateData?.user?.email || email;
+        try {
+          window.history.replaceState({}, document.title, '/head');
+        } catch {}
+        try {
+          await supabase.auth.signOut();
+        } catch {}
+
+        setEmail(accountEmail);
+        setPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
         setResetToken(null);
         setIsSupabaseRecovery(false);
-
-        if (updateData?.user) {
-          const lookup = await lookupHeadAssignment(updateData.user.id);
-          if (lookup.status === 'success' && lookup.assignment) {
-            setTimeout(() => navigateToDashboard(lookup.assignment!), 1100);
-            return;
-          }
-        }
-
-        setResetSuccess('Password updated. You can now sign in with your new password.');
+        setForgotMode(false);
+        setResetSuccess('Password set successfully. Please sign in with your new password.');
         return;
       } catch (supaErr: unknown) {
         setResettingPassword(false);
