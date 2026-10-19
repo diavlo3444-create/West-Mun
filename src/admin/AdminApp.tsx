@@ -17,6 +17,7 @@ import {
   CircleDot,
   Database,
   ScrollText,
+  UserCheck,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '../lib/supabase';
@@ -29,6 +30,7 @@ import { RegistrationsManager } from './RegistrationsManager';
 import { TeamManagement } from './TeamManagement';
 import { StatisticsReports } from './StatisticsReports';
 import { SuperAdminManager } from './SuperAdminManager';
+import { AdminAccountsManager } from './AdminAccountsManager';
 import { explainError, type Row } from './ui';
 import { DashboardShell, type NavGroup } from '../dashboard/DashboardShell';
 import { Notice, btnPrimary, inputCls, labelCls } from '../dashboard/ui';
@@ -40,6 +42,7 @@ export type NavigationPage =
   | 'registrations'
   | 'teams'
   | 'reports'
+  | 'admin-accounts'
   | 'super-admin'
   | 'messages'
   | 'settings'
@@ -546,7 +549,10 @@ export default function AdminApp() {
       ? [
           {
             label: 'Access & systems',
-            items: [{ id: 'super-admin', label: 'IT Super Admin', icon: ShieldCheck }],
+            items: [
+              { id: 'admin-accounts', label: 'Admin Accounts', icon: UserCheck },
+              { id: 'super-admin', label: 'IT Super Admin', icon: ShieldCheck },
+            ],
           },
         ]
       : []),
@@ -642,6 +648,13 @@ export default function AdminApp() {
 
         {page === 'super-admin' && (
           <SuperAdminManager session={session} isSuperAdmin={Boolean(isAdmin && isSuperAdmin)} />
+        )}
+
+        {page === 'admin-accounts' && (
+          <AdminAccountsManager
+            session={session}
+            isSuperAdmin={Boolean(isAdmin && isSuperAdmin)}
+          />
         )}
 
         {page === 'messages' && <InquiriesManager />}

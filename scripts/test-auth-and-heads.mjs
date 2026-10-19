@@ -276,6 +276,21 @@ check('non-super-admin cannot list head accounts', r.status === 403, r);
 r = await call('GET', '/api/super-admin');
 check('unauthenticated caller cannot list head accounts', r.status === 401, r);
 
+r = await call('GET', '/api/super-admin?scope=admins', { token: 'token-admin' });
+check('non-super-admin cannot access admin accounts list', r.status === 403, r);
+
+r = await call('POST', '/api/super-admin?scope=admins', {
+  token: 'token-admin',
+  body: { fullName: 'Unauthorized Attempt', email: 'intruder@test.org', password: 'ValidPassword123!' },
+});
+check('non-super-admin cannot create admin accounts', r.status === 403, r);
+
+r = await call('GET', '/api/super-admin?scope=admins');
+check('unauthenticated caller cannot access admin accounts list', r.status === 401, r);
+
+r = await call('GET', '/api/super-admin?scope=admins', { token: 'token-super' });
+check('super-admin can access admin accounts list', r.status === 200 && Array.isArray(r.body?.admins), r);
+
 // ---------------------------------------------------------------------------
 // 2. Head account creation / recoverable assignment
 //    Provisioning requires the server-side service-role key (never sent to
