@@ -53,7 +53,9 @@ export default function AdminApp() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [booting, setBooting] = useState(true);
-  const [page, setPage] = useState<NavigationPage>('dashboard');
+  const [page, setPage] = useState<NavigationPage>(() =>
+    new URLSearchParams(window.location.search).has('gmail') ? 'registrations' : 'dashboard',
+  );
 
   // Authentication form state
   const [email, setEmail] = useState('');

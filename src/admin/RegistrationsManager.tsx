@@ -22,6 +22,8 @@ import {
   SlidersHorizontal,
   Inbox,
   ListFilter,
+  Mail,
+  Send,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { explainError, type Row } from './ui';
@@ -129,6 +131,70 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   );
   const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | 'delete' | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
+  const [gmailBusy, setGmailBusy] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [gmailNotice, setGmailNotice] = useState<{ tone: 'success' | 'error' | 'info'; text: string } | null>(null);
+
+  React.useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get('gmail');
+    if (!result) return;
+    const messages: Record<string, { tone: 'success' | 'error' | 'info'; text: string }> = {
+      connected: { tone: 'success', text: 'Gmail is connected. Acceptance emails are still sent manually.' },
+      denied: { tone: 'error', text: 'Google authorization was cancelled.' },
+      'config-error': { tone: 'error', text: 'Gmail setup is incomplete. Check the required Supabase Edge Function secrets.' },
+      'invalid-state': { tone: 'error', text: 'The Gmail authorization state was invalid. Start the connection again.' },
+      'expired-state': { tone: 'error', text: 'The Gmail authorization expired. Start the connection again.' },
+      'used-or-expired-state': { tone: 'error', text: 'This Gmail authorization link was already used or expired. Start again.' },
+      'admin-not-authorized': { tone: 'error', text: 'The account that started Gmail authorization is no longer an authorised admin.' },
+      'token-exchange-failed': { tone: 'error', text: 'Google did not complete the token exchange. Check OAuth client settings and try again.' },
+      'refresh-token-missing': { tone: 'error', text: 'Google did not return a refresh token. Reconnect and approve access when prompted.' },
+      'token-save-failed': { tone: 'error', text: 'Gmail authorization succeeded but the encrypted token could not be saved.' },
+      'callback-failed': { tone: 'error', text: 'Gmail authorization failed. Check server configuration and try again.' },
+    };
+    setGmailNotice(messages[result] ?? { tone: 'info', text: `Gmail connection result: ${result.replace(/-/g, ' ')}.` });
+    const url = new URL(window.location.href);
+    url.searchParams.delete('gmail');
+    window.history.replaceState({}, '', url.toString());
+  }, []);
+
+  const connectGmail = async () => {
+    if (!supabase || gmailBusy) return;
+    setGmailBusy(true);
+    setGmailNotice(null);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('gmail-oauth-start', { body: {} });
+      if (invokeError || !data?.authorization_url) {
+        setGmailNotice({ tone: 'error', text: invokeError?.message || data?.error || 'Could not start Gmail authorization.' });
+        return;
+      }
+      window.location.assign(data.authorization_url);
+    } catch {
+      setGmailNotice({ tone: 'error', text: 'Could not start Gmail authorization. Check the connection and try again.' });
+    } finally {
+      setGmailBusy(false);
+    }
+  };
+
+  const sendAcceptanceEmail = async () => {
+    if (!supabase || !activeItem || activeItem._type !== 'delegate' || activeItem.status !== 'accepted' || emailBusy) return;
+    if (!window.confirm(`Send the WEST MUN acceptance email to ${activeItem.email} now? This sends a real email.`)) return;
+    setEmailBusy(true);
+    setGmailNotice(null);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('gmail-send-acceptance', {
+        body: { delegateId: activeItem.id },
+      });
+      if (invokeError || !data?.sent) {
+        setGmailNotice({ tone: 'error', text: invokeError?.message || data?.error || 'Email was not confirmed as sent.' });
+        return;
+      }
+      setGmailNotice({ tone: 'success', text: `Acceptance email sent to ${data.recipient || activeItem.email}.` });
+    } catch {
+      setGmailNotice({ tone: 'error', text: 'Could not confirm the email result. Check the Edge Function logs before trying again.' });
+    } finally {
+      setEmailBusy(false);
+    }
+  };
 
   const openItem = (item: UnifiedRegistration) => {
     setActiveItem(item);
@@ -395,6 +461,10 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         description="Review every application in one place. Decisions and private notes are written straight to Supabase."
         actions={
           <>
+            <button type="button" onClick={connectGmail} className={btnGhost} disabled={gmailBusy}>
+              {gmailBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Mail className="h-3.5 w-3.5" aria-hidden="true" />}
+              Connect Gmail
+            </button>
             <button type="button" onClick={onRefresh} className={btnSecondary} disabled={loading}>
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
               Refresh
@@ -416,6 +486,20 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         <Notice tone="error" title="Could not refresh every record">
           {error}
         </Notice>
+      )}
+      {gmailNotice && (
+        <div
+          className={`rounded-md border p-3 text-xs ${
+            gmailNotice.tone === 'success'
+              ? 'border-emerald-500/30 bg-emerald-950/25 text-emerald-200'
+              : gmailNotice.tone === 'error'
+                ? 'border-rose-500/30 bg-rose-950/25 text-rose-200'
+                : 'border-[#d4af37]/30 bg-neutral-900 text-neutral-200'
+          }`}
+          role="status"
+        >
+          {gmailNotice.text}
+        </div>
       )}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -978,7 +1062,19 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                     Status changes are written directly to the registrations table.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeItem._type === 'delegate' && activeItem.status === 'accepted' && (
+                    <button
+                      type="button"
+                      onClick={sendAcceptanceEmail}
+                      disabled={emailBusy || saving}
+                      className={btnGhost}
+                      title="Send the acceptance email manually. Nothing is sent automatically."
+                    >
+                      {emailBusy ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <Send className="h-3 w-3" aria-hidden="true" />}
+                      Send acceptance email
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setPendingAction('approve')}
