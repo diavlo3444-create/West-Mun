@@ -53,7 +53,7 @@ export default function TeamMemberPortal() {
             <LockKeyhole className="mx-auto h-8 w-8 text-rose-300" />
             <h1 className="mt-4 font-serif text-2xl">Team access required</h1>
             <p className="mt-2 text-sm leading-relaxed text-neutral-400">This page is only available to an account invited for this team. Sign up with your official one-time invitation link or contact your section head.</p>
-            <a href="/" className="mt-5 inline-flex rounded-md border border-white/10 px-4 py-2 text-xs text-neutral-200 hover:bg-white/5">Return to website</a>
+            <a href="/login" className="mt-5 inline-flex rounded-md border border-[#d4af37]/30 px-4 py-2 text-xs text-[#e2c258] hover:bg-[#d4af37]/10">Sign in</a>
           </div>
         ) : (
           <>
