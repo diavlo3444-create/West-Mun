@@ -183,15 +183,39 @@ function loadSettings(): Promise<Settings | null> {
   return settingsPromise;
 }
 
+export function invalidateSettingsCache(): void {
+  settingsPromise = null;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('westmun:settings_updated'));
+  }
+}
+
+export function invalidateTableCache(table?: string): void {
+  if (table) {
+    tableCache.delete(table);
+  } else {
+    tableCache.clear();
+  }
+}
+
 export function useSettings(): Settings {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   useEffect(() => {
     let alive = true;
-    loadSettings().then((data) => {
-      if (alive && data) setSettings({ ...DEFAULT_SETTINGS, ...data });
-    });
+    const fetchSettings = () => {
+      loadSettings().then((data) => {
+        if (alive && data) setSettings({ ...DEFAULT_SETTINGS, ...data });
+      });
+    };
+    fetchSettings();
+    const handleUpdate = () => {
+      settingsPromise = null;
+      fetchSettings();
+    };
+    window.addEventListener('westmun:settings_updated', handleUpdate);
     return () => {
       alive = false;
+      window.removeEventListener('westmun:settings_updated', handleUpdate);
     };
   }, []);
   return settings;

@@ -1,10 +1,54 @@
 import React from 'react';
-import { Target, Award, Users2, Calendar, MapPin, Building } from 'lucide-react';
+import { Target, Award, Users2, Calendar, MapPin, Building, Globe } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
+import { useCmsContent } from '../lib/cmsContent';
 
 export const AboutSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
+  const { t } = useCmsContent();
+
+  const eyebrow = t('about_eyebrow', 'Institutional Profile');
+  const title = t('about_title', 'About WEST MUN');
+  const description = t(
+    'about_description',
+    'WEST MUN is established to offer an uncompromising, academically rigorous platform for high school and collegiate delegates. We convene future diplomats to test their grasp of real-time crises, treaty obligations, and international negotiation.',
+  );
+  const missionTitle = t('about_mission_title', 'Mission & Vision');
+  const missionText = t(
+    'about_mission_text',
+    'Our mission is to foster analytical critical thinking, cross-cultural empathy, and diplomatic discipline. WEST MUN empowers delegates to deconstruct complex international deadlocks and build durable coalitions through consensus.',
+  );
+  const themeTitle = t('about_theme_notice_title', 'Official Conference Theme');
+  const themeText = t(
+    'about_theme_notice_text',
+    'TBA — The Secretariat will release the annual conference theme and comprehensive delegate handbook ahead of the registration deadline.',
+  );
+  const whyTitle = t('about_why_title', 'Why Participate?');
+  const whyBullet1 = t(
+    'about_why_bullet1',
+    'Develop substantive fluency in international law, foreign policy, and treaty resolution drafting.',
+  );
+  const whyBullet2 = t(
+    'about_why_bullet2',
+    'Gain command of parliamentary procedure and high-stakes diplomatic rhetoric under pressure.',
+  );
+  const whyBullet3 = t(
+    'about_why_bullet3',
+    'Network with driven student delegates, faculty advisors, and guest speakers in international affairs.',
+  );
+  const expectationsTitle = t('about_expectations_title', 'What Delegates Can Expect');
+  const expectationsText = t(
+    'about_expectations_text',
+    'From opening plenary to final voting procedure, delegates will engage in rigorous committee sessions led by experienced dais members. Expect deep background research, dynamic crises updates, spirited debate, and collegiate social events.',
+  );
+  const factsDates = t('conference_dates') || t('about_facts_dates', 'TBA');
+  const factsVenue = t('conference_venue') || t('about_facts_venue', 'TBA');
+  const factsDelegations = t('about_facts_delegations', 'Single Delegates & School Delegations');
+  const factsLanguage = t(
+    'about_facts_language',
+    'English (Official UN Parliamentary Procedure)',
+  );
 
   return (
     <section id="about" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
@@ -19,20 +63,17 @@ export const AboutSection: React.FC = React.memo(() => {
           <div className="flex items-center gap-2 mb-3">
             <span className="w-8 h-[1px] bg-[#d4af37]" />
             <span className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">
-              Institutional Profile
+              {eyebrow}
             </span>
           </div>
           <h2
             className="text-3xl sm:text-5xl font-serif font-normal text-white tracking-tight leading-tight mb-6"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            About{' '}
-            <span className="gold-gradient-text shimmer-gold shimmer-stagger-3">
-              WEST MUN
-            </span>
+            {title}
           </h2>
           <p className="text-neutral-300 text-base sm:text-lg leading-relaxed font-light">
-            WEST MUN is established to offer an uncompromising, academically rigorous platform for high school and collegiate delegates. We convene future diplomats to test their grasp of real-time crises, treaty obligations, and international negotiation.
+            {description}
           </p>
         </motion.div>
 
@@ -48,34 +89,34 @@ export const AboutSection: React.FC = React.memo(() => {
             <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm hover:border-[#d4af37]/30 transition-colors">
               <div className="flex items-center gap-3 mb-4 text-[#d4af37]">
                 <Target className="w-5 h-5" />
-                <h3 className="text-xl font-serif text-white">Mission & Vision</h3>
+                <h3 className="text-xl font-serif text-white">{missionTitle}</h3>
               </div>
               <p className="text-neutral-400 text-sm leading-relaxed mb-4">
-                Our mission is to foster analytical critical thinking, cross-cultural empathy, and diplomatic discipline. WEST MUN empowers delegates to deconstruct complex international deadlocks and build durable coalitions through consensus.
+                {missionText}
               </p>
               <div className="p-4 bg-[#121215] border-l-2 border-[#d4af37] text-xs text-neutral-300">
-                <span className="text-[#d4af37] font-semibold block mb-1">Official Conference Theme</span>
-                TBA — The Secretariat will release the annual conference theme and comprehensive delegate handbook ahead of the registration deadline.
+                <span className="text-[#d4af37] font-semibold block mb-1">{themeTitle}</span>
+                {themeText}
               </div>
             </div>
 
             <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm hover:border-[#d4af37]/30 transition-colors">
               <div className="flex items-center gap-3 mb-4 text-[#d4af37]">
                 <Award className="w-5 h-5" />
-                <h3 className="text-xl font-serif text-white">Why Participate?</h3>
+                <h3 className="text-xl font-serif text-white">{whyTitle}</h3>
               </div>
               <ul className="space-y-3 text-sm text-neutral-400">
                 <li className="flex items-start gap-2.5">
                   <span className="text-[#d4af37] font-serif text-base">✦</span>
-                  <span>Develop substantive fluency in international law, foreign policy, and treaty resolution drafting.</span>
+                  <span>{whyBullet1}</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="text-[#d4af37] font-serif text-base">✦</span>
-                  <span>Gain command of parliamentary procedure and high-stakes diplomatic rhetoric under pressure.</span>
+                  <span>{whyBullet2}</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="text-[#d4af37] font-serif text-base">✦</span>
-                  <span>Network with driven student delegates, faculty advisors, and guest speakers in international affairs.</span>
+                  <span>{whyBullet3}</span>
                 </li>
               </ul>
             </div>
@@ -91,10 +132,10 @@ export const AboutSection: React.FC = React.memo(() => {
             <div className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm hover:border-[#d4af37]/30 transition-colors">
               <div className="flex items-center gap-3 mb-4 text-[#d4af37]">
                 <Users2 className="w-5 h-5" />
-                <h3 className="text-xl font-serif text-white">What Delegates Can Expect</h3>
+                <h3 className="text-xl font-serif text-white">{expectationsTitle}</h3>
               </div>
               <p className="text-neutral-400 text-sm leading-relaxed mb-6">
-                From opening plenary to final voting procedure, delegates will engage in rigorous committee sessions led by experienced dais members. Expect deep background research, dynamic crises updates, spirited debate, and collegiate social events.
+                {expectationsText}
               </p>
 
               {/* Conference Facts Table with Mandatory TBA policy */}
@@ -108,28 +149,28 @@ export const AboutSection: React.FC = React.memo(() => {
                       <Calendar className="w-3.5 h-3.5 text-[#d4af37]" />
                       <span>Dates</span>
                     </dt>
-                    <dd className="font-mono text-white font-medium">TBA</dd>
+                    <dd className="font-mono text-white font-medium">{factsDates}</dd>
                   </div>
                   <div className="px-4 py-3 flex justify-between items-center bg-[#0e0e11]">
                     <dt className="text-neutral-400 flex items-center gap-2">
                       <MapPin className="w-3.5 h-3.5 text-[#d4af37]" />
                       <span>Venue / Host City</span>
                     </dt>
-                    <dd className="font-mono text-white font-medium">TBA</dd>
+                    <dd className="font-mono text-white font-medium">{factsVenue}</dd>
                   </div>
                   <div className="px-4 py-3 flex justify-between items-center bg-[#09090b]">
                     <dt className="text-neutral-400 flex items-center gap-2">
                       <Building className="w-3.5 h-3.5 text-[#d4af37]" />
-                      <span>Host Institution</span>
+                      <span>Delegations</span>
                     </dt>
-                    <dd className="font-mono text-white font-medium">TBA</dd>
+                    <dd className="font-mono text-white font-medium">{factsDelegations}</dd>
                   </div>
                   <div className="px-4 py-3 flex justify-between items-center bg-[#0e0e11]">
                     <dt className="text-neutral-400 flex items-center gap-2">
-                      <Users2 className="w-3.5 h-3.5 text-[#d4af37]" />
-                      <span>Target Delegation</span>
+                      <Globe className="w-3.5 h-3.5 text-[#d4af37]" />
+                      <span>Language</span>
                     </dt>
-                    <dd className="font-mono text-white font-medium">High School & University</dd>
+                    <dd className="font-mono text-white font-medium">{factsLanguage}</dd>
                   </div>
                 </dl>
               </div>

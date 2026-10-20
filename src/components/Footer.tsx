@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowUp, Shield, Instagram } from 'lucide-react';
 import { useInView } from '../hooks/useInView';
 import { useSettings, orTba } from '../lib/content';
+import { useCmsContent } from '../lib/cmsContent';
 import { safeUrl } from '../lib/safe';
 
 interface FooterProps {
@@ -12,8 +13,18 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
   const { ref, isInView } = useInView<HTMLElement>({ threshold: 0.05 });
   const currentYear = 2027;
   const settings = useSettings();
+  const { t } = useCmsContent();
   const instagramUrl = safeUrl(settings.instagram_url);
   const contactEmail = settings.contact_email.trim();
+
+  const brandTitle = t('footer_brand_title', 'WEST MUN');
+  const brandTagline = t('footer_brand_tagline', 'Where Diplomacy Meets Leadership');
+  const description = t(
+    'footer_description',
+    'Western Model United Nations Conference. Fostering diplomatic negotiation, global perspective, and principled leadership through rigorous international simulations.',
+  );
+  const badgeText = t('footer_badge_text', 'Official Conference Secretariat');
+  const copyright = t('footer_copyright', `© ${currentYear} WEST MUN (Model United Nations). All rights reserved.`);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -42,19 +53,19 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
                   className="text-xl font-bold tracking-wider text-white font-serif leading-tight"
                   style={{ fontFamily: 'var(--font-heading)' }}
                 >
-                  WEST <span className="text-[#d4af37]">MUN</span>
+                  <span className="text-white">{brandTitle}</span>
                 </span>
                 <span className="text-[10px] tracking-widest uppercase text-neutral-400 font-sans">
-                  Where Diplomacy Meets Leadership
+                  {brandTagline}
                 </span>
               </div>
             </div>
             <p className="text-neutral-400 text-xs sm:text-sm font-light max-w-sm leading-relaxed">
-              Western Model United Nations Conference. Fostering diplomatic negotiation, global perspective, and principled leadership through rigorous international simulations.
+              {description}
             </p>
             <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono">
               <Shield className="w-3.5 h-3.5 text-[#d4af37]" />
-              <span>Official Conference Secretariat</span>
+              <span>{badgeText}</span>
             </div>
           </div>
 
@@ -127,7 +138,7 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
 
         {/* Bottom Bar with Back to Top */}
         <div className="pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
-          <p>© {currentYear} WEST MUN (Model United Nations). All rights reserved.</p>
+          <p>{copyright}</p>
           <div className="flex items-center gap-6">
             <a href="/terms" className="hover:text-[#d4af37] transition-colors">Terms of Service</a>
             <a href="/privacy" className="hover:text-[#d4af37] transition-colors">Privacy Policy</a>

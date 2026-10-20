@@ -2,40 +2,25 @@ import React from 'react';
 import { Mic2, ScrollText, Users, Scale } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
+import { useCmsContent } from '../lib/cmsContent';
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  Scale,
+  ScrollText,
+  Mic2,
+  Users,
+};
 
 export const ConferenceHighlights: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
+  const { t, highlightItems } = useCmsContent();
 
-  const highlights = [
-    {
-      icon: Scale,
-      title: 'Debate & Diplomacy',
-      description:
-        'Engage in parliamentary procedure under strict Rules of Procedure. Deliver formal speeches, raise points of inquiry, and present diplomatic counter-arguments while adhering to country policy.',
-      metrics: 'Rules of Procedure · Parliamentary Floor · Moderated Caucuses',
-    },
-    {
-      icon: ScrollText,
-      title: 'Research & Resolution Writing',
-      description:
-        'Analyze extensive background guides, historical treaties, and international law. Draft rigorous preambulatory and operative clauses that propose tangible solutions to global crises.',
-      metrics: 'Working Papers · Draft Resolutions · Direct Amendments',
-    },
-    {
-      icon: Mic2,
-      title: 'Public Speaking & Rhetoric',
-      description:
-        'Hone oratorical confidence and poise in front of a committee of international peers. Learn to articulate complex geopolitical arguments under strict speech-timer limits.',
-      metrics: 'Speakers List · Right of Reply · Point of Information',
-    },
-    {
-      icon: Users,
-      title: 'Collaboration & Leadership',
-      description:
-        'Coordinate multilateral blocs during unmoderated sessions. Reconcile conflicting sovereign interests, negotiate mutual concessions, and lead sponsor groups toward a two-thirds majority vote.',
-      metrics: 'Bloc Consensus · Coalition Building · Sponsor Leadership',
-    },
-  ];
+  const eyebrow = t('highlights_eyebrow', 'Core Academic Disciplines');
+  const title = t('highlights_title', 'Conference Highlights');
+  const description = t(
+    'highlights_description',
+    'Model United Nations provides hands-on mastery of diplomacy, speechwriting, geopolitical strategy, and international dispute resolution.',
+  );
 
   return (
     <section id="highlights" ref={ref} className="section-content-visibility relative z-20 py-24 bg-[#0a0a0c] text-white border-t border-neutral-900">
@@ -45,27 +30,27 @@ export const ConferenceHighlights: React.FC = React.memo(() => {
             <div className="flex items-center gap-2 mb-3">
               <span className="w-8 h-[1px] bg-[#d4af37]" />
               <span className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">
-                Core Academic Disciplines
+                {eyebrow}
               </span>
             </div>
             <h2
               className="text-3xl sm:text-5xl font-serif font-normal text-white tracking-tight"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
-              Conference <span className="gold-gradient-text">Highlights</span>
+              {title}
             </h2>
           </div>
           <p className="text-neutral-400 text-sm max-w-md font-light">
-            Model United Nations provides hands-on mastery of diplomacy, speechwriting, geopolitical strategy, and international dispute resolution.
+            {description}
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-          {highlights.map((item, idx) => {
-            const Icon = item.icon;
+          {highlightItems.map((item, idx) => {
+            const Icon = (item.icon && ICON_MAP[item.icon]) || Scale;
             return (
               <motion.div
-                key={item.title}
+                key={item.id || item.title}
                 initial={{ opacity: 0, y: 18 }}
                 animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
                 transition={{ duration: 0.5, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}

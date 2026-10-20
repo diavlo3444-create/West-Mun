@@ -2,30 +2,30 @@ import React from 'react';
 import { Compass, BookOpen, Handshake, Globe } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
+import { useCmsContent } from '../lib/cmsContent';
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  Compass,
+  BookOpen,
+  Handshake,
+  Globe,
+};
 
 export const ConferenceIntro: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
+  const { t, introPillars } = useCmsContent();
 
-  const pillars = [
-    {
-      icon: Compass,
-      title: 'Sovereign Representation',
-      description:
-        'Step into the shoes of career diplomats and heads of state. Defend geopolitical stances, reconcile competing alliances, and defend constitutional mandates through reasoned debate.',
-    },
-    {
-      icon: Handshake,
-      title: 'Multilateral Consensus',
-      description:
-        'Real world solutions cannot be dictated; they must be negotiated. Experience unmoderated caucuses, coalition building, compromise, and diplomatic bridge-building across ideological divides.',
-    },
-    {
-      icon: BookOpen,
-      title: 'Resolution Crafting',
-      description:
-        'Transform discussions into actionable international policy. Draft operative clauses, debate formal amendments, and establish international frameworks addressing modern global challenges.',
-    },
-  ];
+  const eyebrow = t('intro_eyebrow', 'The Mission of WEST MUN');
+  const title = t('intro_title', 'Diplomacy. Dialogue. Impact.');
+  const description = t(
+    'intro_description',
+    'Model United Nations is an authentic simulation of the UN General Assembly, Security Council, and multilateral diplomatic agencies. Delegates represent sovereign nations, advocating foreign policy objectives, drafting binding resolutions, and navigating international crises.',
+  );
+  const themeBadge = t('intro_theme_badge', 'Official Conference Theme');
+  const themeText = t(
+    'intro_theme_text',
+    'To Be Announced (TBA) by the Secretariat prior to registration opening.',
+  );
 
   return (
     <section id="intro" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#070707] text-white border-t border-neutral-900">
@@ -40,30 +40,27 @@ export const ConferenceIntro: React.FC = React.memo(() => {
           <div className="flex items-center gap-2 mb-3">
             <span className="w-8 h-[1px] bg-[#d4af37]" />
             <span className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">
-              The Mission of WEST MUN
+              {eyebrow}
             </span>
           </div>
           <h2
             className="text-3xl sm:text-5xl font-serif font-normal text-white tracking-tight leading-tight mb-6"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            Diplomacy. Dialogue.{' '}
-            <span className="gold-gradient-text shimmer-gold shimmer-stagger-1">
-              Impact.
-            </span>
+            {title}
           </h2>
           <p className="text-neutral-300 text-base sm:text-lg leading-relaxed font-light">
-            Model United Nations is an authentic simulation of the UN General Assembly, Security Council, and multilateral diplomatic agencies. Delegates represent sovereign nations, advocating foreign policy objectives, drafting binding resolutions, and navigating international crises.
+            {description}
           </p>
         </motion.div>
 
         {/* 3 Pillars of Diplomatic Engagement */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          {pillars.map((pillar, index) => {
-            const Icon = pillar.icon;
+          {introPillars.map((pillar, index) => {
+            const Icon = (pillar.icon && ICON_MAP[pillar.icon]) || Compass;
             return (
               <motion.div
-                key={pillar.title}
+                key={pillar.id || pillar.title}
                 initial={{ opacity: 0, y: 24 }}
                 animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
                 transition={{
@@ -95,10 +92,10 @@ export const ConferenceIntro: React.FC = React.memo(() => {
             <Globe className="w-5 h-5 text-[#d4af37] shrink-0" />
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-[#d4af37] block">
-                Official Conference Theme
+                {themeBadge}
               </span>
               <span className="text-sm text-neutral-300">
-                To Be Announced (TBA) by the Secretariat prior to registration opening.
+                {themeText}
               </span>
             </div>
           </div>

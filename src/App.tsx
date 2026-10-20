@@ -15,10 +15,11 @@ import { Footer } from './components/Footer';
 import { AnnouncementsSection } from './components/AnnouncementsSection';
 import { DocumentsSection } from './components/DocumentsSection';
 import { SponsorsSection } from './components/SponsorsSection';
-
-
+import { CustomSectionsRenderer } from './components/CustomSectionsRenderer';
+import { useCmsContent } from './lib/cmsContent';
 
 export default function App() {
+  const { customSections } = useCmsContent();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Intro animation playback state:
@@ -120,6 +121,9 @@ export default function App() {
 
       {/* K. Contact & Inquiries */}
       <ContactSection />
+
+      {/* User-Defined Custom CMS Sections */}
+      <CustomSectionsRenderer sections={customSections} />
 
       {/* L. Conference Footer */}
       <Footer onReplayIntro={handleReplayIntro} />

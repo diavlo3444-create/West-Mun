@@ -7,8 +7,10 @@ import {
   MessageSquare,
   ShieldAlert,
   LogOut,
+  Globe,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { WebsiteEditor } from '../admin/WebsiteEditor';
 import {
   DEPARTMENTS,
   canManageRegistrations,
@@ -450,12 +452,16 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     })),
   ];
 
+  const isCmsDepartment =
+    department === 'design' || department === 'marketing' || department === 'pr' || department === 'it';
+
   const operationsNavItems: NavItem[] = [
     ...(registrationAccess
       ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
       : []),
     ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
     ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
+    ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
     { id: 'department', label: 'Assignment', icon: Building2 },
   ];
 
@@ -469,15 +475,17 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const viewLabel =
     view === 'overview'
       ? 'Overview'
-      : view === 'registrations'
-        ? 'Applications'
-        : view === 'sponsors'
-          ? 'Sponsors & Partners'
-          : view === 'inquiries'
-            ? 'Inquiries & Messages'
-            : view === 'department'
-              ? 'Assignment'
-              : activeModule?.label || 'Workspace';
+      : view === 'website-editor'
+        ? 'Website CMS'
+        : view === 'registrations'
+          ? 'Applications'
+          : view === 'sponsors'
+            ? 'Sponsors & Partners'
+            : view === 'inquiries'
+              ? 'Inquiries & Messages'
+              : view === 'department'
+                ? 'Assignment'
+                : activeModule?.label || 'Workspace';
 
   const displayName = (headName && headName.trim()) || headEmail.split('@')[0] || 'Department head';
 
@@ -636,6 +644,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
         {view === 'inquiries' && isHr && (
           <HeadInquiriesManager headName={headName} headEmail={headEmail} />
+        )}
+
+        {view === 'website-editor' && (
+          <WebsiteEditor authorName={displayName} authorEmail={headEmail} />
         )}
 
         {view === 'department' && (

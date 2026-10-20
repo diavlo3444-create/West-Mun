@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback, memo } from 'react';
 import { ArrowRight, ShieldCheck, Sparkles, ChevronDown } from 'lucide-react';
+import { useCmsContent } from '../lib/cmsContent';
 
 interface HeroProps {
   displayedText?: string;
@@ -14,10 +15,13 @@ const FULL_DISPATCH_TEXT =
 const TypewriterDispatch = memo(({
   fallbackText,
   fallbackDone,
+  dispatchText = FULL_DISPATCH_TEXT,
 }: {
   fallbackText?: string;
   fallbackDone?: boolean;
+  dispatchText?: string;
 }) => {
+  const targetText = dispatchText || FULL_DISPATCH_TEXT;
   const [text, setText] = useState(() => fallbackText || '');
   const [done, setDone] = useState(() => fallbackDone || false);
 
@@ -35,10 +39,10 @@ const TypewriterDispatch = memo(({
     timer = window.setTimeout(() => {
       interval = window.setInterval(() => {
         index++;
-        if (index <= FULL_DISPATCH_TEXT.length) {
-          setText(FULL_DISPATCH_TEXT.slice(0, index));
+        if (index <= targetText.length) {
+          setText(targetText.slice(0, index));
         }
-        if (index >= FULL_DISPATCH_TEXT.length) {
+        if (index >= targetText.length) {
           if (interval !== null) clearInterval(interval);
           setDone(true);
         }
@@ -49,7 +53,7 @@ const TypewriterDispatch = memo(({
       if (timer !== null) clearTimeout(timer);
       if (interval !== null) clearInterval(interval);
     };
-  }, [fallbackText, fallbackDone]);
+  }, [fallbackText, fallbackDone, targetText]);
 
   return (
     <p className="text-sm sm:text-base text-neutral-200 font-normal leading-relaxed text-center">
@@ -317,6 +321,25 @@ class VelocityInertiaHelper {
 }
 
 export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) => {
+  const { t } = useCmsContent();
+  const stage1Eyebrow = t('hero_stage1_eyebrow', 'Official Delegation Summit · 2027');
+  const stage1Title = t('hero_stage1_title', 'WEST MUN 2027');
+  const stage1Subtitle = t('hero_stage1_subtitle', 'The Western Model United Nations Conference — convening sovereign youth delegations to debate global crises, draft treaties, and advance multilateral diplomacy.');
+  const stage1ScrollHint = t('hero_stage1_scroll_hint', 'Scroll down to initiate proceedings');
+  const stage2Badge = t('hero_stage2_badge', 'Plenary Session Dispatch');
+  const stage2Title = t('hero_stage2_title', 'Diplomatic Engagement in Real-Time');
+  const stage2Dispatch = t('hero_stage2_dispatch', FULL_DISPATCH_TEXT);
+  const stage2Pill1 = t('hero_stage2_pill1', '✓ Parliamentary Procedure');
+  const stage2Pill2 = t('hero_stage2_pill2', '✓ Consensus Building');
+  const stage2Pill3 = t('hero_stage2_pill3', '✓ Working Resolutions');
+  const stage3Eyebrow = t('hero_stage3_eyebrow', 'Registration: TBA');
+  const stage3Title = t('hero_stage3_title', 'Take Your Seat on the World Stage');
+  const stage3Desc = t('hero_stage3_description', 'Whether representing a permanent member of the Security Council or leading an assembly coalition, WEST MUN provides the substantive arena for your diplomatic ambitions.');
+  const ctaPrimaryLabel = t('hero_cta_primary_label', 'Registration: TBA');
+  const ctaPrimaryHref = t('hero_cta_primary_href', '#register');
+  const ctaSecondaryLabel = t('hero_cta_secondary_label', 'Explore the Conference');
+  const ctaSecondaryHref = t('hero_cta_secondary_href', '#about');
+
   const heroTrackRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoParallaxRef = useRef<HTMLDivElement>(null);
@@ -779,7 +802,7 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
               <div className="inline-flex items-center justify-center gap-2 mb-4 px-3.5 py-1 bg-[#0c0c0e]/95 border border-[#d4af37]/40 rounded-sm shadow-[0_0_15px_rgba(212,175,55,0.15)]">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#d4af37]" />
                 <span className="text-[11px] sm:text-xs font-medium uppercase tracking-widest text-[#f3e5ab]">
-                  Official Delegation Summit · 2027
+                  {stage1Eyebrow}
                 </span>
               </div>
 
@@ -787,19 +810,18 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
                 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-white mb-4 font-serif leading-[1.06] text-center"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
-                <span className="shimmer-platinum">WEST</span>{' '}
-                <span className="shimmer-gold">MUN</span>
+                {stage1Title}
               </h1>
 
               <div className="w-24 h-[2px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent mb-5 mx-auto" />
 
               <p className="text-base sm:text-lg md:text-xl text-neutral-300 font-light leading-relaxed mb-6 text-center max-w-2xl mx-auto">
-                The Western Model United Nations Conference — convening sovereign youth delegations to debate global crises, draft treaties, and advance multilateral diplomacy.
+                {stage1Subtitle}
               </p>
 
               <div className="flex items-center justify-center gap-3 text-xs tracking-widest uppercase text-neutral-400 mx-auto text-center">
                 <span className="text-[#d4af37]">✦</span>
-                <span>Scroll down to initiate proceedings</span>
+                <span>{stage1ScrollHint}</span>
                 <span className="animate-pulse text-[#d4af37]">↓</span>
               </div>
             </div>
@@ -819,7 +841,7 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
               <div className="inline-flex items-center justify-center gap-2 mb-3">
                 <Sparkles className="w-4 h-4 text-[#d4af37]" />
                 <span className="text-xs uppercase tracking-widest text-[#d4af37] font-semibold">
-                  Plenary Session Dispatch
+                  {stage2Badge}
                 </span>
               </div>
 
@@ -827,11 +849,7 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
                 className="text-2xl sm:text-4xl font-serif text-white mb-4 leading-snug text-center"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
-                Diplomatic{' '}
-                <span className="gold-gradient-text shimmer-gold shimmer-stagger-1">
-                  Engagement
-                </span>{' '}
-                in Real-Time
+                {stage2Title}
               </h2>
 
               {/* Typewriter Text Container */}
@@ -839,18 +857,19 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
                 <TypewriterDispatch
                   fallbackText={displayedText}
                   fallbackDone={isDoneTyping}
+                  dispatchText={stage2Dispatch}
                 />
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-xs font-mono text-neutral-400 mx-auto">
                 <span className="px-2.5 py-1 bg-black/70 border border-neutral-800 rounded-sm">
-                  ✓ Parliamentary Procedure
+                  {stage2Pill1}
                 </span>
                 <span className="px-2.5 py-1 bg-black/70 border border-neutral-800 rounded-sm">
-                  ✓ Consensus Building
+                  {stage2Pill2}
                 </span>
                 <span className="px-2.5 py-1 bg-black/70 border border-neutral-800 rounded-sm">
-                  ✓ Working Resolutions
+                  {stage2Pill3}
                 </span>
               </div>
             </div>
@@ -868,38 +887,35 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
               }}
             >
               <div className="inline-flex items-center justify-center gap-2 mb-3 px-3 py-1 bg-[#141418] border border-[#d4af37]/30 rounded-sm text-xs text-[#f3e5ab] font-medium uppercase tracking-wider">
-                Registration: TBA
+                {stage3Eyebrow}
               </div>
 
               <h2
                 className="text-3xl sm:text-5xl font-serif text-white mb-4 text-center leading-tight"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
-                Take Your Seat on the{' '}
-                <span className="gold-gradient-text shimmer-gold shimmer-stagger-2">
-                  World Stage
-                </span>
+                {stage3Title}
               </h2>
 
               <p className="text-neutral-300 text-sm sm:text-base mb-8 max-w-xl mx-auto font-light leading-relaxed text-center">
-                Whether representing a permanent member of the Security Council or leading an assembly coalition, WEST MUN provides the substantive arena for your diplomatic ambitions.
+                {stage3Desc}
               </p>
 
               {/* Dual Action CTAs */}
               <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mx-auto w-full max-w-md sm:max-w-none">
                 <a
-                  href="#register"
+                  href={ctaPrimaryHref}
                   className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 text-xs sm:text-sm font-semibold uppercase tracking-widest text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_20px_rgba(212,175,55,0.3)] cursor-pointer"
                 >
-                  <span>Registration: TBA</span>
+                  <span>{ctaPrimaryLabel}</span>
                   <ArrowRight className="w-4 h-4 text-black" />
                 </a>
 
                 <a
-                  href="#about"
+                  href={ctaSecondaryHref}
                   className="inline-flex items-center justify-center gap-2 px-7 py-3.5 text-xs sm:text-sm font-medium uppercase tracking-widest text-white bg-[#0e0e11]/90 border border-neutral-700 hover:border-[#d4af37]/60 hover:text-[#d4af37] rounded-sm transition-all active:scale-95 cursor-pointer"
                 >
-                  <span>Explore the Conference</span>
+                  <span>{ctaSecondaryLabel}</span>
                 </a>
               </div>
             </div>

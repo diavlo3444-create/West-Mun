@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
+import { useCmsContent } from '../lib/cmsContent';
 
 interface NavbarProps {
   scrolled?: boolean;
@@ -16,7 +17,11 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
   logoVisible = true,
   navVisible = true,
 }) => {
-  const regLabel = 'Registration: TBA';
+  const { t, navLinks } = useCmsContent();
+  const regLabel = t('nav_cta_label', 'Registration: TBA');
+  const regHref = t('nav_cta_href', '#register');
+  const brandTitle = t('nav_brand_title', 'WEST MUN');
+  const brandSubtitle = t('nav_brand_subtitle', 'Model United Nations');
   const [internalScrolled, setInternalScrolled] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.scrollY > 40;
@@ -52,17 +57,6 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
       }
     };
   }, [externalScrolled]);
-
-  const navLinks = [
-    { label: 'Home', href: '#hero' },
-    { label: 'About', href: '#about' },
-    { label: 'Committees', href: '#committees' },
-    { label: 'Schedule', href: '#schedule' },
-    { label: 'Secretariat', href: '#secretariat' },
-    { label: 'FAQ', href: '#faq' },
-    { label: 'Contact', href: '#contact' },
-  ];
-
 
   return (
     <>
@@ -132,7 +126,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
             <motion.a
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
-              href="#register"
+              href={regHref}
               className="inline-flex items-center justify-center px-4 py-2 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 transition-all shadow-[0_2px_12px_rgba(212,175,55,0.25)]"
             >
               {regLabel}
@@ -201,7 +195,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
         ))}
         <div className="pt-4 w-full max-w-xs border-t border-neutral-800">
           <motion.a
-            href="#register"
+            href={regHref}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setMenuOpen(false)}

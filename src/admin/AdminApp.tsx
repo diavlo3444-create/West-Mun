@@ -18,6 +18,7 @@ import {
   Database,
   ScrollText,
   UserCheck,
+  Globe,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '../lib/supabase';
@@ -31,6 +32,7 @@ import { TeamManagement } from './TeamManagement';
 import { StatisticsReports } from './StatisticsReports';
 import { SuperAdminManager } from './SuperAdminManager';
 import { AdminAccountsManager } from './AdminAccountsManager';
+import { WebsiteEditor } from './WebsiteEditor';
 import { explainError, type Row } from './ui';
 import { DashboardShell, type NavGroup } from '../dashboard/DashboardShell';
 import { Notice, btnPrimary, inputCls, labelCls } from '../dashboard/ui';
@@ -44,6 +46,7 @@ export type NavigationPage =
   | 'reports'
   | 'admin-accounts'
   | 'super-admin'
+  | 'website-editor'
   | 'messages'
   | 'settings'
   | `section:${string}`;
@@ -566,12 +569,15 @@ export default function AdminApp() {
       ],
     },
     {
-      label: 'Website content',
-      items: SECTIONS.map((section) => ({
-        id: `section:${section.id}`,
-        label: section.label,
-        icon: Layers,
-      })),
+      label: 'Website CMS & Content',
+      items: [
+        { id: 'website-editor', label: 'Live Visual Editor', icon: Globe },
+        ...SECTIONS.map((section) => ({
+          id: `section:${section.id}`,
+          label: section.label,
+          icon: Layers,
+        })),
+      ],
     },
   ];
 
@@ -657,6 +663,14 @@ export default function AdminApp() {
           <AdminAccountsManager
             session={session}
             isSuperAdmin={Boolean(isAdmin && isSuperAdmin)}
+          />
+        )}
+
+        {page === 'website-editor' && (
+          <WebsiteEditor
+            session={session}
+            authorName={displayName}
+            authorEmail={session.user.email || ''}
           />
         )}
 
