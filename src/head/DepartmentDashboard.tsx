@@ -103,6 +103,9 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const isPr = department === 'pr';
   const isHr = department === 'hr';
   const registrationAccess = canManageRegistrations(department);
+  // Operations Studio is restricted to the three operational department heads.
+  // Super IT test sessions are separately authenticated and audit-logged.
+  const operationsAccess = Boolean(testMode?.isActive) || ['media_press', 'security', 'volunteers'].includes(department);
   const workspaceModules = useMemo(() => getWorkspaceModules(department), [department]);
 
   const isModuleView = useCallback(
@@ -438,6 +441,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   };
 
   const navigate = (id: string) => {
+    if (id === 'operations' && !operationsAccess) return;
     if (id === 'registrations' && !registrationAccess) return;
     if (id === 'sponsors' && !isPr) return;
     if (id === 'inquiries' && !isHr) return;
@@ -463,7 +467,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
     ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
-    { id: 'operations', label: 'Operations studio', icon: Users },
+    ...(operationsAccess ? [{ id: 'operations', label: 'Operations studio', icon: Users }] : []),
     { id: 'department', label: 'Assignment', icon: Building2 },
   ];
 
@@ -648,7 +652,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           <HeadInquiriesManager headName={headName} headEmail={headEmail} />
         )}
 
-        {view === 'operations' && (
+        {view === 'operations' && operationsAccess && (
           <OperationsWorkspace department={department} section={section} testToken={testMode?.token || null} />
         )}
 
