@@ -868,7 +868,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                     </div>
                     <button type="button" onClick={() => void createSignupLink()} disabled={signupBusy} className={btnPrimary}>
                       {signupBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
-                      {signupBusy ? 'Creating…' : 'Generate & copy link'}
+                      {signupBusy ? 'Creating message…' : 'Generate acceptance message'}
                     </button>
                   </div>
                   {signupNotice && <p role="status" className="mt-3 text-[11px] text-neutral-300">{signupNotice}</p>}
