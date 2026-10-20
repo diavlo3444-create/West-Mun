@@ -22,6 +22,8 @@ import {
   SlidersHorizontal,
   Inbox,
   ListFilter,
+  Link2,
+  Copy,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { explainError, type Row } from './ui';
@@ -142,6 +144,9 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   const [signupUrl, setSignupUrl] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
   const [headRecommendation, setHeadRecommendation] = useState<{ head_decision: string; head_notes: string; admin_decision: string } | null>(null);
+  const [bulkSignupBusy, setBulkSignupBusy] = useState(false);
+  const [bulkSignupLinks, setBulkSignupLinks] = useState<Array<{ signupUrl: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>>([]);
+  const [bulkSignupNotice, setBulkSignupNotice] = useState<string | null>(null);
 
   React.useEffect(() => {
     let current = true;
@@ -488,6 +493,65 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     );
   };
 
+  const bulkSignupCandidates = filteredList.filter((item) => item._type === 'team' && item.status === 'accepted');
+
+  const generateBulkSignupLinks = async () => {
+    if (!supabase || bulkSignupBusy || bulkSignupCandidates.length === 0) return;
+    if (bulkSignupCandidates.length > 25) {
+      setBulkSignupNotice('Filter the list to 25 or fewer accepted team applications before generating links.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Generate fresh one-time signup links for ${bulkSignupCandidates.length} accepted team application(s)? Any older unused link for those applicants will be revoked. No emails will be sent.`,
+    );
+    if (!confirmed) return;
+    setBulkSignupBusy(true);
+    setBulkSignupNotice(null);
+    setBulkSignupLinks([]);
+    try {
+      const { data, error } = await supabase.functions.invoke('team-signup', {
+        body: { action: 'create_batch', registrationIds: bulkSignupCandidates.map((item) => item.id) },
+      });
+      if (error || !Array.isArray(data?.links)) {
+        let message = data?.error || error?.message || 'Could not create the signup links.';
+        try {
+          const body = await (error as any)?.context?.json();
+          if (body?.error) message = body.error;
+        } catch {}
+        setBulkSignupNotice(message);
+        return;
+      }
+      const links = data.links as Array<{ signupUrl: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>;
+      setBulkSignupLinks(links);
+      const plain = links.map((link) => `${link.applicantEmail}\t${link.team}${link.section ? ` / ${link.section}` : ''}\t${link.signupUrl}`).join('\n');
+      if (links.length) {
+        try {
+          await navigator.clipboard.writeText(plain);
+          setBulkSignupNotice(`Copied ${links.length} signup link(s). ${Array.isArray(data.failures) && data.failures.length ? `${data.failures.length} failed.` : ''} Send each link manually; none were emailed.`);
+        } catch {
+          setBulkSignupNotice(`Created ${links.length} signup link(s). Copy them below and send them manually. No emails were sent.`);
+        }
+      } else {
+        setBulkSignupNotice('No signup links were created. Review the selected applications and try again.');
+      }
+    } catch {
+      setBulkSignupNotice('Could not create signup links. Check your connection and try again.');
+    } finally {
+      setBulkSignupBusy(false);
+    }
+  };
+
+  const copyAllBulkLinks = async () => {
+    if (!bulkSignupLinks.length) return;
+    const plain = bulkSignupLinks.map((link) => `${link.applicantEmail}\t${link.team}${link.section ? ` / ${link.section}` : ''}\t${link.signupUrl}`).join('\n');
+    try {
+      await navigator.clipboard.writeText(plain);
+      setBulkSignupNotice(`Copied ${bulkSignupLinks.length} signup link(s). Send them manually; no emails were sent.`);
+    } catch {
+      setBulkSignupNotice('Clipboard access is blocked. Select and copy the links below manually.');
+    }
+  };
+
   const emptyRecords = unifiedList.length === 0;
 
   return (
@@ -501,6 +565,16 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
             <button type="button" onClick={onRefresh} className={btnSecondary} disabled={loading}>
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
               Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => void generateBulkSignupLinks()}
+              disabled={bulkSignupBusy || bulkSignupCandidates.length === 0 || bulkSignupCandidates.length > 25}
+              className={btnSecondary}
+              title={bulkSignupCandidates.length > 25 ? 'Filter to 25 or fewer accepted team applications' : 'Create one-time links for accepted team applications in the current filtered list'}
+            >
+              {bulkSignupBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Link2 className="h-3.5 w-3.5" aria-hidden="true" />}
+              {bulkSignupBusy ? 'Creating links…' : `Create signup links (${bulkSignupCandidates.length})`}
             </button>
             <button
               type="button"
@@ -534,6 +608,30 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
           </div>
         </div>
       </Panel>
+
+      {(bulkSignupNotice || bulkSignupLinks.length > 0) && (
+        <Panel className="border-[#d4af37]/20 bg-[#101013]">
+          <PanelHeader
+            eyebrow="Manual distribution"
+            title="Bulk signup links"
+            description="These links are one-time invitations. Send them to applicants yourself; this panel never emails anyone."
+            action={<button type="button" onClick={() => void copyAllBulkLinks()} disabled={bulkSignupLinks.length === 0} className={btnSecondary}><Copy className="h-3.5 w-3.5" /> Copy all links</button>}
+          />
+          <div className="space-y-3 p-4">
+            {bulkSignupNotice && <p role="status" className="text-[11px] text-neutral-300">{bulkSignupNotice}</p>}
+            {bulkSignupLinks.map((link) => (
+              <div key={link.signupUrl} className="grid gap-2 rounded-md border border-white/[0.07] bg-black/20 p-3 sm:grid-cols-[minmax(130px,0.8fr)_minmax(0,2fr)_auto] sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] text-neutral-200">{link.applicantEmail}</p>
+                  <p className="mt-0.5 text-[9px] font-mono uppercase text-neutral-500">{link.team}{link.section ? ` · ${link.section}` : ''}</p>
+                </div>
+                <input aria-label={`Signup link for ${link.applicantEmail}`} readOnly value={link.signupUrl} onFocus={(e) => e.currentTarget.select()} className={`${inputCls} min-w-0 font-mono text-[10px]`} />
+                <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(link.signupUrl); setBulkSignupNotice(`Copied signup link for ${link.applicantEmail}.`); } catch { setBulkSignupNotice('Clipboard access is blocked. Select and copy the link manually.'); } }} className={btnSecondary}>Copy</button>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <SegmentedTabs<StatusTab>
