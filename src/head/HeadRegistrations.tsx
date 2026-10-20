@@ -855,7 +855,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                 </Notice>
               )}
 
-              {activeItem.status === 'accepted' && (
+              {activeItem.status === 'accepted' && activeItem.admin_finalized_at && (
                 <div className="rounded-md border border-[#d4af37]/20 bg-[#d4af37]/[0.035] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
