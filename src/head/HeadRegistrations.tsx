@@ -875,7 +875,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor="head-detail-status" className={labelCls}>
-                    Detailed status
+                    Head recommendation
                   </label>
                   <select
                     id="head-detail-status"
@@ -890,7 +890,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                 </div>
                 <div>
                   <label htmlFor="head-detail-notes" className={labelCls}>
-                    Internal notes
+                    Recommendation notes
                   </label>
                   <textarea
                     id="head-detail-notes"
