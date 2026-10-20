@@ -15,6 +15,8 @@ import {
   FileText,
   Shield,
   CalendarDays,
+  Copy,
+  Link2,
 } from 'lucide-react';
 import { downloadText, toCsv } from '../lib/safe';
 import {
@@ -35,6 +37,7 @@ import {
   selectCls,
 } from '../dashboard/ui';
 import type { HeadRegistration } from './HeadOverview';
+import { supabase } from '../lib/supabase';
 import type { SectionKey } from './departments';
 import { SECURITY_QUESTIONS, countWords, extractSecurityAnswers, getWordCountFeedback } from '../lib/securityQuestions';
 
@@ -102,13 +105,32 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
   );
   const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
+  const [adminDecision, setAdminDecision] = useState('pending');
+  const [signupBusy, setSignupBusy] = useState(false);
+  const [signupUrl, setSignupUrl] = useState<string | null>(null);
+  const [signupNotice, setSignupNotice] = useState<string | null>(null);
 
   const openItem = (record: HeadRegistration) => {
     setActiveItem(record);
-    setDraftStatus(record.status || 'received');
-    setDraftNotes(record.admin_notes || '');
+    setDraftStatus('received');
+    setDraftNotes('');
     setModalNotice(null);
     setPendingAction(null);
+    setAdminDecision('pending');
+    setSignupUrl(null);
+    setSignupNotice(null);
+    if (supabase) {
+      void supabase.from('wm_staffing_decisions')
+        .select('head_decision,head_notes,admin_decision')
+        .eq('registration_id', record.id)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error || !data) return;
+          setDraftStatus(data.head_decision === 'approved' ? 'accepted' : 'rejected');
+          setDraftNotes(data.head_notes || '');
+          setAdminDecision(data.admin_decision || 'pending');
+        });
+    }
   };
 
   useEffect(() => {
@@ -199,14 +221,63 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
 
     setDraftStatus(targetStatus);
     setActiveItem((prev) =>
-      prev ? { ...prev, status: targetStatus, admin_notes: draftNotes.trim() } : null,
+      prev ? {
+        ...prev,
+        head_decision: targetStatus === 'accepted' ? 'approved' : targetStatus === 'rejected' ? 'rejected' : null,
+        head_notes: draftNotes.trim(),
+      } : null,
     );
     setPendingAction(null);
-    setModalNotice({ type: 'success', text: 'Decision saved to Supabase.' });
+    setModalNotice({
+      type: 'success',
+      text: targetStatus === 'received'
+        ? 'Your pending recommendation was cleared. The Secretariat still controls the final application status.'
+        : 'Your recommendation was submitted for Secretariat review. The final application status has not changed.',
+    });
+    setAdminDecision('pending');
     setToast({
-      message: `${activeItem.full_name} is now marked ${targetStatus.replace('_', ' ')}.`,
+      message: targetStatus === 'received'
+        ? `Recommendation cleared for ${activeItem.full_name}.`
+        : `Recommendation submitted for ${activeItem.full_name}; Secretariat approval is still required.`,
       tone: 'success',
     });
+  };
+
+  const createSignupLink = async () => {
+    if (!supabase || !activeItem || activeItem.status !== 'accepted' || signupBusy) return;
+    setSignupBusy(true);
+    setSignupUrl(null);
+    setSignupNotice(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('team-signup', {
+        body: { action: 'create', registrationId: activeItem.id },
+      });
+      if (error || !data?.success || typeof data.signupUrl !== 'string') {
+        setSignupNotice(data?.error || error?.message || 'Could not create a signup link.');
+        return;
+      }
+      setSignupUrl(data.signupUrl);
+      try {
+        await navigator.clipboard.writeText(data.signupUrl);
+        setSignupNotice(`Signup link copied. Expires ${new Date(data.expiresAt).toLocaleString()}.`);
+      } catch {
+        setSignupNotice('Link created. Copy it from the field below and send it manually to the applicant.');
+      }
+    } catch {
+      setSignupNotice('Could not create the signup link. Try again or contact an admin.');
+    } finally {
+      setSignupBusy(false);
+    }
+  };
+
+  const copySignupLink = async () => {
+    if (!signupUrl) return;
+    try {
+      await navigator.clipboard.writeText(signupUrl);
+      setSignupNotice('Signup link copied. Send it manually; no email will be sent.');
+    } catch {
+      setSignupNotice('Clipboard access is blocked. Select and copy the link manually.');
+    }
   };
 
   const exportCsv = () => {
@@ -699,30 +770,30 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-[#d4af37]/85">
-                    Department adjudication
+                    Head recommendation
                   </p>
                   <p className="mt-0.5 text-[10.5px] text-neutral-400">
-                    Your decision is saved to the record and visible to the Secretariat.
+                    Submit a recommendation for the Secretariat. This does not change the final application status.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setPendingAction('approve')}
-                    disabled={saving || activeItem.status === 'accepted'}
+                    disabled={saving || adminDecision !== 'pending'}
                     className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/25 bg-emerald-400/[0.07] px-2.5 py-1.5 text-[10.5px] font-medium text-emerald-300 transition-colors hover:bg-emerald-400/[0.13] disabled:opacity-40"
                   >
                     <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-                    Approve
+                    Recommend approval
                   </button>
                   <button
                     type="button"
                     onClick={() => setPendingAction('reject')}
-                    disabled={saving || activeItem.status === 'rejected'}
+                    disabled={saving || adminDecision !== 'pending'}
                     className="inline-flex items-center gap-1.5 rounded-md border border-rose-400/25 bg-rose-400/[0.06] px-2.5 py-1.5 text-[10.5px] font-medium text-rose-300 transition-colors hover:bg-rose-400/[0.12] disabled:opacity-40"
                   >
                     <XCircle className="h-3 w-3" aria-hidden="true" />
-                    Reject
+                    Recommend rejection
                   </button>
                 </div>
               </div>
@@ -747,13 +818,11 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                     <div>
                       <p className="text-[11.5px] font-medium text-neutral-100">
                         {pendingAction === 'approve'
-                          ? `Approve ${activeItem.full_name}?`
-                          : `Reject ${activeItem.full_name}?`}
+                          ? `Recommend approval for ${activeItem.full_name}?`
+                          : `Recommend rejection for ${activeItem.full_name}?`}
                       </p>
                       <p className="mt-0.5 text-[10.5px] leading-relaxed text-neutral-400">
-                        This updates the candidate’s status for {departmentLabel}
-                        {activeItem.section ? ` · ${activeItem.section} division` : ''}. The Secretariat
-                        can still revise the final decision.
+                        This sends your recommendation to the Secretariat. The application remains pending until an admin makes the final decision.
                       </p>
                     </div>
                   </div>
@@ -774,9 +843,32 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                       className={btnPrimary}
                     >
                       {saving && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
-                      {pendingAction === 'approve' ? 'Confirm approval' : 'Confirm rejection'}
+                      {pendingAction === 'approve' ? 'Submit recommendation' : 'Submit recommendation'}
                     </button>
                   </div>
+                </div>
+              )}
+
+              {adminDecision !== 'pending' && (
+                <Notice tone="info" title="Secretariat decision recorded">
+                  This application already has a final admin decision. Your recommendation can no longer be changed.
+                </Notice>
+              )}
+
+              {activeItem.status === 'accepted' && (
+                <div className="rounded-md border border-[#d4af37]/20 bg-[#d4af37]/[0.035] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-[#d4af37]"><Link2 className="h-3.5 w-3.5" /> Manual signup link</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">This applicant has been accepted by the Secretariat. Generate a one-time link and send it manually; this website will not send emails.</p>
+                    </div>
+                    <button type="button" onClick={() => void createSignupLink()} disabled={signupBusy} className={btnPrimary}>
+                      {signupBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
+                      {signupBusy ? 'Creating…' : 'Generate & copy link'}
+                    </button>
+                  </div>
+                  {signupNotice && <p role="status" className="mt-3 text-[11px] text-neutral-300">{signupNotice}</p>}
+                  {signupUrl && <div className="mt-2 flex flex-col gap-2 sm:flex-row"><input aria-label="One-time signup link" readOnly value={signupUrl} onFocus={(e) => e.currentTarget.select()} className={`${inputCls} min-w-0 flex-1 font-mono text-[10px]`} /><button type="button" onClick={() => void copySignupLink()} className={btnSecondary}>Copy link</button></div>}
                 </div>
               )}
 
@@ -791,11 +883,9 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                     value={draftStatus}
                     onChange={(event) => setDraftStatus(event.target.value)}
                   >
-                    <option value="received">Received / pending</option>
-                    <option value="under_review">Under review</option>
-                    <option value="accepted">Accepted / approved</option>
-                    <option value="waitlisted">Waitlisted</option>
-                    <option value="rejected">Rejected</option>
+                    <option value="received">No recommendation</option>
+                    <option value="accepted">Recommend approval</option>
+                    <option value="rejected">Recommend rejection</option>
                   </select>
                 </div>
                 <div>
@@ -806,7 +896,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                     id="head-detail-notes"
                     rows={2}
                     className={inputCls}
-                    placeholder="Private evaluation notes for the Secretariat…"
+                    placeholder="Recommendation notes for the Secretariat…"
                     value={draftNotes}
                     onChange={(event) => setDraftNotes(event.target.value)}
                   />
