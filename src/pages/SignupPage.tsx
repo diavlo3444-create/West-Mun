@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import { ShieldCheck, Loader2, LockKeyhole } from "lucide-react";
 
 export default function SignupPage() {
-  const token = useMemo(() => new URLSearchParams(window.location.search).get("token") || "", []);
+  const token = useMemo(() => new URLSearchParams(window.location.hash.replace(/^#/, "")).get("token") || "", []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
