@@ -122,6 +122,7 @@ export async function listDepartmentPeople(
   if (!supabase) return { ok: false, error: 'Database client not initialized.' };
 
   try {
+    await ensureFreshSupabaseSession();
     let query = supabase
       .from('wm_people')
       .select('*')
@@ -246,6 +247,7 @@ export async function listDepartmentProjects(
   if (!supabase) return { ok: false, error: 'Database client not initialized.' };
 
   try {
+    await ensureFreshSupabaseSession();
     let query = supabase
       .from('wm_projects')
       .select('*')
@@ -669,6 +671,7 @@ export async function listDepartmentShifts(
   if (!supabase) return { ok: false, error: 'Database client not initialized.' };
 
   try {
+    await ensureFreshSupabaseSession();
     let query = supabase
       .from('wm_shifts')
       .select('*')

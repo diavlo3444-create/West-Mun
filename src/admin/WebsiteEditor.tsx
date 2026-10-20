@@ -1121,7 +1121,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </button>
 
               <a
-                href="/?preview=true"
+                href="/preview"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-[#d4af37] transition-colors"
@@ -1145,7 +1145,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             <iframe
               key={previewKey}
               ref={iframeRef}
-              src="/?preview=true"
+              src="/preview"
               title="WEST MUN Website Preview"
               className="w-full h-full border-none bg-[#070707]"
               onLoad={() => {

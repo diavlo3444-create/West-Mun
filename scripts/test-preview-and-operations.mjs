@@ -14,6 +14,70 @@ import {
   handleTerminateTestSession,
 } from '../src/server/superAdminHandler.ts';
 import { handleSuperAdminOperations } from '../src/server/operationsAdmin.ts';
+import { HeadStore } from '../src/server/headStore.ts';
+
+// Configure mock Supabase Auth environment for test suite
+process.env.SUPABASE_URL = 'https://fake.supabase.test';
+process.env.SUPABASE_ANON_KEY = 'fake-anon-key';
+delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (input, init) => {
+  const url = typeof input === 'string' ? input : (input?.url || '');
+  const headers = init?.headers || {};
+  const auth = headers.Authorization || headers.authorization || '';
+
+  if (url.includes('/auth/v1/user')) {
+    if (typeof auth === 'string' && auth.includes('dummy_admin_bearer')) {
+      return new Response(
+        JSON.stringify({
+          id: '11111111-1111-4111-8111-111111111111',
+          email: 'diavlo3444@gmail.com',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    return new Response(
+      JSON.stringify({ message: 'Invalid JWT', code: 'bad_jwt' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  if (url.includes('/rest/v1/admins')) {
+    return new Response(
+      JSON.stringify([{ user_id: '11111111-1111-4111-8111-111111111111' }]),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  if (url.includes('/rest/v1/department_heads')) {
+    return new Response(
+      JSON.stringify([
+        {
+          id: 'head-vol-test',
+          user_id: 'head-vol-test',
+          email: 'volunteers.head@westmun.org',
+          head_name: 'Volunteers Head',
+          department: 'volunteers',
+          section: null,
+          active: true,
+        },
+      ]),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  return originalFetch(input, init);
+};
+
+try {
+  HeadStore.create({
+    id: 'head-vol-test',
+    email: 'volunteers.head@westmun.org',
+    fullName: 'Volunteers Head',
+    department: 'volunteers',
+    section: null,
+    password: 'Password123!',
+    active: true,
+  });
+} catch {}
 
 console.log('\n====================================================');
 console.log('WEST MUN — Website Editor Preview & Operations Studio Tests');
@@ -215,3 +279,5 @@ console.log('[PASS] Terminated test session is immediately revoked and blocked (
 console.log('\n====================================================');
 console.log('Results: All 14 preview and operations tests PASSED!');
 console.log('====================================================\n');
+
+process.exit(0);

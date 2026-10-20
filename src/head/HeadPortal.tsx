@@ -395,6 +395,12 @@ export default function HeadPortal() {
       // -------------------------------------------------------------
       setHeadUser(resolvedHead);
       setAssignment(resolvedAssignment);
+      if (!activeTestMode) {
+        try {
+          sessionStorage.removeItem('westmun_super_it_test_session');
+          localStorage.removeItem('westmun_super_it_test_session');
+        } catch {}
+      }
 
       const dept = resolvedAssignment.department;
       const sec = resolvedAssignment.section;

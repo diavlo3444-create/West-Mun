@@ -40,21 +40,10 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
   const [shiftForm, setShiftForm] = useState({ title: '', location: '', starts_at: '', ends_at: '', capacity: 4 });
   const [memberForm, setMemberForm] = useState({ person_id: '', project_role: '' });
 
-  // Fallback to stored test token if rendered inside an active Super IT test session tab
-  const effectiveTestToken =
-    testToken ||
-    (typeof window !== 'undefined'
-      ? (() => {
-          try {
-            const raw =
-              sessionStorage.getItem('westmun_super_it_test_session') ||
-              localStorage.getItem('westmun_super_it_test_session');
-            return raw ? JSON.parse(raw)?.token || null : null;
-          } catch {
-            return null;
-          }
-        })()
-      : null);
+  // Dedicated test token passed when running under a verified Super IT Test Session.
+  // For ordinary department heads, this is strictly null so that queries execute
+  // directly against Supabase RLS under their own authentic head session.
+  const effectiveTestToken = testToken || null;
 
   const load = useCallback(async () => {
     setBusy(true); setError(''); setNotice('');
@@ -71,7 +60,16 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
       setPeople(p.data || []); setProjects(pr.data || []); setShifts(sh.data || []);
       if (win.ok) setWindows(win.data || []);
       setSelectedProject(current => (pr.data || []).some(x => x.id === current) ? current : (pr.data?.[0]?.id || ''));
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not load workspace data.'); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not load workspace data.';
+      setError(msg);
+      if (effectiveTestToken && (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('session invalid') || msg.toLowerCase().includes('invalid token'))) {
+        try {
+          sessionStorage.removeItem('westmun_super_it_test_session');
+          localStorage.removeItem('westmun_super_it_test_session');
+        } catch {}
+      }
+    }
     finally { setBusy(false); }
   }, [department, section, effectiveTestToken]);
 
