@@ -143,9 +143,10 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   const [signupBusy, setSignupBusy] = useState(false);
   const [signupUrl, setSignupUrl] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
+  const [signupMessage, setSignupMessage] = useState<string | null>(null);
   const [headRecommendation, setHeadRecommendation] = useState<{ head_decision: string; head_notes: string; admin_decision: string } | null>(null);
   const [bulkSignupBusy, setBulkSignupBusy] = useState(false);
-  const [bulkSignupLinks, setBulkSignupLinks] = useState<Array<{ signupUrl: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>>([]);
+  const [bulkSignupLinks, setBulkSignupLinks] = useState<Array<{ signupUrl: string; message: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>>([]);
   const [bulkSignupNotice, setBulkSignupNotice] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -179,12 +180,14 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         return;
       }
       setSignupUrl(data.signupUrl);
-      setSignupNotice(`Link created. It expires ${new Date(data.expiresAt).toLocaleString()}.`);
+      const message = typeof data.message === 'string' ? data.message : `Congratulations! Your WEST MUN 2027 application has been accepted. Create your team account here: ${data.signupUrl}`;
+      setSignupMessage(message);
+      setSignupNotice(`Acceptance message and link ready. It expires ${new Date(data.expiresAt).toLocaleString()}.`);
       try {
-        await navigator.clipboard.writeText(data.signupUrl);
-        setSignupNotice(`Signup link copied. It expires ${new Date(data.expiresAt).toLocaleString()}.`);
+        await navigator.clipboard.writeText(message);
+        setSignupNotice(`Acceptance message and signup link copied. It expires ${new Date(data.expiresAt).toLocaleString()}.`);
       } catch {
-        setSignupNotice('Link created. Copy it from the field below and send it manually to the applicant.');
+        setSignupNotice('Acceptance message and link are ready below. Copy them and send manually to the applicant.');
       }
     } catch {
       setSignupNotice('Could not create a signup link. Check your connection and try again.');
@@ -196,8 +199,8 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   const copySignupLink = async () => {
     if (!signupUrl) return;
     try {
-      await navigator.clipboard.writeText(signupUrl);
-      setSignupNotice('Signup link copied. Send it manually to the applicant.');
+      await navigator.clipboard.writeText(signupMessage || signupUrl);
+      setSignupNotice('Acceptance message and signup link copied. Send them manually to the applicant.');
     } catch {
       setSignupNotice('Clipboard access is blocked. Select and copy the link manually.');
     }
@@ -521,9 +524,9 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         setBulkSignupNotice(message);
         return;
       }
-      const links = data.links as Array<{ signupUrl: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>;
+      const links = data.links as Array<{ signupUrl: string; message: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>;
       setBulkSignupLinks(links);
-      const plain = links.map((link) => `${link.applicantEmail}\t${link.team}${link.section ? ` / ${link.section}` : ''}\t${link.signupUrl}`).join('\n');
+      const plain = links.map((link) => link.message || `Congratulations! Your WEST MUN 2027 application has been accepted for ${link.team}${link.section ? ` / ${link.section}` : ''}. Create your team account: ${link.signupUrl}`).join('\n\n---\n\n');
       if (links.length) {
         try {
           await navigator.clipboard.writeText(plain);
@@ -543,7 +546,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
 
   const copyAllBulkLinks = async () => {
     if (!bulkSignupLinks.length) return;
-    const plain = bulkSignupLinks.map((link) => `${link.applicantEmail}\t${link.team}${link.section ? ` / ${link.section}` : ''}\t${link.signupUrl}`).join('\n');
+    const plain = bulkSignupLinks.map((link) => link.message || `Congratulations! Your WEST MUN 2027 application has been accepted for ${link.team}${link.section ? ` / ${link.section}` : ''}. Create your team account: ${link.signupUrl}`).join('\n\n---\n\n');
     try {
       await navigator.clipboard.writeText(plain);
       setBulkSignupNotice(`Copied ${bulkSignupLinks.length} signup link(s). Send them manually; no emails were sent.`);
@@ -632,8 +635,10 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                   <p className="truncate text-[11px] text-neutral-200">{link.applicantEmail}</p>
                   <p className="mt-0.5 text-[9px] font-mono uppercase text-neutral-500">{link.team}{link.section ? ` · ${link.section}` : ''}</p>
                 </div>
-                <input aria-label={`Signup link for ${link.applicantEmail}`} readOnly value={link.signupUrl} onFocus={(e) => e.currentTarget.select()} className={`${inputCls} min-w-0 font-mono text-[10px]`} />
-                <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(link.signupUrl); setBulkSignupNotice(`Copied signup link for ${link.applicantEmail}.`); } catch { setBulkSignupNotice('Clipboard access is blocked. Select and copy the link manually.'); } }} className={btnSecondary}>Copy</button>
+                <div className="min-w-0 space-y-2">
+                  <textarea aria-label={`Acceptance message for ${link.applicantEmail}`} readOnly rows={4} value={link.message || `Congratulations! Your WEST MUN 2027 application has been accepted for ${link.team}${link.section ? ` / ${link.section}` : ''}. Create your team account here: ${link.signupUrl}`} onFocus={(e) => e.currentTarget.select()} className={`${inputCls} w-full resize-y text-xs leading-relaxed`} />
+                  <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(link.message || `Congratulations! Your WEST MUN 2027 application has been accepted for ${link.team}${link.section ? ` / ${link.section}` : ''}. Create your team account here: ${link.signupUrl}`); setBulkSignupNotice(`Copied acceptance message for ${link.applicantEmail}.`); } catch { setBulkSignupNotice('Clipboard access is blocked. Select and copy the message manually.'); } }} className={btnSecondary}><Copy className="h-3.5 w-3.5" /> Copy message</button>
+                </div>
               </div>
             ))}
           </div>
@@ -1330,9 +1335,13 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                 <div className="mt-3 rounded-md border border-[#d4af37]/20 bg-[#d4af37]/[0.04] p-3 text-[11px] text-neutral-300" role="status">
                   <p>{signupNotice}</p>
                   {signupUrl && (
-                    <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                      <input aria-label="One-time signup link" readOnly value={signupUrl} onFocus={(e) => e.currentTarget.select()} className={`${inputCls} min-w-0 flex-1 font-mono text-[10px]`} />
-                      <button type="button" onClick={() => void copySignupLink()} className={btnSecondary}>Copy link</button>
+                    <div className="mt-3 space-y-2">
+                      <label className="block text-[10px] font-mono uppercase tracking-wider text-[#d4af37]">Acceptance message to send</label>
+                      <textarea aria-label="Acceptance message with signup link" readOnly value={signupMessage || signupUrl} rows={4} onFocus={(e) => e.currentTarget.select()} className={`${inputCls} w-full resize-y text-xs leading-relaxed`} />
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(signupMessage || signupUrl); setSignupNotice('Acceptance message copied. Send it manually to the applicant.'); } catch { setSignupNotice('Clipboard access is blocked. Select and copy the message manually.'); } }} className={btnSecondary}><Copy className="h-3.5 w-3.5" /> Copy acceptance message</button>
+                        <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(signupUrl); setSignupNotice('Signup link copied.'); } catch { setSignupNotice('Clipboard access is blocked. Select and copy the link manually.'); } }} className={btnSecondary}>Copy link only</button>
+                      </div>
                     </div>
                   )}
                 </div>
