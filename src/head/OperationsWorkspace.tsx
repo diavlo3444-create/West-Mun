@@ -150,7 +150,7 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
             {tasks.map(t=><article key={t.id} className="rounded-md border border-white/5 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-medium">{t.title}</div><p className="mt-1 whitespace-pre-wrap text-xs text-neutral-400">{t.description}</p><p className="mt-1 text-[11px] text-neutral-500">{t.assigned_person?.display_name||'Unassigned'} · {t.priority}</p></div><div className="flex gap-2"><select aria-label="Task status" className={field+' w-auto'} value={t.status} onChange={e=>void run(()=>updateProjectTask(t.id,{status:e.target.value as WmProjectTask['status']},testToken),'Task updated.')}><option value="todo">To do</option><option value="in_progress">In progress</option><option value="review">Review</option><option value="blocked">Blocked</option><option value="done">Done</option></select><button aria-label="Delete task" className="text-red-300" onClick={()=>void run(()=>deleteProjectTask(t.id,testToken),'Task deleted.')}><Trash2 size={14}/></button></div></div></article>)}
           </>:<div className={panel+' text-sm text-neutral-400'}>Select a project to manage its stages, team and tasks.</div>}</div>
       </div>
-    </div>}
+    </div></div>}
 
     {tab === 'shifts' && <div className="grid gap-4 lg:grid-cols-[minmax(260px,.8fr)_minmax(0,1.2fr)]">
       <form className={panel+' space-y-3'} onSubmit={e=>{e.preventDefault();createShift();}}><h2 className="font-semibold">Create a shift / coverage slot</h2>
