@@ -146,7 +146,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       pending: registrations.filter(
         (r) => r.status === 'received' || r.status === 'under_review',
       ).length,
-      approved: registrations.filter((r) => r.status === 'accepted' && !r.admin_finalized_at).length,
+      approved: registrations.filter((r) => r.status === 'accepted').length,
       acceptedSecretariat: registrations.filter((r) => r.status === 'accepted' && Boolean(r.admin_finalized_at)).length,
       waitlisted: registrations.filter((r) => r.status === 'waitlisted').length,
       rejected: registrations.filter((r) => r.status === 'rejected').length,
@@ -353,7 +353,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
           options={[
             { value: 'all', label: 'All', count: counts.all },
             { value: 'pending', label: 'Pending', count: counts.pending },
-            { value: 'approved', label: 'Head approved', count: counts.approved },
+            { value: 'approved', label: 'Accepted (all)', count: counts.approved },
             { value: 'accepted-secretariat', label: 'Accepted by Secretariat', count: counts.acceptedSecretariat },
             { value: 'waitlisted', label: 'Waitlisted', count: counts.waitlisted },
             { value: 'rejected', label: 'Rejected', count: counts.rejected },
