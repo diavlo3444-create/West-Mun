@@ -114,7 +114,6 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   onRefresh,
   selectedApp,
   onClearSelectedApp,
-  isSuperAdmin = false,
 }) => {
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -142,6 +141,19 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   const [signupBusy, setSignupBusy] = useState(false);
   const [signupUrl, setSignupUrl] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
+  const [headRecommendation, setHeadRecommendation] = useState<{ head_decision: string; head_notes: string; admin_decision: string } | null>(null);
+
+  React.useEffect(() => {
+    let current = true;
+    setHeadRecommendation(null);
+    if (!supabase || !activeItem || activeItem._type !== 'team') return () => { current = false; };
+    void supabase.from('wm_staffing_decisions')
+      .select('head_decision,head_notes,admin_decision')
+      .eq('registration_id', activeItem.id)
+      .maybeSingle()
+      .then(({ data }) => { if (current && data) setHeadRecommendation(data as any); });
+    return () => { current = false; };
+  }, [activeItem?.id, activeItem?._type]);
 
   const createSignupLink = async () => {
     if (!supabase || !activeItem || activeItem._type !== 'team' || activeItem.status !== 'accepted' || signupBusy) return;
@@ -367,6 +379,26 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     if (saveError) {
       setModalNotice({ type: 'error', text: explainError(saveError) });
       return;
+    }
+
+    if (activeItem._type === 'team' && (targetStatus === 'accepted' || targetStatus === 'rejected')) {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData.user) {
+        const finalDecision = await supabase.from('wm_staffing_decisions')
+          .update({
+            admin_decision: targetStatus === 'accepted' ? 'approved' : 'rejected',
+            admin_notes: draftNotes.trim(),
+            admin_user_id: authData.user.id,
+            admin_reviewed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('registration_id', activeItem.id)
+          .select('id')
+          .maybeSingle();
+        if (finalDecision.error) {
+          setModalNotice({ type: 'error', text: 'The application status was saved, but the head-recommendation record could not be finalized. Refresh and review the recommendation record.' });
+        }
+      }
     }
 
     setDraftStatus(targetStatus);
@@ -1115,6 +1147,24 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                 </div>
               );
             })()}
+
+            {activeItem._type === 'team' && (
+              <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-3">
+                <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-[#d4af37]/85">Head recommendation</p>
+                {headRecommendation ? (
+                  <>
+                    <p className="mt-1 text-[11.5px] text-neutral-200">
+                      {headRecommendation.head_decision === 'approved' ? 'Recommends approval' : 'Recommends rejection'}
+                      <span className="mx-2 text-neutral-600">·</span>
+                      Secretariat: {headRecommendation.admin_decision === 'approved' ? 'Approved' : headRecommendation.admin_decision === 'rejected' ? 'Rejected' : 'Pending final decision'}
+                    </p>
+                    {headRecommendation.head_notes && <p className="mt-2 whitespace-pre-wrap text-[11px] leading-relaxed text-neutral-400">{headRecommendation.head_notes}</p>}
+                  </>
+                ) : (
+                  <p className="mt-1 text-[11px] text-neutral-400">No head recommendation has been submitted. You can still make the final decision yourself.</p>
+                )}
+              </div>
+            )}
 
             {/* Decision */}
             <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-4">
