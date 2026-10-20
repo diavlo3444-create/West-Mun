@@ -43,6 +43,8 @@ export interface HeadRegistration {
   team: string;
   section?: SectionKey | null;
   status: string;
+  head_decision?: 'approved' | 'rejected' | null;
+  head_notes?: string;
   experience?: string;
   statement?: string;
   admin_notes?: string;
