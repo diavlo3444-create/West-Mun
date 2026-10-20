@@ -47,6 +47,42 @@ export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
 }) => {
   const Icon = meta.icon;
 
+  // PR and HR keep their existing sponsor/inquiry modules; neither is on the
+  // registration allowlist, so their copy must not promise candidate access.
+  const workspaceScopeCopy =
+    meta.key === 'pr'
+      ? 'Your tools write to public.department_records scoped to PR, and you manage public.sponsors through the existing sponsor manager. Candidate applications, inquiries, admins, and other departments stay outside your scope in PostgreSQL RLS.'
+      : meta.key === 'hr'
+        ? 'Your tools write to public.department_records scoped to HR, and you can triage public.inquiries. Sponsors, candidate applications, admins, and other departments stay outside your scope in PostgreSQL RLS.'
+        : `Your tools write to public.department_records scoped to ${meta.label}. Candidate applications, sponsor records, and inquiries stay outside your scope in PostgreSQL RLS.`;
+
+  const visibleRecordsCopy =
+    meta.key === 'pr'
+      ? 'All sponsor records in public.sponsors plus PR department_records and shared venue, equipment, and run-of-show records. No registration rows.'
+      : meta.key === 'hr'
+        ? 'Public inquiries in public.inquiries plus HR department_records and shared coordination records. No registration rows and no sponsor access.'
+        : registrationAccess
+          ? `Only team_registrations where team matches ${meta.label}${section ? ` and section is ${section}` : ''}, plus department_records for ${meta.label}.`
+          : `public.department_records rows for ${meta.label}${section ? ` (${section} division)` : ''}, plus shared venue, equipment, and run-of-show records. No registration rows.`;
+
+  const permittedActionsCopy =
+    meta.key === 'pr'
+      ? 'Manage sponsor tiers and tasks, partner follow-ups, and approved logo records with the existing sponsors manager and site-files storage.'
+      : meta.key === 'hr'
+        ? 'Triage and update public inquiries; record internal notes and HR follow-ups. Inquiries cannot be deleted and sponsors stay out of scope.'
+        : registrationAccess
+          ? 'Create, edit, and delete department records; review candidate records in scope and update status and internal notes.'
+          : 'Create, edit, and delete records only in your department workspace. Candidate records, account management, and other departments stay out of scope.';
+
+  const sharedDatabaseCopy =
+    meta.key === 'pr'
+      ? 'Inquiries, candidate registrations, delegates, admins, and other departments remain strictly outside your scope in PostgreSQL RLS.'
+      : meta.key === 'hr'
+        ? 'Sponsors, candidate registrations, delegates, admins, and other departments remain strictly outside your scope in PostgreSQL RLS.'
+        : registrationAccess
+          ? 'Delegates, inquiries, admins, and the other ten departments remain outside your scope even through the Supabase API.'
+          : 'Candidate registrations, sponsors, inquiries, delegates, and admins remain outside your scope even through the Supabase API.';
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -163,9 +199,7 @@ export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
                 <div>
                   <p className="text-[12px] font-medium text-[#f1e4bb]">Department workspace only</p>
                   <p className="mt-0.5 text-[10.5px] leading-relaxed text-neutral-400">
-                    Your tools write to <span className="font-mono text-neutral-300">public.department_records</span>{' '}
-                    scoped to {meta.label}. Candidate applications for other teams, sponsor records, and
-                    inquiries stay outside your scope in PostgreSQL RLS.
+                    {workspaceScopeCopy}
                   </p>
                 </div>
               </div>
@@ -259,35 +293,17 @@ export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
             {
               icon: Database,
               title: 'Visible records',
-              copy: !registrationAccess
-                ? `public.department_records rows for ${meta.label}${section ? ` (${section} division)` : ''}, plus shared venue, equipment, and run-of-show records. No registration rows.`
-                : meta.key === 'pr'
-                  ? `team_registrations for ${meta.label} plus all sponsor records in public.sponsors.`
-                  : meta.key === 'hr'
-                    ? `team_registrations for ${meta.label} plus all contact submissions in public.inquiries.`
-                    : `Only team_registrations where team matches ${meta.label}${section ? ` and section is ${section}` : ''}.`,
+              copy: visibleRecordsCopy,
             },
             {
               icon: UserCheck,
               title: 'Permitted actions',
-              copy:
-                meta.key === 'pr'
-                  ? 'Manage sponsor tiers and tasks, partner follow-ups, and approved logo records; review PR candidates and sponsor records.'
-                  : meta.key === 'hr'
-                    ? 'Triage and update public inquiries; record internal notes and follow-up tasks. Inquiries cannot be deleted and sponsors stay out of scope.'
-                    : registrationAccess
-                      ? 'Create, edit, and delete records in your department workspace; review candidate records in scope and update status and internal notes.'
-                      : 'Create, edit, and delete records only in your department workspace. Candidate records, account management, and other departments stay out of scope.',
+              copy: permittedActionsCopy,
             },
             {
               icon: KeyRound,
               title: 'Shared database',
-              copy:
-                meta.key === 'pr'
-                  ? 'Inquiries, delegates, admins, and other departments remain strictly outside your scope in PostgreSQL RLS.'
-                  : meta.key === 'hr'
-                  ? 'Sponsors, delegates, admins, and other departments remain strictly outside your scope in PostgreSQL RLS.'
-                  : 'Delegates, inquiries, admins and other departments remain outside your scope even through the Supabase API.',
+              copy: sharedDatabaseCopy,
             },
           ].map((item) => {
             const Icon = item.icon;
