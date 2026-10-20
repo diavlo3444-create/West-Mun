@@ -7,8 +7,9 @@ import { ConsentCheck } from './ConsentCheck';
 import {
   SECURITY_QUESTIONS,
   countWords,
+  getWordCountFeedback,
   validateSecurityAnswers,
-  type SecurityAnswersPayload,
+  formatSecurityAnswers,
 } from '../lib/securityQuestions';
 
 interface TeamRegistrationModalProps {
@@ -118,7 +119,16 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
 
     setBusy(true);
 
-    const payload = {
+    const formattedStatement = team === 'security'
+      ? formatSecurityAnswers({
+          security_emergency_steps: form.security_emergency_steps,
+          security_teamwork: form.security_teamwork,
+          security_motivation: form.security_motivation,
+          security_handling_harassment: form.security_handling_harassment,
+        })
+      : form.statement.trim();
+
+    const fullPayload = {
       full_name: name,
       email,
       phone: form.phone.trim(),
@@ -126,7 +136,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
       team,
       section: form.section,
       experience: form.experience.trim(),
-      statement: form.statement.trim() || (team === 'security' ? form.security_motivation.trim() : ''),
+      statement: formattedStatement,
       security_emergency_steps: team === 'security' ? form.security_emergency_steps.trim() : '',
       security_teamwork: team === 'security' ? form.security_teamwork.trim() : '',
       security_motivation: team === 'security' ? form.security_motivation.trim() : '',
@@ -138,7 +148,36 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     let submissionSuccess = false;
 
     if (supabase) {
-      const { error } = await supabase.from('team_registrations').insert(payload);
+      // 1. Attempt insert with all dedicated columns
+      let { error } = await supabase.from('team_registrations').insert(fullPayload);
+
+      // If Supabase reports a missing column or schema cache error, gracefully retry with standard columns
+      // while retaining all 4 answers in the formatted statement.
+      if (error) {
+        const isColumnSchemaError =
+          error.code === 'PGRST204' ||
+          error.code === '42703' ||
+          /could not find the 'security_.*' column/i.test(error.message || '') ||
+          /column "security_.*" of relation .* does not exist/i.test(error.message || '') ||
+          /permission denied for column 'security_.*'/i.test(error.message || '');
+
+        if (isColumnSchemaError) {
+          const fallbackPayload = {
+            full_name: name,
+            email,
+            phone: form.phone.trim(),
+            institution: inst,
+            team,
+            section: form.section,
+            experience: form.experience.trim(),
+            statement: formattedStatement,
+            age_confirmed: true,
+            consent_version: settings.legal_version || '2026-10-17',
+          };
+          const retry = await supabase.from('team_registrations').insert(fallbackPayload);
+          error = retry.error;
+        }
+      }
 
       if (!error) {
         submissionSuccess = true;
@@ -156,24 +195,23 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
           setSubmitError('High registration volume detected. Please wait a moment and try again.');
           setBusy(false);
           return;
-        } else if (error.message?.includes('security_emergency_steps')) {
+        } else if (error.message?.includes('security_emergency_steps_min_words_80')) {
           setSubmitError('Emergency Problem-Solving response requires at least 80 words.');
           setBusy(false);
           return;
-        } else if (error.message?.includes('security_teamwork')) {
+        } else if (error.message?.includes('security_teamwork_min_words_50')) {
           setSubmitError('Teamwork and Communication response requires at least 50 words.');
           setBusy(false);
           return;
-        } else if (error.message?.includes('security_motivation')) {
+        } else if (error.message?.includes('security_motivation_min_words_50')) {
           setSubmitError('Motivation response requires at least 50 words.');
           setBusy(false);
           return;
-        } else if (error.message?.includes('security_handling_harassment')) {
+        } else if (error.message?.includes('security_handling_harassment_min_words_50')) {
           setSubmitError('Handling Bullying and Harassment response requires at least 50 words.');
           setBusy(false);
           return;
         }
-        // If columns are not yet in Supabase schema cache or Supabase threw an unexpected error, attempt backend API
       }
     }
 
@@ -183,7 +221,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
         const res = await fetch('/api/team-register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(fullPayload),
         });
         const resData = await res.json().catch(() => ({}));
         if (res.ok && resData.success) {
@@ -469,7 +507,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
                 {SECURITY_QUESTIONS.map((q, idx) => {
                   const currentWords = countWords(form[q.key as keyof typeof form] as string);
                   const meetsMin = currentWords >= q.minWords;
-                  const remaining = q.minWords - currentWords;
+                  const feedback = getWordCountFeedback(currentWords, q.minWords);
                   const hasError = Boolean(errors[q.key]);
 
                   return (
@@ -488,7 +526,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
                               : 'bg-amber-950/50 border-amber-500/40 text-amber-300'
                           }`}
                         >
-                          {currentWords} / {q.minWords} words {meetsMin ? '✓ Met' : `(${remaining} needed)`}
+                          {feedback}
                         </span>
                       </div>
 

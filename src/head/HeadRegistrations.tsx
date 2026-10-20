@@ -36,7 +36,7 @@ import {
 } from '../dashboard/ui';
 import type { HeadRegistration } from './HeadOverview';
 import type { SectionKey } from './departments';
-import { SECURITY_QUESTIONS, countWords } from '../lib/securityQuestions';
+import { SECURITY_QUESTIONS, countWords, extractSecurityAnswers, getWordCountFeedback } from '../lib/securityQuestions';
 
 type StatusTab = 'all' | 'pending' | 'approved' | 'waitlisted' | 'rejected';
 
@@ -628,61 +628,72 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
             )}
 
             {/* Security Team Assessment Section (All 4 Questions & Answers) */}
-            {(activeItem.team === 'security' ||
-              activeItem.security_emergency_steps ||
-              activeItem.security_teamwork ||
-              activeItem.security_motivation ||
-              activeItem.security_handling_harassment) && (
-              <div className="space-y-3 rounded-md border border-[#d4af37]/35 bg-[#12110c] p-3.5">
-                <div className="flex items-center justify-between gap-2 border-b border-[#d4af37]/20 pb-2">
-                  <div className="flex items-center gap-1.5 text-[9.5px] font-mono uppercase tracking-[0.14em] text-[#d4af37]">
-                    <Shield className="h-3.5 w-3.5" aria-hidden="true" />
-                    Security Team Scenario Assessment (4 Required Questions)
+            {(() => {
+              const secAnswers = extractSecurityAnswers(activeItem);
+              const hasAnyAnswers =
+                activeItem.team === 'security' ||
+                Boolean(
+                  secAnswers.security_emergency_steps ||
+                  secAnswers.security_teamwork ||
+                  secAnswers.security_motivation ||
+                  secAnswers.security_handling_harassment
+                );
+
+              if (!hasAnyAnswers) return null;
+
+              return (
+                <div className="space-y-3 rounded-md border border-[#d4af37]/35 bg-[#12110c] p-3.5">
+                  <div className="flex items-center justify-between gap-2 border-b border-[#d4af37]/20 pb-2">
+                    <div className="flex items-center gap-1.5 text-[9.5px] font-mono uppercase tracking-[0.14em] text-[#d4af37]">
+                      <Shield className="h-3.5 w-3.5" aria-hidden="true" />
+                      Security Team Scenario Assessment (4 Required Questions)
+                    </div>
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-sm bg-[#d4af37]/15 border border-[#d4af37]/40 text-[#d4af37]">
+                      Official Responses
+                    </span>
                   </div>
-                  <span className="text-[9px] font-mono px-2 py-0.5 rounded-sm bg-[#d4af37]/15 border border-[#d4af37]/40 text-[#d4af37]">
-                    Official Responses
-                  </span>
-                </div>
 
-                <div className="space-y-3 pt-1">
-                  {SECURITY_QUESTIONS.map((q, idx) => {
-                    const ans = (activeItem as any)[q.key] as string | undefined;
-                    const words = countWords(ans);
-                    const meetsMin = words >= q.minWords;
+                  <div className="space-y-3 pt-1">
+                    {SECURITY_QUESTIONS.map((q, idx) => {
+                      const ans = secAnswers[q.key];
+                      const words = countWords(ans);
+                      const meetsMin = words >= q.minWords;
+                      const feedback = getWordCountFeedback(words, q.minWords);
 
-                    return (
-                      <div key={q.key} className="rounded-md border border-white/[0.07] bg-[#0c0c0f] p-3 space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="text-[10.5px] font-mono uppercase tracking-wider text-neutral-200 font-semibold flex items-center gap-1.5">
-                            <span className="w-4 h-4 rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 text-[#d4af37] text-[9px] flex items-center justify-center">
-                              {idx + 1}
+                      return (
+                        <div key={q.key} className="rounded-md border border-white/[0.07] bg-[#0c0c0f] p-3 space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-[10.5px] font-mono uppercase tracking-wider text-neutral-200 font-semibold flex items-center gap-1.5">
+                              <span className="w-4 h-4 rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 text-[#d4af37] text-[9px] flex items-center justify-center">
+                                {idx + 1}
+                              </span>
+                              {q.title}
                             </span>
-                            {q.title}
-                          </span>
-                          <span
-                            className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded-sm border ${
-                              meetsMin
-                                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400 font-semibold'
-                                : 'bg-amber-950/50 border-amber-500/40 text-amber-300'
-                            }`}
-                          >
-                            {words} words (min {q.minWords})
-                          </span>
-                        </div>
+                            <span
+                              className={`text-[9.5px] font-mono px-2 py-0.5 rounded-sm border ${
+                                meetsMin
+                                  ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400 font-semibold'
+                                  : 'bg-amber-950/50 border-amber-500/40 text-amber-300'
+                              }`}
+                            >
+                              {feedback}
+                            </span>
+                          </div>
 
-                        <p className="text-[10.5px] text-neutral-400 italic font-light leading-relaxed">
-                          "{q.prompt}"
-                        </p>
+                          <p className="text-[10.5px] text-neutral-400 italic font-light leading-relaxed">
+                            "{q.prompt}"
+                          </p>
 
-                        <div className="wm-scroll max-h-36 overflow-y-auto whitespace-pre-wrap rounded border border-white/[0.06] bg-[#141418] p-2.5 text-[11px] leading-relaxed text-neutral-200">
-                          {ans ? ans : <span className="text-neutral-500 italic">No response submitted.</span>}
+                          <div className="wm-scroll max-h-36 overflow-y-auto whitespace-pre-wrap rounded border border-white/[0.06] bg-[#141418] p-2.5 text-[11px] leading-relaxed text-neutral-200">
+                            {ans ? ans : <span className="text-neutral-500 italic">No response submitted.</span>}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
