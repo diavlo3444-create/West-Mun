@@ -19,6 +19,7 @@ import {
   ScrollText,
   UserCheck,
   Globe,
+  UserRoundCog,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '../lib/supabase';
@@ -32,6 +33,7 @@ import { TeamManagement } from './TeamManagement';
 import { StatisticsReports } from './StatisticsReports';
 import { SuperAdminManager } from './SuperAdminManager';
 import { AdminAccountsManager } from './AdminAccountsManager';
+import { HeadsManager } from './HeadsManager';
 import { WebsiteEditor } from './WebsiteEditor';
 import { explainError, type Row } from './ui';
 import { DashboardShell, type NavGroup } from '../dashboard/DashboardShell';
@@ -42,6 +44,7 @@ const IDLE_MS = 30 * 60 * 1000; // Sign out after 30 minutes of inactivity
 export type NavigationPage =
   | 'dashboard'
   | 'registrations'
+  | 'heads'
   | 'teams'
   | 'reports'
   | 'admin-accounts'
@@ -546,6 +549,7 @@ export default function AdminApp() {
       items: [
         { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
         { id: 'registrations', label: 'Registrations', icon: Users, badge: pendingCount },
+        { id: 'heads', label: 'Heads', icon: UserRoundCog },
         { id: 'teams', label: 'Departments', icon: Layers },
         { id: 'reports', label: 'Reports', icon: BarChart3 },
       ],
@@ -633,6 +637,14 @@ export default function AdminApp() {
             selectedApp={inspectTarget}
             onClearSelectedApp={() => setInspectTarget(null)}
             isSuperAdmin={Boolean(isAdmin && isSuperAdmin)}
+          />
+        )}
+
+        {page === 'heads' && (
+          <HeadsManager
+            teamRegistrations={teamRegistrations}
+            loading={dataLoading}
+            onRefresh={loadData}
           />
         )}
 
