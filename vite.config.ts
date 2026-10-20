@@ -23,6 +23,7 @@ export default defineConfig(() => {
               req.url.startsWith('/api/admin') ||
               req.url.startsWith('/api/contact') ||
               req.url.startsWith('/api/register') ||
+              req.url.startsWith('/api/team-register') ||
               req.url.startsWith('/api/health')
             ) {
               targetFilePath = path.resolve(process.cwd(), 'api/local-routes.ts');

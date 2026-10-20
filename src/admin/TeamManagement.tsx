@@ -47,6 +47,10 @@ create table if not exists public.team_registrations (
   statement text default '',
   status text not null default 'received',
   admin_notes text default '',
+  security_emergency_steps text default '',
+  security_teamwork text default '',
+  security_motivation text default '',
+  security_handling_harassment text default '',
   age_confirmed boolean not null,
   consent_version text not null,
   consent_at timestamptz not null default now()
@@ -56,7 +60,7 @@ create policy "public submit team" on public.team_registrations for insert to an
 create policy "admin read team" on public.team_registrations for select to authenticated using (public.is_admin());
 create policy "admin update team" on public.team_registrations for update to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "admin delete team" on public.team_registrations for delete to authenticated using (public.is_admin());
-grant insert (full_name, email, phone, institution, team, experience, statement, age_confirmed, consent_version) on public.team_registrations to anon, authenticated;
+grant insert (full_name, email, phone, institution, team, section, experience, statement, security_emergency_steps, security_teamwork, security_motivation, security_handling_harassment, age_confirmed, consent_version) on public.team_registrations to anon, authenticated;
 grant select, update, delete on public.team_registrations to authenticated;`;
 
 export const TeamManagement: React.FC<TeamManagementProps> = ({

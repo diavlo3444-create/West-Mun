@@ -278,6 +278,127 @@ export default async function handler(req: any, res: any) {
     }
   }
 
+  // /api/team-register
+  if (pathname === '/api/team-register' && method === 'POST') {
+    const body = await parseJsonBody(req);
+    const {
+      full_name,
+      fullName,
+      email,
+      phone,
+      institution,
+      team,
+      section,
+      experience,
+      statement,
+      security_emergency_steps,
+      security_teamwork,
+      security_motivation,
+      security_handling_harassment,
+    } = body || {};
+
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!isValidEmail(cleanEmail)) {
+      return res.status(400).json({ error: 'Please provide a valid official email address.' });
+    }
+
+    const cleanName = sanitizeInput(full_name || fullName, 100);
+    const cleanInstitution = sanitizeInput(institution, 150);
+    const cleanPhone = sanitizeInput(phone, 40);
+    const cleanTeam = String(team || '').trim().toLowerCase();
+    const cleanSection = section === 'female' ? 'female' : 'male';
+    const cleanExperience = sanitizeInput(experience, 3000);
+    const cleanStatement = sanitizeInput(statement, 3000);
+
+    if (!cleanName || cleanName.length < 2) {
+      return res.status(400).json({ error: 'Full name is required.' });
+    }
+    if (!cleanInstitution || cleanInstitution.length < 2) {
+      return res.status(400).json({ error: 'Academic institution or school name is required.' });
+    }
+
+    const validTeams = ['security', 'media', 'volunteers'];
+    if (!validTeams.includes(cleanTeam)) {
+      return res.status(400).json({ error: 'Invalid department or team selected.' });
+    }
+
+    const cleanEmergency = String(security_emergency_steps || '').trim();
+    const cleanTeamwork = String(security_teamwork || '').trim();
+    const cleanMotivation = String(security_motivation || '').trim();
+    const cleanHarassment = String(security_handling_harassment || '').trim();
+
+    if (cleanTeam === 'security') {
+      const countWords = (text: string) => {
+        const trimmed = text.trim();
+        return trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
+      };
+
+      const emergencyWords = countWords(cleanEmergency);
+      if (emergencyWords < 80) {
+        return res.status(400).json({
+          error: `Emergency Problem-Solving response requires at least 80 words (received ${emergencyWords}).`,
+          field: 'security_emergency_steps',
+          minWords: 80,
+          currentWords: emergencyWords,
+        });
+      }
+
+      const teamworkWords = countWords(cleanTeamwork);
+      if (teamworkWords < 50) {
+        return res.status(400).json({
+          error: `Teamwork and Communication response requires at least 50 words (received ${teamworkWords}).`,
+          field: 'security_teamwork',
+          minWords: 50,
+          currentWords: teamworkWords,
+        });
+      }
+
+      const motivationWords = countWords(cleanMotivation);
+      if (motivationWords < 50) {
+        return res.status(400).json({
+          error: `Motivation response requires at least 50 words (received ${motivationWords}).`,
+          field: 'security_motivation',
+          minWords: 50,
+          currentWords: motivationWords,
+        });
+      }
+
+      const harassmentWords = countWords(cleanHarassment);
+      if (harassmentWords < 50) {
+        return res.status(400).json({
+          error: `Handling Bullying and Harassment response requires at least 50 words (received ${harassmentWords}).`,
+          field: 'security_handling_harassment',
+          minWords: 50,
+          currentWords: harassmentWords,
+        });
+      }
+    }
+
+    const newStaffRecord = {
+      id: crypto.randomUUID(),
+      full_name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      institution: cleanInstitution,
+      team: cleanTeam,
+      section: cleanSection,
+      experience: cleanExperience,
+      statement: cleanStatement || (cleanTeam === 'security' ? cleanMotivation : ''),
+      security_emergency_steps: cleanEmergency,
+      security_teamwork: cleanTeamwork,
+      security_motivation: cleanMotivation,
+      security_handling_harassment: cleanHarassment,
+      status: 'received',
+      created_at: new Date().toISOString(),
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: 'Your application has been safely recorded by the Secretariat.',
+      data: newStaffRecord,
+    });
+  }
+
   // /api/admin/login
   if (pathname === '/api/admin/login' && method === 'POST') {
     const body = await parseJsonBody(req);

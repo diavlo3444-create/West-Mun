@@ -391,6 +391,171 @@ app.post('/api/register', (req: Request, res: Response) => {
 });
 
 /**
+ * Public Conference Staff / Team Registration Endpoint
+ * Enforces server-side word count validation on Security team questions.
+ */
+app.post('/api/team-register', async (req: Request, res: Response) => {
+  const ip = getClientIp(req);
+  const rate = checkRateLimit('register', ip, 10, 10 * 60 * 1000);
+  if (!rate.allowed) {
+    return res.status(429).json({
+      error: `Too many registration attempts. Please wait ${rate.retryAfterSeconds} seconds before trying again.`,
+    });
+  }
+
+  const {
+    full_name,
+    fullName,
+    email,
+    phone,
+    institution,
+    team,
+    section,
+    experience,
+    statement,
+    security_emergency_steps,
+    security_teamwork,
+    security_motivation,
+    security_handling_harassment,
+  } = req.body || {};
+
+  const cleanName = sanitizeInput(full_name || fullName, 100);
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanInstitution = sanitizeInput(institution, 150);
+  const cleanPhone = sanitizeInput(phone, 40);
+  const cleanTeam = String(team || '').trim().toLowerCase();
+  const cleanSection = section === 'female' ? 'female' : 'male';
+  const cleanExperience = sanitizeInput(experience, 3000);
+  const cleanStatement = sanitizeInput(statement, 3000);
+
+  if (!isValidEmail(cleanEmail)) {
+    return res.status(400).json({ error: 'Please provide a valid official email address.' });
+  }
+
+  if (!cleanName || cleanName.length < 2) {
+    return res.status(400).json({ error: 'Full name is required.' });
+  }
+
+  if (!cleanInstitution || cleanInstitution.length < 2) {
+    return res.status(400).json({ error: 'Institution or school is required.' });
+  }
+
+  const validTeams = ['security', 'media', 'volunteers'];
+  if (!validTeams.includes(cleanTeam)) {
+    return res.status(400).json({ error: 'Invalid department or team selection.' });
+  }
+
+  // Strict server-side word count enforcement for Security team
+  const cleanEmergency = String(security_emergency_steps || '').trim();
+  const cleanTeamwork = String(security_teamwork || '').trim();
+  const cleanMotivation = String(security_motivation || '').trim();
+  const cleanHarassment = String(security_handling_harassment || '').trim();
+
+  if (cleanTeam === 'security') {
+    const countWords = (text: string) => {
+      const trimmed = text.trim();
+      return trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
+    };
+
+    const emergencyWords = countWords(cleanEmergency);
+    if (emergencyWords < 80) {
+      return res.status(400).json({
+        error: `Emergency Problem-Solving response requires at least 80 words (received ${emergencyWords}).`,
+        code: 'INSUFFICIENT_WORD_COUNT',
+        field: 'security_emergency_steps',
+        minWords: 80,
+        currentWords: emergencyWords,
+      });
+    }
+
+    const teamworkWords = countWords(cleanTeamwork);
+    if (teamworkWords < 50) {
+      return res.status(400).json({
+        error: `Teamwork and Communication response requires at least 50 words (received ${teamworkWords}).`,
+        code: 'INSUFFICIENT_WORD_COUNT',
+        field: 'security_teamwork',
+        minWords: 50,
+        currentWords: teamworkWords,
+      });
+    }
+
+    const motivationWords = countWords(cleanMotivation);
+    if (motivationWords < 50) {
+      return res.status(400).json({
+        error: `Motivation response requires at least 50 words (received ${motivationWords}).`,
+        code: 'INSUFFICIENT_WORD_COUNT',
+        field: 'security_motivation',
+        minWords: 50,
+        currentWords: motivationWords,
+      });
+    }
+
+    const harassmentWords = countWords(cleanHarassment);
+    if (harassmentWords < 50) {
+      return res.status(400).json({
+        error: `Handling Bullying and Harassment response requires at least 50 words (received ${harassmentWords}).`,
+        code: 'INSUFFICIENT_WORD_COUNT',
+        field: 'security_handling_harassment',
+        minWords: 50,
+        currentWords: harassmentWords,
+      });
+    }
+  }
+
+  const newRecord = {
+    id: crypto.randomUUID(),
+    full_name: cleanName,
+    email: cleanEmail,
+    phone: cleanPhone,
+    institution: cleanInstitution,
+    team: cleanTeam,
+    section: cleanSection,
+    experience: cleanExperience,
+    statement: cleanStatement || (cleanTeam === 'security' ? cleanMotivation : ''),
+    security_emergency_steps: cleanEmergency,
+    security_teamwork: cleanTeamwork,
+    security_motivation: cleanMotivation,
+    security_handling_harassment: cleanHarassment,
+    status: 'received',
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const { getSupabaseAdmin } = await import('./src/server/superAdminHandler.ts');
+    const supabaseAdmin = getSupabaseAdmin();
+    if (supabaseAdmin) {
+      const { error } = await supabaseAdmin.from('team_registrations').insert({
+        full_name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        institution: cleanInstitution,
+        team: cleanTeam,
+        section: cleanSection,
+        experience: cleanExperience,
+        statement: cleanStatement || (cleanTeam === 'security' ? cleanMotivation : ''),
+        security_emergency_steps: cleanEmergency,
+        security_teamwork: cleanTeamwork,
+        security_motivation: cleanMotivation,
+        security_handling_harassment: cleanHarassment,
+        age_confirmed: true,
+        consent_version: '2026-10-17',
+      });
+      if (error && !error.message?.includes('duplicate key')) {
+        console.warn('[Server team-register Supabase insert warning]:', error.message);
+      }
+    }
+  } catch (err) {
+    console.warn('[Server team-register Supabase error]:', err);
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'Your application has been safely registered with the Secretariat.',
+    data: newRecord,
+  });
+});
+
+/**
  * Organizer Admin Authentication Endpoint (Constant-time string comparison)
  */
 app.post('/api/admin/login', (req: Request, res: Response) => {

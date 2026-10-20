@@ -48,6 +48,10 @@ export interface HeadRegistration {
   admin_notes?: string;
   age_confirmed?: boolean;
   consent_version?: string;
+  security_emergency_steps?: string;
+  security_teamwork?: string;
+  security_motivation?: string;
+  security_handling_harassment?: string;
 }
 
 export interface HeadAnnouncement {

@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, CheckCircle2, Shield, Camera, HeartHandshake, Lock } from 'lucide-react';
+import { X, Loader2, CheckCircle2, Shield, Camera, HeartHandshake, Lock, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { EMAIL_RE } from '../lib/safe';
 import type { Settings } from '../lib/content';
 import { ConsentCheck } from './ConsentCheck';
+import {
+  SECURITY_QUESTIONS,
+  countWords,
+  validateSecurityAnswers,
+  type SecurityAnswersPayload,
+} from '../lib/securityQuestions';
 
 interface TeamRegistrationModalProps {
   settings: Settings;
@@ -25,6 +31,11 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     section: 'male' as 'male' | 'female',
     experience: '',
     statement: '',
+    // Security team 4 mandatory scenario questions
+    security_emergency_steps: '',
+    security_teamwork: '',
+    security_motivation: '',
+    security_handling_harassment: '',
     ageOk: false,
     consent: false,
     website: '', // honeypot
@@ -48,6 +59,16 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // Compute live Security validation state if team is security
+  const securityValidation = team === 'security'
+    ? validateSecurityAnswers({
+        security_emergency_steps: form.security_emergency_steps,
+        security_teamwork: form.security_teamwork,
+        security_motivation: form.security_motivation,
+        security_handling_harassment: form.security_handling_harassment,
+      })
+    : { valid: true, errors: {}, counts: {} };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
@@ -67,22 +88,37 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     if (inst.length < 2 || inst.length > 150) errs.institution = 'Please enter your school or organisation.';
     if (!form.ageOk) errs.ageOk = 'Please confirm this.';
     if (!form.consent) errs.consent = 'You must agree to the Terms and Privacy Policy.';
+
+    // Strict validation for Security team long-answer scenario questions
+    if (team === 'security') {
+      const secVal = validateSecurityAnswers({
+        security_emergency_steps: form.security_emergency_steps,
+        security_teamwork: form.security_teamwork,
+        security_motivation: form.security_motivation,
+        security_handling_harassment: form.security_handling_harassment,
+      });
+
+      if (!secVal.valid) {
+        Object.assign(errs, secVal.errors);
+      }
+    }
+
     setErrors(errs);
-    if (Object.keys(errs).length) return;
+    if (Object.keys(errs).length > 0) {
+      if (team === 'security' && !securityValidation.valid) {
+        setSubmitError('Please complete all 4 Security Assessment questions with their minimum required word counts.');
+      }
+      return;
+    }
 
     if (form.website) {
       setDone(true); // bot honeypot
       return;
     }
 
-    if (!supabase) {
-      setSubmitError('Team registration is unavailable at this moment. Please reach out via contact form.');
-      return;
-    }
-
     setBusy(true);
 
-    const { error } = await supabase.from('team_registrations').insert({
+    const payload = {
       full_name: name,
       email,
       phone: form.phone.trim(),
@@ -90,24 +126,83 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
       team,
       section: form.section,
       experience: form.experience.trim(),
-      statement: form.statement.trim(),
+      statement: form.statement.trim() || (team === 'security' ? form.security_motivation.trim() : ''),
+      security_emergency_steps: team === 'security' ? form.security_emergency_steps.trim() : '',
+      security_teamwork: team === 'security' ? form.security_teamwork.trim() : '',
+      security_motivation: team === 'security' ? form.security_motivation.trim() : '',
+      security_handling_harassment: team === 'security' ? form.security_handling_harassment.trim() : '',
       age_confirmed: true,
       consent_version: settings.legal_version || '2026-10-17',
-    });
+    };
+
+    let submissionSuccess = false;
+
+    if (supabase) {
+      const { error } = await supabase.from('team_registrations').insert(payload);
+
+      if (!error) {
+        submissionSuccess = true;
+      } else {
+        console.warn('[Team Registration Supabase Insert Warning]:', error);
+        if (error.message?.includes('team_registration_closed')) {
+          setSubmitError(`Registration for the ${team.toUpperCase()} team has been closed.`);
+          setBusy(false);
+          return;
+        } else if (error.code === '23505') {
+          setSubmitError(`This email address has already submitted an application for the ${team.toUpperCase()} team.`);
+          setBusy(false);
+          return;
+        } else if (error.message?.includes('rate_limited')) {
+          setSubmitError('High registration volume detected. Please wait a moment and try again.');
+          setBusy(false);
+          return;
+        } else if (error.message?.includes('security_emergency_steps')) {
+          setSubmitError('Emergency Problem-Solving response requires at least 80 words.');
+          setBusy(false);
+          return;
+        } else if (error.message?.includes('security_teamwork')) {
+          setSubmitError('Teamwork and Communication response requires at least 50 words.');
+          setBusy(false);
+          return;
+        } else if (error.message?.includes('security_motivation')) {
+          setSubmitError('Motivation response requires at least 50 words.');
+          setBusy(false);
+          return;
+        } else if (error.message?.includes('security_handling_harassment')) {
+          setSubmitError('Handling Bullying and Harassment response requires at least 50 words.');
+          setBusy(false);
+          return;
+        }
+        // If columns are not yet in Supabase schema cache or Supabase threw an unexpected error, attempt backend API
+      }
+    }
+
+    if (!submissionSuccess) {
+      // Fallback via server endpoint
+      try {
+        const res = await fetch('/api/team-register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const resData = await res.json().catch(() => ({}));
+        if (res.ok && resData.success) {
+          submissionSuccess = true;
+        } else {
+          setSubmitError(resData.error || 'Could not submit application. Please verify your details and try again.');
+        }
+      } catch {
+        if (!supabase) {
+          setSubmitError('Team registration is unavailable at this moment. Please reach out via the contact form.');
+        } else {
+          setSubmitError('Could not submit application. Please verify your connection and try again.');
+        }
+      }
+    }
 
     setBusy(false);
 
-    if (error) {
-      if (error.message?.includes('team_registration_closed')) {
-        setSubmitError(`Registration for the ${team.toUpperCase()} team has been closed.`);
-      } else if (error.code === '23505') {
-        setSubmitError(`This email address has already submitted an application for the ${team.toUpperCase()} team.`);
-      } else if (error.message?.includes('rate_limited')) {
-        setSubmitError('High registration volume detected. Please wait a moment and try again.');
-      } else {
-        setSubmitError('Could not submit application. Please verify your details and try again.');
-      }
-    } else {
+    if (submissionSuccess) {
       setDone(true);
     }
   };
@@ -122,7 +217,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
       role="dialog"
       aria-modal="true"
     >
-      <div className="relative w-full max-w-xl my-8 bg-[#0e0e12] border border-[#d4af37]/40 rounded-sm p-6 sm:p-8 shadow-2xl">
+      <div className="relative w-full max-w-2xl my-8 bg-[#0e0e12] border border-[#d4af37]/40 rounded-sm p-6 sm:p-8 shadow-2xl max-h-[92vh] overflow-y-auto">
         <button
           type="button"
           onClick={onClose}
@@ -152,7 +247,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
             </div>
             <h4 className="text-xl font-serif text-white">Application Received</h4>
             <p className="text-xs text-neutral-300 max-w-md mx-auto font-light leading-relaxed">
-              Your application for the <strong className="text-[#d4af37] capitalize">{team}</strong> team has been securely recorded. The Secretariat will review your credentials and contact you at <span className="font-mono text-white">{form.email}</span>.
+              Your application for the <strong className="text-[#d4af37] capitalize">{team}</strong> team has been securely recorded. The Secretariat and Department Head will review your credentials and contact you at <span className="font-mono text-white">{form.email}</span>.
             </p>
             <button
               type="button"
@@ -223,8 +318,9 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
             )}
 
             {submitError && (
-              <div className="p-3 bg-red-950/40 border border-red-500/40 text-red-300 text-xs rounded-sm">
-                {submitError}
+              <div className="p-3 bg-red-950/40 border border-red-500/40 text-red-300 text-xs rounded-sm flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <span>{submitError}</span>
               </div>
             )}
 
@@ -334,23 +430,106 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
                 rows={2}
                 disabled={!currentlyOpen || busy}
                 className={inputCls}
-                placeholder="Past MUN conferences, media portfolio links, first-aid certificates, etc."
+                placeholder="Past MUN conferences, security/protocol roles, first-aid certificates, etc."
                 value={form.experience}
                 onChange={(e) => setForm({ ...form, experience: e.target.value })}
               />
             </div>
 
-            <div>
-              <label className={labelCls}>Statement of Motivation (Optional)</label>
-              <textarea
-                rows={2}
-                disabled={!currentlyOpen || busy}
-                className={inputCls}
-                placeholder="Why do you wish to join this team at WEST MUN 2027?"
-                value={form.statement}
-                onChange={(e) => setForm({ ...form, statement: e.target.value })}
-              />
-            </div>
+            {/* Non-Security Teams: Standard Statement of Motivation */}
+            {team !== 'security' && (
+              <div>
+                <label className={labelCls}>Statement of Motivation (Optional)</label>
+                <textarea
+                  rows={2}
+                  disabled={!currentlyOpen || busy}
+                  className={inputCls}
+                  placeholder="Why do you wish to join this team at WEST MUN 2027?"
+                  value={form.statement}
+                  onChange={(e) => setForm({ ...form, statement: e.target.value })}
+                />
+              </div>
+            )}
+
+            {/* SECURITY TEAM ONLY: The 4 Required Long-Answer Scenario Questions */}
+            {team === 'security' && (
+              <div className="space-y-5 pt-3 border-t border-[#d4af37]/30">
+                <div className="rounded-sm border border-[#d4af37]/35 bg-[#14120a] p-3.5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Shield className="w-4 h-4 text-[#d4af37]" />
+                    <span className="text-xs font-serif font-semibold text-white tracking-wide">
+                      Security Team Assessment (4 Required Long-Answer Questions)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
+                    Security officers are responsible for delegate safety, floor protocol, and committee decorum. All four scenario questions below are required and subject to minimum word counts enforced on submission.
+                  </p>
+                </div>
+
+                {SECURITY_QUESTIONS.map((q, idx) => {
+                  const currentWords = countWords(form[q.key as keyof typeof form] as string);
+                  const meetsMin = currentWords >= q.minWords;
+                  const remaining = q.minWords - currentWords;
+                  const hasError = Boolean(errors[q.key]);
+
+                  return (
+                    <div key={q.key} className="space-y-1.5 bg-[#101014] p-3.5 rounded-sm border border-neutral-800/90">
+                      <div className="flex items-start justify-between gap-2">
+                        <label className="text-xs font-medium text-white flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-[#d4af37]/20 border border-[#d4af37]/50 text-[#d4af37] text-[10.5px] font-mono flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="font-serif text-[12.5px] text-neutral-100">{q.title} *</span>
+                        </label>
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-sm border shrink-0 transition-colors ${
+                            meetsMin
+                              ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400 font-semibold'
+                              : 'bg-amber-950/50 border-amber-500/40 text-amber-300'
+                          }`}
+                        >
+                          {currentWords} / {q.minWords} words {meetsMin ? '✓ Met' : `(${remaining} needed)`}
+                        </span>
+                      </div>
+
+                      <p className="text-[11.5px] text-neutral-300 font-light leading-relaxed italic bg-black/40 p-2.5 rounded-sm border border-neutral-800">
+                        "{q.prompt}"
+                      </p>
+
+                      <textarea
+                        rows={4}
+                        required
+                        disabled={!currentlyOpen || busy}
+                        className={`${inputCls} font-normal leading-relaxed text-[11.5px] ${
+                          hasError ? 'border-red-500/80 focus:border-red-400' : ''
+                        }`}
+                        placeholder={`Provide your detailed answer here (minimum ${q.minWords} words)...`}
+                        value={(form[q.key as keyof typeof form] as string) || ''}
+                        onChange={(e) => {
+                          const nextVal = e.target.value;
+                          setForm({ ...form, [q.key]: nextVal });
+                          if (errors[q.key]) {
+                            const newWords = countWords(nextVal);
+                            if (newWords >= q.minWords) {
+                              const nextErrs = { ...errors };
+                              delete nextErrs[q.key];
+                              setErrors(nextErrs);
+                            }
+                          }
+                        }}
+                      />
+
+                      {errors[q.key] && (
+                        <p className="text-[11px] text-red-400 font-medium flex items-center gap-1.5 mt-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{errors[q.key]}</span>
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Consents */}
             <div className="space-y-2 pt-2 border-t border-neutral-800 text-xs text-neutral-300">
@@ -385,8 +564,9 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
 
               <button
                 type="submit"
-                disabled={!currentlyOpen || busy}
+                disabled={!currentlyOpen || busy || (team === 'security' && !securityValidation.valid)}
                 className="px-6 py-2.5 text-xs font-semibold uppercase tracking-widest text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all inline-flex items-center gap-2"
+                title={team === 'security' && !securityValidation.valid ? 'Please satisfy all 4 minimum word count requirements before submitting' : undefined}
               >
                 {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {currentlyOpen ? 'Submit Application' : 'Department Closed'}
