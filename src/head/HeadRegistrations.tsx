@@ -41,7 +41,7 @@ import { supabase } from '../lib/supabase';
 import type { SectionKey } from './departments';
 import { SECURITY_QUESTIONS, countWords, extractSecurityAnswers, getWordCountFeedback } from '../lib/securityQuestions';
 
-type StatusTab = 'all' | 'pending' | 'approved' | 'waitlisted' | 'rejected';
+type StatusTab = 'all' | 'pending' | 'approved' | 'accepted-secretariat' | 'waitlisted' | 'rejected';
 
 interface HeadRegistrationsProps {
   registrations: HeadRegistration[];
@@ -146,7 +146,8 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       pending: registrations.filter(
         (r) => r.status === 'received' || r.status === 'under_review',
       ).length,
-      approved: registrations.filter((r) => r.status === 'accepted').length,
+      approved: registrations.filter((r) => r.status === 'accepted' && !r.admin_finalized_at).length,
+      acceptedSecretariat: registrations.filter((r) => r.status === 'accepted' && Boolean(r.admin_finalized_at)).length,
       waitlisted: registrations.filter((r) => r.status === 'waitlisted').length,
       rejected: registrations.filter((r) => r.status === 'rejected').length,
     }),
@@ -168,7 +169,9 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
           if (!matches) return false;
         }
 
-        if (statusTab === 'pending') {
+        if (statusTab === 'accepted-secretariat') {
+          if (record.status !== 'accepted' || !record.admin_finalized_at) return false;
+        } else if (statusTab === 'pending') {
           if (record.status !== 'received' && record.status !== 'under_review') return false;
         } else if (statusTab === 'approved') {
           if (record.status !== 'accepted') return false;
@@ -324,7 +327,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       <PageHeader
         eyebrow="Candidate registry"
         title="Applications"
-        description={`Every candidate you are permitted to review for ${departmentLabel}${section ? ` · ${section} division` : ''}.`}
+        description={`Review candidates for ${departmentLabel}${section ? ` · ${section} division` : ''}. Use “Accepted by Secretariat” to see candidates with a recorded final decision.`}
         actions={
           <>
             <button type="button" onClick={onRefresh} className={btnSecondary} disabled={loading}>
@@ -350,7 +353,8 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
           options={[
             { value: 'all', label: 'All', count: counts.all },
             { value: 'pending', label: 'Pending', count: counts.pending },
-            { value: 'approved', label: 'Approved', count: counts.approved },
+            { value: 'approved', label: 'Head approved', count: counts.approved },
+            { value: 'accepted-secretariat', label: 'Accepted by Secretariat', count: counts.acceptedSecretariat },
             { value: 'waitlisted', label: 'Waitlisted', count: counts.waitlisted },
             { value: 'rejected', label: 'Rejected', count: counts.rejected },
           ]}
