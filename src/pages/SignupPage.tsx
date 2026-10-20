@@ -80,6 +80,7 @@ export default function SignupPage() {
               {busy ? "Creating account…" : "Create team account"}
             </button>
           </form>
+          <p className="mt-5 text-center text-[11px] text-neutral-400">Already have an account? <a href="/login" className="text-[#d4af37] underline underline-offset-4 hover:text-[#f1d985]">Sign in</a></p>
           <p className="mt-5 text-center text-[11px] leading-relaxed text-neutral-500">WEST MUN will never ask you to share your password with a section head or admin.</p>
         </section>
       </div>
