@@ -384,7 +384,28 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         ? 'volunteers'
         : applicationTeam;
     const decisionSection = record.section || section || 'general';
-    const decision = await supabase.from('wm_staffing_decisions').upsert({
+    // Check for an existing recommendation before writing. Blind upsert can
+    // attempt an UPDATE that RLS correctly blocks after Secretariat finalization.
+    const { data: existingDecision, error: existingError } = await supabase
+      .from('wm_staffing_decisions')
+      .select('id,head_user_id,admin_decision')
+      .eq('registration_id', id)
+      .maybeSingle();
+
+    if (existingError) {
+      return { ok: false, error: explainAccessError(existingError) };
+    }
+    if (existingDecision && existingDecision.admin_decision !== 'pending') {
+      return { ok: false, error: 'The Secretariat has already finalized this application. Heads cannot change the recommendation after a final decision.' };
+    }
+    if (existingDecision && existingDecision.head_user_id !== headUser.id) {
+      return { ok: false, error: 'A recommendation already exists under another head. Ask the Secretariat to review it instead of overwriting another head’s decision.' };
+    }
+    if (['accepted', 'rejected', 'withdrawn'].includes(String(record.status || ''))) {
+      return { ok: false, error: 'This application is already finalized or withdrawn and cannot receive a new head recommendation.' };
+    }
+
+    const payload = {
       registration_id: id,
       department: decisionDepartment,
       section: decisionSection,
@@ -399,9 +420,18 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       admin_user_id: null,
       admin_reviewed_at: null,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'registration_id' });
+    };
 
-    if (decision.error) return { ok: false, error: explainAccessError(decision.error) };
+    const decision = existingDecision
+      ? await supabase.from('wm_staffing_decisions').update(payload).eq('registration_id', id).eq('head_user_id', headUser.id).eq('admin_decision', 'pending')
+      : await supabase.from('wm_staffing_decisions').insert(payload);
+
+    if (decision.error) {
+      const message = /row-level security|permission denied|policy/i.test(decision.error.message || '')
+        ? 'Supabase blocked this recommendation. The assignment may not match this application’s department/section, or the application may already be finalized. Refresh the page; if it continues, the Secretariat must review the assignment and decision record.'
+        : explainAccessError(decision.error);
+      return { ok: false, error: message };
+    }
     return { ok: true };
   };
 
