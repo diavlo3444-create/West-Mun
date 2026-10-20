@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, BriefcaseBusiness, Check, ChevronDown, LoaderCircle, Plus, RefreshCw, Trash2, Users, Video, Clock3 } from 'lucide-react';
-import type { DepartmentKey, SectionKey } from '../departments';
+import type { DepartmentKey, SectionKey } from './departments';
 import {
   addProjectMember, assignPersonToShift, createDepartmentPerson, createDepartmentProject,
   createDepartmentShift, createProjectStage, createProjectTask, deleteDepartmentPerson,
