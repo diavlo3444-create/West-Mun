@@ -381,6 +381,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
       return;
     }
 
+    let decisionSyncError = false;
     if (activeItem._type === 'team' && (targetStatus === 'accepted' || targetStatus === 'rejected')) {
       const { data: authData } = await supabase.auth.getUser();
       if (authData.user) {
@@ -395,9 +396,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
           .eq('registration_id', activeItem.id)
           .select('id')
           .maybeSingle();
-        if (finalDecision.error) {
-          setModalNotice({ type: 'error', text: 'The application status was saved, but the head-recommendation record could not be finalized. Refresh and review the recommendation record.' });
-        }
+        if (finalDecision.error) decisionSyncError = true;
       }
     }
 
@@ -406,10 +405,12 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
       prev ? { ...prev, status: targetStatus, admin_notes: draftNotes.trim() } : null,
     );
     setPendingAction(null);
-    setModalNotice({ type: 'success', text: 'Decision saved to Supabase.' });
+    setModalNotice(decisionSyncError
+      ? { type: 'error', text: 'The application status was saved, but the head-recommendation record could not be finalized. Refresh and review the recommendation record.' }
+      : { type: 'success', text: 'Decision saved to Supabase.' });
     setToast({
-      message: `${activeItem.full_name} is now marked ${targetStatus.replace('_', ' ')}.`,
-      tone: 'success',
+      message: `${activeItem.full_name} is now marked ${targetStatus.replace('_', ' ')}${decisionSyncError ? '; recommendation sync needs review' : ''}.`,
+      tone: decisionSyncError ? 'error' : 'success',
     });
     onRefresh();
   };
