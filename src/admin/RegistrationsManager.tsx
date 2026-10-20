@@ -553,6 +553,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   };
 
   const emptyRecords = unifiedList.length === 0;
+  const legacyAcceptedCount = unifiedList.filter((item) => item._type === 'team' && item.status === 'accepted' && !item.admin_finalized_at).length;
 
   return (
     <div className="space-y-5">
@@ -608,6 +609,12 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
           </div>
         </div>
       </Panel>
+
+      {legacyAcceptedCount > 0 && (
+        <Notice tone="warning" title="Confirm older approvals before creating links">
+          {legacyAcceptedCount} accepted team application(s) predate the secure final-approval record. Open each one, keep its status as Accepted, and click Save Changes once. This records the admin confirmation required before a signup link can be created.
+        </Notice>
+      )}
 
       {(bulkSignupNotice || bulkSignupLinks.length > 0) && (
         <Panel className="border-[#d4af37]/20 bg-[#101013]">
@@ -1249,6 +1256,12 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                 </div>
               );
             })()}
+
+            {activeItem._type === 'team' && activeItem.status === 'accepted' && !activeItem.admin_finalized_at && (
+              <Notice tone="warning" title="Admin confirmation required">
+                This older Accepted status has not been reconfirmed under the secure approval flow. Keep the status set to Accepted and click Save Changes before generating a signup link.
+              </Notice>
+            )}
 
             {activeItem._type === 'team' && (
               <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-3">
