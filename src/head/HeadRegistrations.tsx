@@ -594,7 +594,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                 type="button"
                 onClick={() => persist(draftStatus)}
                 className={btnPrimary}
-                disabled={saving}
+                disabled={saving || adminDecision !== 'pending'}
               >
                 {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
                 Save adjudication
@@ -880,6 +880,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                   <select
                     id="head-detail-status"
                     className={selectCls}
+                    disabled={adminDecision !== 'pending'}
                     value={draftStatus}
                     onChange={(event) => setDraftStatus(event.target.value)}
                   >
@@ -896,6 +897,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                     id="head-detail-notes"
                     rows={2}
                     className={inputCls}
+                    disabled={adminDecision !== 'pending'}
                     placeholder="Recommendation notes for the Secretariat…"
                     value={draftNotes}
                     onChange={(event) => setDraftNotes(event.target.value)}
