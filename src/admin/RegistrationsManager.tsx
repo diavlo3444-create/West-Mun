@@ -400,6 +400,9 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
       }
     }
 
+    if (!decisionSyncError && activeItem._type === 'team' && (targetStatus === 'accepted' || targetStatus === 'rejected')) {
+      setHeadRecommendation((prev) => prev ? { ...prev, admin_decision: targetStatus === 'accepted' ? 'approved' : 'rejected' } : prev);
+    }
     setDraftStatus(targetStatus);
     setActiveItem((prev) =>
       prev ? { ...prev, status: targetStatus, admin_notes: draftNotes.trim() } : null,
@@ -526,7 +529,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
           <div>
             <h2 className="text-sm font-semibold text-neutral-100">Manual applicant contact</h2>
             <p className="mt-1 max-w-3xl text-[11.5px] leading-relaxed text-neutral-400">
-              No emails are sent by this website. After an application is accepted, generate a one-time signup link and send it yourself by WhatsApp, phone, or your own email account. The link expires in seven days and only works with the email on the application.
+              No emails are sent by this website. After an application is accepted, the authorized section head or admin can generate a one-time signup link and share it manually by WhatsApp, phone, or their own email account. The link expires in seven days and only works with the email on the application.
             </p>
           </div>
         </div>
