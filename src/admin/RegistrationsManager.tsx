@@ -212,6 +212,9 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     setDraftNotes(item.admin_notes || '');
     setModalNotice(null);
     setPendingAction(null);
+    setSignupUrl(null);
+    setSignupMessage(null);
+    setSignupNotice(null);
   };
 
   // Deep-link from the overview page opens the exact dossier.
@@ -630,7 +633,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
           <div className="space-y-3 p-4">
             {bulkSignupNotice && <p role="status" className="text-[11px] text-neutral-300">{bulkSignupNotice}</p>}
             {bulkSignupLinks.map((link) => (
-              <div key={link.signupUrl} className="grid gap-2 rounded-md border border-white/[0.07] bg-black/20 p-3 sm:grid-cols-[minmax(130px,0.8fr)_minmax(0,2fr)_auto] sm:items-center">
+              <div key={link.signupUrl} className="grid gap-2 rounded-md border border-white/[0.07] bg-black/20 p-3 sm:grid-cols-[minmax(130px,0.8fr)_minmax(0,2fr)] sm:items-center">
                 <div className="min-w-0">
                   <p className="truncate text-[11px] text-neutral-200">{link.applicantEmail}</p>
                   <p className="mt-0.5 text-[9px] font-mono uppercase text-neutral-500">{link.team}{link.section ? ` · ${link.section}` : ''}</p>
@@ -1304,10 +1307,10 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                       onClick={() => void createSignupLink()}
                       disabled={signupBusy || saving}
                       className={btnGhost}
-                      title="Create and copy a one-time signup link. No email will be sent."
+                      title="Create and copy a short acceptance message with a one-time signup link. No email will be sent."
                     >
                       {signupBusy ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <Shield className="h-3 w-3" aria-hidden="true" />}
-                      {signupBusy ? 'Creating link…' : 'Generate & copy signup link'}
+                      {signupBusy ? 'Creating message…' : 'Generate acceptance message'}
                     </button>
                   )}
                   <button
