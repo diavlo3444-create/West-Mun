@@ -908,10 +908,20 @@ export async function removeShiftAssignment(
 // 7. WM_REGISTRATION_WINDOWS
 // ---------------------------------------------------------------------------
 
-export async function listRegistrationWindows(): Promise<OperationResult<WmRegistrationWindow[]>> {
+export async function listRegistrationWindows(
+  testToken?: string | null,
+): Promise<OperationResult<WmRegistrationWindow[]>> {
+  if (testToken) {
+    return callSuperAdminOperations<WmRegistrationWindow[]>(
+      'list_registration_windows',
+      {},
+      testToken,
+    );
+  }
   if (!supabase) return { ok: false, error: 'Database client not initialized.' };
 
   try {
+    await ensureFreshSupabaseSession();
     const { data, error } = await supabase
       .from('wm_registration_windows')
       .select('*')
@@ -940,6 +950,7 @@ export async function setRegistrationWindowStatus(
   if (!supabase) return { ok: false, error: 'Database client not initialized.' };
 
   try {
+    await ensureFreshSupabaseSession();
     const payload = {
       team,
       is_open: isOpen,
@@ -970,8 +981,19 @@ export async function setRegistrationWindowStatus(
 }
 
 // ---------------------------------------------------------------------------
-// 8. SUPER IT TEST SESSIONS DISPATCHER
+// 8. SUPER IT TEST SESSIONS DISPATCHER & SESSION REFRESH
 // ---------------------------------------------------------------------------
+
+async function ensureFreshSupabaseSession(): Promise<void> {
+  if (!supabase) return;
+  try {
+    const { data } = await supabase.auth.getSession();
+    const session = data?.session;
+    if (session?.expires_at && session.expires_at * 1000 - Date.now() < 60_000) {
+      await supabase.auth.refreshSession();
+    }
+  } catch {}
+}
 
 async function callSuperAdminOperations<T>(
   action: string,
@@ -979,7 +1001,7 @@ async function callSuperAdminOperations<T>(
   testToken: string,
 ): Promise<OperationResult<T>> {
   try {
-    const res = await fetch('/api/super-admin', {
+    const res = await fetch(`/api/super-admin?action=operations&op=${encodeURIComponent(action)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -987,6 +1009,7 @@ async function callSuperAdminOperations<T>(
       },
       body: JSON.stringify({
         action: `wm_ops_${action}`,
+        op: action,
         ...payload,
       }),
     });

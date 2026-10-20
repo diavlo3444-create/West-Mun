@@ -32,6 +32,8 @@ async function boot() {
   } else if (path === '/privacy') {
     const { LegalPage } = await import('./pages/LegalPage');
     Page = () => <LegalPage kind="privacy" />;
+  } else if (path === '/preview' || path.startsWith('/preview/')) {
+    Page = (await import('./App')).default;
   } else {
     Page = (await import('./App')).default;
   }

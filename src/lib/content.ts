@@ -198,8 +198,36 @@ export function invalidateTableCache(table?: string): void {
   }
 }
 
+function isPreviewEnvironment(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const search = window.location.search || '';
+    if (search.includes('preview=') || window.location.pathname === '/preview') return true;
+    if (window.self !== window.top) return true;
+  } catch {}
+  return false;
+}
+
+function getStoredPreviewDraft(): Settings | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw =
+      localStorage.getItem('westmun_cms_draft_preview') ||
+      sessionStorage.getItem('westmun_cms_draft_preview');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch {}
+  return null;
+}
+
 export function useSettings(): Settings {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [previewDraft, setPreviewDraft] = useState<Settings | null>(() => {
+    return isPreviewEnvironment() ? getStoredPreviewDraft() : null;
+  });
+
   useEffect(() => {
     let alive = true;
     const fetchSettings = () => {
@@ -213,12 +241,46 @@ export function useSettings(): Settings {
       fetchSettings();
     };
     window.addEventListener('westmun:settings_updated', handleUpdate);
+
+    // Live preview sync listeners
+    let handleMessage: ((e: MessageEvent) => void) | null = null;
+    let handleStorage: ((e: StorageEvent) => void) | null = null;
+    let handleCustom: ((e: Event) => void) | null = null;
+
+    if (isPreviewEnvironment()) {
+      handleMessage = (e: MessageEvent) => {
+        if (e.data?.type === 'WESTMUN_CMS_PREVIEW_UPDATE' && e.data.draft) {
+          if (alive) setPreviewDraft(e.data.draft);
+        }
+      };
+      handleStorage = (e: StorageEvent) => {
+        if (e.key === 'westmun_cms_draft_preview' && e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            if (parsed && typeof parsed === 'object' && alive) setPreviewDraft(parsed);
+          } catch {}
+        }
+      };
+      handleCustom = (e: Event) => {
+        const custom = (e as CustomEvent).detail?.draft;
+        if (custom && alive) setPreviewDraft(custom);
+      };
+
+      window.addEventListener('message', handleMessage);
+      window.addEventListener('storage', handleStorage);
+      window.addEventListener('westmun:draft_updated', handleCustom);
+    }
+
     return () => {
       alive = false;
       window.removeEventListener('westmun:settings_updated', handleUpdate);
+      if (handleMessage) window.removeEventListener('message', handleMessage);
+      if (handleStorage) window.removeEventListener('storage', handleStorage);
+      if (handleCustom) window.removeEventListener('westmun:draft_updated', handleCustom);
     };
   }, []);
-  return settings;
+
+  return { ...settings, ...(previewDraft || {}) };
 }
 
 /** Text that is blank in Settings falls back to this ("TBA" style). */

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { OpeningIntro } from './components/OpeningIntro';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -18,23 +18,66 @@ import { SponsorsSection } from './components/SponsorsSection';
 import { CustomSectionsRenderer } from './components/CustomSectionsRenderer';
 import { useCmsContent } from './lib/cmsContent';
 
+function isPreviewContext(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const search = window.location.search || '';
+    if (search.includes('preview=') || window.location.pathname === '/preview') return true;
+    if (window.self !== window.top) return true;
+  } catch {}
+  return false;
+}
+
 export default function App() {
   const { customSections } = useCmsContent();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Intro animation playback state:
-  // Shows on first visit or when triggered by Replay Intro
+  // Shows on first visit or when triggered by Replay Intro. Bypassed in preview mode.
   const [introFinished, setIntroFinished] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
+      if (isPreviewContext()) return true;
       return sessionStorage.getItem('westmun_intro_seen') === 'true';
     } catch {
       return false;
     }
   });
 
-  const [introFlying, setIntroFlying] = useState(false);
+  const [introFlying, setIntroFlying] = useState(() => isPreviewContext());
   const [introKey, setIntroKey] = useState(1);
+
+  // Smooth scroll sync for Live Visual Editor preview
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'WESTMUN_CMS_PREVIEW_SCROLL' && e.data.sectionId) {
+        const secId = String(e.data.sectionId).replace(/^section:/, '');
+        const targetMap: Record<string, string> = {
+          hero: 'hero',
+          intro: 'about',
+          highlights: 'highlights',
+          about: 'about',
+          committees: 'committees',
+          schedule: 'schedule',
+          secretariat: 'secretariat',
+          registration: 'register',
+          faq: 'faq',
+          contact: 'contact',
+          announcements: 'announcements',
+          sponsors: 'sponsors',
+          documents: 'documents',
+        };
+        const domId = targetMap[secId] || secId;
+        const targetEl = document.getElementById(domId);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   const handleIntroComplete = useCallback(() => {
     try {

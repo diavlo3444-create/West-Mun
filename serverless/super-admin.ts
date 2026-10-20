@@ -22,6 +22,7 @@ import {
   handleTestSessionRecordSave,
   handleTestSessionRecordDelete,
 } from '../src/server/departmentRecordsAdmin.ts';
+import { handleSuperAdminOperations } from '../src/server/operationsAdmin.ts';
 
 // Robust body parser for serverless Node/Vercel environments
 async function parseJsonBody(req: any): Promise<any> {
@@ -174,6 +175,18 @@ export default async function handler(req: any, res: any) {
       return res.status(result.statusCode).json(result.body);
     }
 
+    // Operations Studio (wm_people, wm_projects, wm_shifts, wm_registration_windows, etc.)
+    if (
+      action === 'operations' ||
+      action === 'ops' ||
+      action === 'test-operations' ||
+      action.startsWith('wm_ops_')
+    ) {
+      const body = method !== 'GET' ? await parseJsonBody(req) : {};
+      const result = await handleSuperAdminOperations(authHeader, body, url.searchParams);
+      return res.status(result.statusCode).json(result.body);
+    }
+
     // 2. Normal Admin Accounts Management (Super Admin Exclusive)
     if (scope === 'admins' || action.startsWith('admin-')) {
       if (method === 'GET') {
@@ -209,6 +222,15 @@ export default async function handler(req: any, res: any) {
     // 3. Head Accounts Management - Create / Reset Password
     if (method === 'POST') {
       const body = await parseJsonBody(req);
+      if (
+        body?.action === 'operations' ||
+        body?.action === 'ops' ||
+        body?.action?.startsWith('wm_ops_')
+      ) {
+        const result = await handleSuperAdminOperations(authHeader, body, url.searchParams);
+        return res.status(result.statusCode).json(result.body);
+      }
+
       if (action === 'reset-password' || url.pathname.includes('/password')) {
         const targetId = headId || body.id;
         const result = await handleResetPassword(authHeader, targetId, body, undefined, origin);

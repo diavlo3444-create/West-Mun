@@ -1778,6 +1778,7 @@ export interface TestAuditLogRecord {
     | 'access_data'
     | 'update_record'
     | 'department_record_write'
+    | 'operations_studio_access'
     | 'terminate_test_session';
   headEmail: string;
   headDepartment: string;

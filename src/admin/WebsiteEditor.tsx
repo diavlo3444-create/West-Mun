@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -85,6 +85,53 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const [newSectionModal, setNewSectionModal] = useState(false);
   const [newCardModal, setNewCardModal] = useState<string | null>(null);
 
+  // Live preview frame ref and key
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [previewKey, setPreviewKey] = useState(1);
+
+  // Synchronize draft and custom sections with the live preview iframe & storage
+  const syncPreviewDraft = useCallback(
+    (draftData: Record<string, string>, customSecs: CmsCustomSection[]) => {
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('westmun_cms_draft_preview', JSON.stringify(draftData));
+          localStorage.setItem('westmun_cms_custom_sections_preview', JSON.stringify(customSecs));
+          window.dispatchEvent(
+            new CustomEvent('westmun:draft_updated', {
+              detail: { draft: draftData, customSections: customSecs },
+            })
+          );
+        }
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage(
+            {
+              type: 'WESTMUN_CMS_PREVIEW_UPDATE',
+              draft: draftData,
+              customSections: customSecs,
+            },
+            '*'
+          );
+        }
+      } catch (e) {
+        console.warn('[WebsiteEditor] Could not sync preview update:', e);
+      }
+    },
+    []
+  );
+
+  // Scroll live preview iframe when active section changes
+  useEffect(() => {
+    if (iframeRef.current?.contentWindow && activeSectionId) {
+      iframeRef.current.contentWindow.postMessage(
+        {
+          type: 'WESTMUN_CMS_PREVIEW_SCROLL',
+          sectionId: activeSectionId,
+        },
+        '*'
+      );
+    }
+  }, [activeSectionId]);
+
   // New section form state
   const [newSectionTitle, setNewSectionTitle] = useState('');
   const [newSectionEyebrow, setNewSectionEyebrow] = useState('');
@@ -117,10 +164,12 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     }
 
     // Parse custom sections
+    let parsedCustomSections: CmsCustomSection[] = [];
     try {
       const rawCustom = initialSettings['cms_custom_sections_json'];
       if (rawCustom) {
-        setCustomSections(JSON.parse(rawCustom));
+        parsedCustomSections = JSON.parse(rawCustom);
+        setCustomSections(parsedCustomSections);
       }
     } catch {
       setCustomSections([]);
@@ -151,7 +200,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     setPublished(initialSettings);
     setDraft(activeDraft);
     setLoading(false);
-  }, []);
+    syncPreviewDraft(activeDraft, parsedCustomSections);
+  }, [syncPreviewDraft]);
 
   useEffect(() => {
     loadData();
@@ -176,18 +226,23 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     return CMS_SECTIONS.find((s) => s.id === activeSectionId) ?? CMS_SECTIONS[0];
   }, [activeSectionId]);
 
-  // Field change handler
+  // Field change handler: updates local draft and pushes live update to preview
   const handleFieldChange = (key: string, value: string) => {
-    setDraft((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    setDraft((prev) => {
+      const next = {
+        ...prev,
+        [key]: value,
+      };
+      syncPreviewDraft(next, customSections);
+      return next;
+    });
   };
 
   // Discard changes
   const handleDiscard = () => {
     if (confirm('Discard all unsaved changes and revert to currently published content?')) {
       setDraft({ ...published });
+      syncPreviewDraft(published, customSections);
       setNotice({ ok: true, message: 'All changes discarded.' });
     }
   };
@@ -1054,20 +1109,32 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </span>
             </span>
 
-            <a
-              href="/"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-[#d4af37] transition-colors"
-            >
-              <span>Open live website</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+            <div className="inline-flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPreviewKey((k) => k + 1)}
+                className="inline-flex items-center gap-1 text-neutral-400 hover:text-white transition-colors"
+                title="Reload preview iframe"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Reload preview</span>
+              </button>
+
+              <a
+                href="/?preview=true"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-[#d4af37] transition-colors"
+              >
+                <span>Open in new tab</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
 
           {/* Device Frame */}
           <div
-            className={`h-full border border-neutral-800 rounded-md overflow-hidden bg-[#070707] shadow-2xl transition-all duration-300 flex flex-col ${
+            className={`h-full border border-neutral-800 rounded-md overflow-hidden bg-[#070707] shadow-2xl transition-all duration-300 flex flex-col relative ${
               viewport === 'desktop'
                 ? 'w-full max-w-5xl'
                 : viewport === 'tablet'
@@ -1076,9 +1143,23 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             }`}
           >
             <iframe
-              src="/"
+              key={previewKey}
+              ref={iframeRef}
+              src="/?preview=true"
               title="WEST MUN Website Preview"
               className="w-full h-full border-none bg-[#070707]"
+              onLoad={() => {
+                syncPreviewDraft(draft, customSections);
+                if (activeSectionId && iframeRef.current?.contentWindow) {
+                  iframeRef.current.contentWindow.postMessage(
+                    {
+                      type: 'WESTMUN_CMS_PREVIEW_SCROLL',
+                      sectionId: activeSectionId,
+                    },
+                    '*'
+                  );
+                }
+              }}
             />
           </div>
         </div>

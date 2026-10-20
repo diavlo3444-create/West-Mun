@@ -27,18 +27,82 @@ export interface CmsNavLink {
   href: string;
 }
 
+function isPreviewContext(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const search = window.location.search || '';
+    if (search.includes('preview=') || window.location.pathname === '/preview') return true;
+    if (window.self !== window.top) return true;
+  } catch {}
+  return false;
+}
+
+function getStoredPreviewDraft(): Record<string, string> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('westmun_cms_draft_preview') || sessionStorage.getItem('westmun_cms_draft_preview');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch {}
+  return null;
+}
+
 /**
  * Accesses live CMS content with reliable fallbacks to default site copy.
  * Updates in Supabase are immediately reflected when reload occurs or on state refresh.
+ * When in preview mode, seamlessly incorporates uncommitted editor draft updates in real time.
  */
 export function useCmsContent() {
   const settings = useSettings();
+  const [previewDraft, setPreviewDraft] = useState<Record<string, string> | null>(() => {
+    return isPreviewContext() ? getStoredPreviewDraft() : null;
+  });
 
-  // Merge default CMS dictionary with whatever is loaded from public.settings
+  useEffect(() => {
+    if (!isPreviewContext()) return;
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'WESTMUN_CMS_PREVIEW_UPDATE' && e.data.draft) {
+        setPreviewDraft(e.data.draft);
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'westmun_cms_draft_preview' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed && typeof parsed === 'object') setPreviewDraft(parsed);
+        } catch {}
+      }
+    };
+
+    const handleCustomEvent = (e: Event) => {
+      const custom = (e as CustomEvent).detail?.draft;
+      if (custom) setPreviewDraft(custom);
+    };
+
+    window.addEventListener('message', handleMessage);
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('westmun:draft_updated', handleCustomEvent);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('westmun:draft_updated', handleCustomEvent);
+    };
+  }, []);
+
+  // Merge default CMS dictionary with whatever is loaded from public.settings, plus live draft in preview
   const content = useMemo(() => {
-    const merged: Record<string, string> = { ...DEFAULT_CMS_CONTENT, ...settings };
+    const merged: Record<string, string> = {
+      ...DEFAULT_CMS_CONTENT,
+      ...settings,
+      ...(previewDraft || {}),
+    };
     return merged;
-  }, [settings]);
+  }, [settings, previewDraft]);
 
   // Safe accessor helper with fallback
   const t = useCallback(
