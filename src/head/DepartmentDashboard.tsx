@@ -360,40 +360,48 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
     if (!supabase) return { ok: false, error: 'Supabase is not configured.' };
 
-    try {
-      const { data: sessData } = await supabase.auth.getSession();
-      if (sessData?.session?.expires_at && sessData.session.expires_at * 1000 < Date.now() + 60000) {
-        await supabase.auth.refreshSession();
-      }
-    } catch {}
+    const record = registrations.find((item) => item.id === id);
+    if (!record) return { ok: false, error: 'Application not found in this department.' };
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const headUser = userData.user;
+    if (userError || !headUser) return { ok: false, error: 'Your Supabase session is missing. Sign in again.' };
 
-    let updateQuery = supabase
-      .from('team_registrations')
-      .update({
-        status,
-        admin_notes: notes,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .in('team', teamValues);
-
-    if (section) updateQuery = updateQuery.eq('section', section);
-
-    const { data, error } = await updateQuery.select('id');
-
-    if (error) return { ok: false, error: explainAccessError(error) };
-    if (!data || data.length === 0) {
-      return {
-        ok: false,
-        error: 'No record was updated. It may be outside your department scope or no longer exist.',
-      };
+    // Heads submit recommendations only. The Secretariat remains responsible for
+    // the final team_registrations.status decision.
+    if (status !== 'accepted' && status !== 'rejected') {
+      const cleared = await supabase.from('wm_staffing_decisions').delete()
+        .eq('registration_id', id)
+        .eq('head_user_id', headUser.id)
+        .eq('admin_decision', 'pending');
+      if (cleared.error) return { ok: false, error: explainAccessError(cleared.error) };
+      return { ok: true };
     }
 
-    setRegistrations((previous) =>
-      previous.map((record) =>
-        record.id === id ? { ...record, status, admin_notes: notes } : record,
-      ),
-    );
+    const applicationTeam = String(record.team || department);
+    const decisionDepartment = applicationTeam === 'media' || applicationTeam === 'media_press'
+      ? 'media_press'
+      : applicationTeam === 'volunteer' || applicationTeam === 'volunteers'
+        ? 'volunteers'
+        : applicationTeam;
+    const decisionSection = record.section || section || 'general';
+    const decision = await supabase.from('wm_staffing_decisions').upsert({
+      registration_id: id,
+      department: decisionDepartment,
+      section: decisionSection,
+      role_title: decisionDepartment === 'security' ? 'Security Team' :
+        decisionDepartment === 'media_press' ? 'Media & Press Team' : 'Conference Volunteers',
+      head_decision: status === 'accepted' ? 'approved' : 'rejected',
+      head_notes: notes,
+      head_user_id: headUser.id,
+      head_submitted_at: new Date().toISOString(),
+      admin_decision: 'pending',
+      admin_notes: '',
+      admin_user_id: null,
+      admin_reviewed_at: null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'registration_id' });
+
+    if (decision.error) return { ok: false, error: explainAccessError(decision.error) };
     return { ok: true };
   };
 
