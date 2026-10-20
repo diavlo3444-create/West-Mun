@@ -108,6 +108,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
   const [adminDecision, setAdminDecision] = useState('pending');
   const [signupBusy, setSignupBusy] = useState(false);
   const [signupUrl, setSignupUrl] = useState<string | null>(null);
+  const [signupMessage, setSignupMessage] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
 
   const openItem = (record: HeadRegistration) => {
@@ -247,6 +248,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
     if (!supabase || !activeItem || activeItem.status !== 'accepted' || signupBusy) return;
     setSignupBusy(true);
     setSignupUrl(null);
+    setSignupMessage(null);
     setSignupNotice(null);
     try {
       const { data, error } = await supabase.functions.invoke('team-signup', {
@@ -257,11 +259,13 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
         return;
       }
       setSignupUrl(data.signupUrl);
+      const message = typeof data.message === 'string' ? data.message : `Hi ${(activeItem.full_name || '').split(/\\s+/)[0] || 'there'}, congratulations! Your WEST MUN 2027 application has been accepted. Create your team account here: ${data.signupUrl}`;
+      setSignupMessage(message);
       try {
-        await navigator.clipboard.writeText(data.signupUrl);
-        setSignupNotice(`Signup link copied. Expires ${new Date(data.expiresAt).toLocaleString()}.`);
+        await navigator.clipboard.writeText(message);
+        setSignupNotice(`Acceptance message and signup link copied. Expires ${new Date(data.expiresAt).toLocaleString()}.`);
       } catch {
-        setSignupNotice('Link created. Copy it from the field below and send it manually to the applicant.');
+        setSignupNotice('Acceptance message and link are ready below. Copy them and send manually to the applicant.');
       }
     } catch {
       setSignupNotice('Could not create the signup link. Try again or contact an admin.');
@@ -273,8 +277,8 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
   const copySignupLink = async () => {
     if (!signupUrl) return;
     try {
-      await navigator.clipboard.writeText(signupUrl);
-      setSignupNotice('Signup link copied. Send it manually; no email will be sent.');
+      await navigator.clipboard.writeText(signupMessage || signupUrl);
+      setSignupNotice('Acceptance message and signup link copied. Send them manually; no email will be sent.');
     } catch {
       setSignupNotice('Clipboard access is blocked. Select and copy the link manually.');
     }
@@ -868,7 +872,16 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                     </button>
                   </div>
                   {signupNotice && <p role="status" className="mt-3 text-[11px] text-neutral-300">{signupNotice}</p>}
-                  {signupUrl && <div className="mt-2 flex flex-col gap-2 sm:flex-row"><input aria-label="One-time signup link" readOnly value={signupUrl} onFocus={(e) => e.currentTarget.select()} className={`${inputCls} min-w-0 flex-1 font-mono text-[10px]`} /><button type="button" onClick={() => void copySignupLink()} className={btnSecondary}>Copy link</button></div>}
+                  {signupUrl && (
+                    <div className="mt-3 space-y-2">
+                      <label className="block text-[10px] font-mono uppercase tracking-wider text-[#d4af37]">Acceptance message to send</label>
+                      <textarea aria-label="Acceptance message with signup link" readOnly rows={4} value={signupMessage || signupUrl} onFocus={(e) => e.currentTarget.select()} className={`${inputCls} w-full resize-y text-xs leading-relaxed`} />
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(signupMessage || signupUrl); setSignupNotice('Acceptance message copied. Send it manually to the applicant.'); } catch { setSignupNotice('Clipboard access is blocked. Select and copy the message manually.'); } }} className={btnSecondary}><Copy className="h-3.5 w-3.5" /> Copy acceptance message</button>
+                        <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(signupUrl); setSignupNotice('Signup link copied.'); } catch { setSignupNotice('Clipboard access is blocked. Select and copy the link manually.'); } }} className={btnSecondary}>Copy link only</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
