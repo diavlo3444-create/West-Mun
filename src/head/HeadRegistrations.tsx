@@ -594,7 +594,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                 type="button"
                 onClick={() => persist(draftStatus)}
                 className={btnPrimary}
-                disabled={saving || adminDecision !== 'pending'}
+                disabled={saving || adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected'}
               >
                 {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
                 Save adjudication
@@ -849,7 +849,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                 </div>
               )}
 
-              {adminDecision !== 'pending' && (
+              {(adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected') && (
                 <Notice tone="info" title="Secretariat decision recorded">
                   This application already has a final admin decision. Your recommendation can no longer be changed.
                 </Notice>
@@ -880,7 +880,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                   <select
                     id="head-detail-status"
                     className={selectCls}
-                    disabled={adminDecision !== 'pending'}
+                    disabled={adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected'}
                     value={draftStatus}
                     onChange={(event) => setDraftStatus(event.target.value)}
                   >
