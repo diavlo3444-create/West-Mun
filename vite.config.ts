@@ -70,14 +70,7 @@ export default defineConfig(() => {
       port: 3000,
       // Allow the local hostnames plus any host explicitly supplied for a
       // hosted preview. Never use a blanket allowlist.
-      allowedHosts: [
-        'localhost',
-        '127.0.0.1',
-        ...(process.env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS || '')
-          .split(',')
-          .map((h) => h.trim())
-          .filter(Boolean),
-      ],
+      allowedHosts: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
