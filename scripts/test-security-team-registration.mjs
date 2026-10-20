@@ -70,13 +70,37 @@ assert(
 );
 console.log('[PASS] Question 4: Handling Bullying and Harassment (min 50 words) verified');
 
-// 2. WORD COUNT ALGORITHM ACCURACY
-assert.strictEqual(countWords(''), 0);
-assert.strictEqual(countWords('   \n\t  '), 0);
-assert.strictEqual(countWords('One two three'), 3);
-assert.strictEqual(countWords('  One   two \n three \t four  five  '), 5);
-assert.strictEqual(countWords('Disagreements between two individuals, or a sudden medical emergency!'), 9);
-console.log('[PASS] Word count algorithm accurately normalizes whitespace and punctuation');
+// 2. WORD COUNT ALGORITHM ACCURACY (WHITESPACE, EXTRA SPACES, LINE BREAKS, TABS)
+assert.strictEqual(countWords(''), 0, 'Empty string must have 0 words');
+assert.strictEqual(countWords(null), 0, 'null must have 0 words');
+assert.strictEqual(countWords(undefined), 0, 'undefined must have 0 words');
+assert.strictEqual(countWords('   \n\t\r\n  '), 0, 'Whitespace-only string must have 0 words');
+assert.strictEqual(countWords('One two three'), 3, 'Simple 3 words');
+assert.strictEqual(countWords('  One   two \n three \t four  five  '), 5, 'Mixed extra spaces and tabs');
+assert.strictEqual(countWords('Disagreements between two individuals, or a sudden medical emergency!'), 9, 'Punctuation within sentences');
+
+// Test extra spaces between words
+assert.strictEqual(
+  countWords('protocol       security        diplomacy        delegation'),
+  4,
+  'Multiple consecutive spaces must not inflate word count'
+);
+
+// Test line breaks (multiple newlines, carriage returns)
+assert.strictEqual(
+  countWords("First line\n\nSecond line\r\n\r\nThird line\n\n\nFourth line"),
+  8,
+  'Paragraphs separated by multiple line breaks must count accurately'
+);
+
+// Test zero-width space normalization
+assert.strictEqual(
+  countWords('Hello\u200Bworld \uFEFFagain'),
+  2,
+  'Zero-width characters must be handled cleanly'
+);
+
+console.log('[PASS] Word count algorithm accurately normalizes extra spaces, line breaks, tabs, and punctuation');
 
 // Helper to generate text of exact word count
 function generateText(wordCount) {
@@ -92,19 +116,25 @@ function generateText(wordCount) {
   return list.join(' ');
 }
 
-// 3. VALIDATION REJECTS INSUFFICIENT ANSWERS
-const underlengthAnswers = {
+// 3. VALIDATION REJECTS INSUFFICIENT ANSWERS (TESTING ALL 4 QUESTIONS)
+// Q1: Emergency Problem-Solving requires min 80 words
+const underlengthQ1 = {
   security_emergency_steps: generateText(79), // 79 < 80
   security_teamwork: generateText(50),
   security_motivation: generateText(50),
   security_handling_harassment: generateText(50),
 };
-const res1 = validateSecurityAnswers(underlengthAnswers);
+const res1 = validateSecurityAnswers(underlengthQ1);
 assert.strictEqual(res1.valid, false, '79 words for Q1 must be rejected');
 assert(res1.errors.security_emergency_steps, 'Must flag security_emergency_steps error');
-assert(res1.errors.security_emergency_steps.includes('79 / 80 words'), 'Must report current vs minimum');
-console.log('[PASS] Under-length response (79/80 words) correctly rejected by validation');
+assert(
+  res1.errors.security_emergency_steps.includes('79/80 words') ||
+    res1.errors.security_emergency_steps.includes('79 / 80 words'),
+  'Must report 79/80 words'
+);
+console.log('[PASS] Under-length response (79/80 words) for Emergency steps correctly rejected');
 
+// Q2: Teamwork requires min 50 words
 const underlengthQ2 = {
   security_emergency_steps: generateText(80),
   security_teamwork: generateText(49), // 49 < 50
@@ -114,23 +144,87 @@ const underlengthQ2 = {
 const res2 = validateSecurityAnswers(underlengthQ2);
 assert.strictEqual(res2.valid, false, '49 words for Q2 must be rejected');
 assert(res2.errors.security_teamwork, 'Must flag security_teamwork error');
-console.log('[PASS] Under-length response (49/50 words) correctly rejected by validation');
+assert(
+  res2.errors.security_teamwork.includes('49/50 words') ||
+    res2.errors.security_teamwork.includes('49 / 50 words'),
+  'Must report 49/50 words'
+);
+console.log('[PASS] Under-length response (49/50 words) for Teamwork correctly rejected');
 
-// 4. VALIDATION ACCEPTS MET REQUIREMENTS
-const validAnswers = {
-  security_emergency_steps: generateText(85), // 85 >= 80
-  security_teamwork: generateText(52),       // 52 >= 50
-  security_motivation: generateText(50),     // 50 >= 50
-  security_handling_harassment: generateText(60), // 60 >= 50
+// Q3: Motivation requires min 50 words
+const underlengthQ3 = {
+  security_emergency_steps: generateText(80),
+  security_teamwork: generateText(50),
+  security_motivation: generateText(49), // 49 < 50
+  security_handling_harassment: generateText(50),
 };
-const resValid = validateSecurityAnswers(validAnswers);
-assert.strictEqual(resValid.valid, true, 'All 4 answers meeting or exceeding minimum must pass');
-assert.strictEqual(Object.keys(resValid.errors).length, 0, 'No errors for valid answers');
-assert.strictEqual(resValid.counts.security_emergency_steps, 85);
-assert.strictEqual(resValid.counts.security_teamwork, 52);
-assert.strictEqual(resValid.counts.security_motivation, 50);
-assert.strictEqual(resValid.counts.security_handling_harassment, 60);
-console.log('[PASS] Valid responses meeting all 4 minimums pass successfully');
+const res3 = validateSecurityAnswers(underlengthQ3);
+assert.strictEqual(res3.valid, false, '49 words for Q3 must be rejected');
+assert(res3.errors.security_motivation, 'Must flag security_motivation error');
+assert(
+  res3.errors.security_motivation.includes('49/50 words') ||
+    res3.errors.security_motivation.includes('49 / 50 words'),
+  'Must report 49/50 words'
+);
+console.log('[PASS] Under-length response (49/50 words) for Motivation correctly rejected');
+
+// Q4: Handling Bullying and Harassment requires min 50 words
+const underlengthQ4 = {
+  security_emergency_steps: generateText(80),
+  security_teamwork: generateText(50),
+  security_motivation: generateText(50),
+  security_handling_harassment: generateText(49), // 49 < 50
+};
+const res4 = validateSecurityAnswers(underlengthQ4);
+assert.strictEqual(res4.valid, false, '49 words for Q4 must be rejected');
+assert(res4.errors.security_handling_harassment, 'Must flag security_handling_harassment error');
+assert(
+  res4.errors.security_handling_harassment.includes('49/50 words') ||
+    res4.errors.security_handling_harassment.includes('49 / 50 words'),
+  'Must report 49/50 words'
+);
+console.log('[PASS] Under-length response (49/50 words) for Handling Harassment correctly rejected');
+
+// 4. VALIDATION ACCEPTS EXACT MINIMUMS
+const exactMinAnswers = {
+  security_emergency_steps: generateText(80),       // EXACTLY 80
+  security_teamwork: generateText(50),              // EXACTLY 50
+  security_motivation: generateText(50),            // EXACTLY 50
+  security_handling_harassment: generateText(50),   // EXACTLY 50
+};
+const resExactMin = validateSecurityAnswers(exactMinAnswers);
+assert.strictEqual(resExactMin.valid, true, 'Exact minimums (80, 50, 50, 50) must pass');
+assert.strictEqual(Object.keys(resExactMin.errors).length, 0, 'No errors when exact minimums are met');
+assert.strictEqual(resExactMin.counts.security_emergency_steps, 80);
+assert.strictEqual(resExactMin.counts.security_teamwork, 50);
+assert.strictEqual(resExactMin.counts.security_motivation, 50);
+assert.strictEqual(resExactMin.counts.security_handling_harassment, 50);
+console.log('[PASS] Exact minimum responses (80, 50, 50, 50) are accepted successfully');
+
+// 5. VALIDATION ACCEPTS RESPONSES WITH EXTRA SPACES AND LINE BREAKS MEETING MINIMUMS
+const formattedAnswersWithLineBreaks = {
+  security_emergency_steps: generateText(40) + "\n\n\n" + generateText(40), // 80 words with paragraph breaks
+  security_teamwork: "   " + generateText(25) + "   \t\n\n   " + generateText(25) + "   ", // 50 words with extra spaces and newlines
+  security_motivation: generateText(55),
+  security_handling_harassment: generateText(60),
+};
+const resFormatted = validateSecurityAnswers(formattedAnswersWithLineBreaks);
+assert.strictEqual(resFormatted.valid, true, 'Answers formatted with multiple paragraphs and extra spaces pass');
+assert.strictEqual(resFormatted.counts.security_emergency_steps, 80);
+assert.strictEqual(resFormatted.counts.security_teamwork, 50);
+console.log('[PASS] Answers with extra spaces and line breaks meeting minimums are accurately counted and accepted');
+
+// 6. VALIDATION ACCEPTS EXCEEDING MINIMUMS
+const exceedingAnswers = {
+  security_emergency_steps: generateText(95),
+  security_teamwork: generateText(60),
+  security_motivation: generateText(65),
+  security_handling_harassment: generateText(70),
+};
+const resExceeding = validateSecurityAnswers(exceedingAnswers);
+assert.strictEqual(resExceeding.valid, true);
+assert.strictEqual(resExceeding.counts.security_emergency_steps, 95);
+console.log('[PASS] Responses exceeding minimums pass successfully');
 
 // 5. DATABASE MIGRATION SCRIPT VERIFICATION
 const migrationPath = path.resolve('supabase/migration_security_team_questions.sql');

@@ -328,8 +328,10 @@ export default async function handler(req: any, res: any) {
     const cleanHarassment = String(security_handling_harassment || '').trim();
 
     if (cleanTeam === 'security') {
-      const countWords = (text: string) => {
-        const trimmed = text.trim();
+      const countWords = (text: string | null | undefined): number => {
+        if (!text) return 0;
+        const cleaned = String(text).replace(/[\u200B-\u200D\uFEFF]/g, '');
+        const trimmed = cleaned.trim();
         return trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
       };
 

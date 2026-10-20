@@ -131,13 +131,7 @@ export function formatSecurityAnswers(answers: Partial<SecurityAnswersPayload>):
 /**
  * Extracts security answers from dedicated columns or from formatted statement fallback.
  */
-export function extractSecurityAnswers(record: {
-  security_emergency_steps?: string | null;
-  security_teamwork?: string | null;
-  security_motivation?: string | null;
-  security_handling_harassment?: string | null;
-  statement?: string | null;
-}): SecurityAnswersPayload {
+export function extractSecurityAnswers(record: any): SecurityAnswersPayload {
   let emergency = String(record.security_emergency_steps || '').trim();
   let teamwork = String(record.security_teamwork || '').trim();
   let motivation = String(record.security_motivation || '').trim();

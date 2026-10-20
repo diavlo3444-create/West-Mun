@@ -53,6 +53,11 @@ export interface UnifiedRegistration extends Row {
   _type: 'delegate' | 'team';
   _teamId: string;
   _teamLabel: string;
+  statement?: string;
+  security_emergency_steps?: string;
+  security_teamwork?: string;
+  security_motivation?: string;
+  security_handling_harassment?: string;
 }
 
 interface RegistrationsManagerProps {
