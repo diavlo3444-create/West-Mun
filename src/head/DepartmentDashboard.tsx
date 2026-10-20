@@ -7,17 +7,16 @@ import {
   MessageSquare,
   ShieldAlert,
   LogOut,
-  Layers,
-  Sparkles,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   DEPARTMENTS,
+  canManageRegistrations,
   isGenderSeparated,
   type DepartmentKey,
   type SectionKey,
 } from './departments';
-import { DashboardShell, type NavGroup } from '../dashboard/DashboardShell';
+import { DashboardShell, type NavGroup, type NavItem } from '../dashboard/DashboardShell';
 import { Notice } from '../dashboard/ui';
 import {
   HeadOverview,
@@ -30,6 +29,18 @@ import { HeadDepartment } from './HeadDepartment';
 import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 import { HeadSponsorsManager } from './HeadSponsorsManager';
 import { HeadInquiriesManager } from './HeadInquiriesManager';
+import { DepartmentWorkspace } from './DepartmentWorkspace';
+import { WorkspaceModuleGrid, WorkspaceOverview } from './WorkspaceOverview';
+import {
+  createDepartmentRecord,
+  deleteDepartmentRecord,
+  listDepartmentRecords,
+  updateDepartmentRecord,
+  type DepartmentRecord,
+  type RecordInput,
+  type RecordScope,
+} from './services/departmentStore';
+import { getWorkspaceModule, getWorkspaceModules } from './workspaces';
 
 export interface TestModeInfo {
   isActive: boolean;
@@ -44,12 +55,18 @@ interface DepartmentDashboardProps {
   section?: SectionKey | null;
   headName?: string;
   headEmail?: string;
-  initialView?: HeadView;
+  initialView?: string;
   testMode?: TestModeInfo | null;
   onSignOut: () => void;
 }
 
-type HeadView = 'overview' | 'registrations' | 'department' | 'sponsors' | 'inquiries';
+type HeadView =
+  | 'overview'
+  | 'registrations'
+  | 'department'
+  | 'sponsors'
+  | 'inquiries'
+  | string;
 
 function explainAccessError(error: { code?: string; message?: string } | null | undefined): string {
   if (!error) return '';
@@ -82,19 +99,33 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const isGenderDivision = isGenderSeparated(department);
   const isPr = department === 'pr';
   const isHr = department === 'hr';
+  const registrationAccess = canManageRegistrations(department);
+  const workspaceModules = useMemo(() => getWorkspaceModules(department), [department]);
+
+  const isModuleView = useCallback(
+    (value: string) => Boolean(getWorkspaceModule(department, value)),
+    [department],
+  );
 
   const [view, setView] = useState<HeadView>(() => {
     if (initialView === 'sponsors' && isPr) return 'sponsors';
     if (initialView === 'inquiries' && isHr) return 'inquiries';
-    if (initialView === 'registrations' || initialView === 'department') return initialView;
+    if (initialView === 'department') return 'department';
+    if (initialView === 'registrations' && registrationAccess) return 'registrations';
+    if (initialView && workspaceModules.some((module) => module.id === initialView)) return initialView;
     return 'overview';
   });
+
   const [registrations, setRegistrations] = useState<HeadRegistration[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [announcements, setAnnouncements] = useState<HeadAnnouncement[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [focusRecord, setFocusRecord] = useState<HeadRegistration | null>(null);
+
+  const [records, setRecords] = useState<DepartmentRecord[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(true);
+  const [recordsError, setRecordsError] = useState('');
 
   // One-time unlock animation per login/session for this department head
   const sessionUnlockKey = `wm_head_unlocked_${department}_${section || 'main'}`;
@@ -123,34 +154,52 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     [department],
   );
 
-  const loadDepartmentData = useCallback(async () => {
+  const recordScope = useMemo<RecordScope>(
+    () => ({
+      department,
+      section: section ?? null,
+      testToken: testMode?.token || null,
+    }),
+    [department, section, testMode?.token],
+  );
+
+  const loadWorkspaceRecords = useCallback(async () => {
+    setRecordsLoading(true);
+    setRecordsError('');
+    const result = await listDepartmentRecords(recordScope);
+    if (result.ok && result.data) {
+      setRecords(result.data);
+    } else {
+      setRecords([]);
+      setRecordsError(result.error || 'Department records could not be loaded.');
+    }
+    setRecordsLoading(false);
+  }, [recordScope]);
+
+  /**
+   * Registrations and settings. Registration queries only run for the three
+   * authorized departments, so other heads never even request the data.
+   */
+  const loadRegistrationData = useCallback(async () => {
     setLoading(true);
     setLoadError('');
 
-    // If active Super IT Test Mode session, fetch verified testing records via test-data endpoint
-    if (testMode?.token) {
+    if (testMode?.token && registrationAccess) {
       try {
         const resp = await fetch(
           `/api/super-admin?action=test-data&department=${encodeURIComponent(department)}&section=${encodeURIComponent(section || '')}`,
-          {
-            headers: {
-              Authorization: `Bearer ${testMode.token}`,
-            },
-          }
+          { headers: { Authorization: `Bearer ${testMode.token}` } },
         );
         const data = await resp.json();
         if (resp.ok && data?.success) {
           setRegistrations((data.registrations as HeadRegistration[]) || []);
           if (data.settings) setSettings(data.settings);
           if (data.announcements) setAnnouncements(data.announcements as HeadAnnouncement[]);
-          setLoading(false);
-          return;
         } else if (data?.error) {
           setLoadError(data.error);
         }
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Failed to query test session data.';
-        setLoadError(msg);
+        setLoadError(err instanceof Error ? err.message : 'Failed to query test session data.');
       } finally {
         setLoading(false);
       }
@@ -166,26 +215,27 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     try {
       try {
         const { data: sessData } = await supabase.auth.getSession();
-        if (
-          sessData?.session?.expires_at &&
-          sessData.session.expires_at * 1000 < Date.now() + 60000
-        ) {
+        if (sessData?.session?.expires_at && sessData.session.expires_at * 1000 < Date.now() + 60000) {
           await supabase.auth.refreshSession();
         }
       } catch {}
 
-      // Scope is already enforced by RLS; the explicit filters keep the query
-      // aligned with the head's exact department and section as well.
-      let query = supabase.from('team_registrations').select('*').in('team', teamValues);
-      if (section) query = query.eq('section', section);
+      if (registrationAccess) {
+        // Scope is enforced by RLS; the explicit filters keep the query aligned
+        // with the head's exact department and section as well.
+        let query = supabase.from('team_registrations').select('*').in('team', teamValues);
+        if (section) query = query.eq('section', section);
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+        const { data, error } = await query.order('created_at', { ascending: false });
 
-      if (error) {
-        setRegistrations([]);
-        setLoadError(explainAccessError(error));
+        if (error) {
+          setRegistrations([]);
+          setLoadError(explainAccessError(error));
+        } else {
+          setRegistrations((data as HeadRegistration[]) || []);
+        }
       } else {
-        setRegistrations((data as HeadRegistration[]) || []);
+        setRegistrations([]);
       }
 
       // Registration channel status (public settings)
@@ -221,7 +271,11 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [department, section, teamValues, testMode]);
+  }, [department, section, teamValues, registrationAccess, testMode?.token]);
+
+  const loadDepartmentData = useCallback(async () => {
+    await Promise.all([loadRegistrationData(), loadWorkspaceRecords()]);
+  }, [loadRegistrationData, loadWorkspaceRecords]);
 
   useEffect(() => {
     loadDepartmentData();
@@ -271,7 +325,12 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     status: string,
     notes: string,
   ): Promise<{ ok: boolean; error?: string }> => {
-    // If active Super IT Test Mode session, use privileged test-update endpoint
+    if (!registrationAccess) {
+      return { ok: false, error: 'Registration management is not authorized for this department.' };
+    }
+
+    // Super IT test sessions have no Supabase Auth session; use the privileged,
+    // audit-logged server endpoint instead.
     if (testMode?.token) {
       try {
         const resp = await fetch('/api/super-admin?action=test-update', {
@@ -297,10 +356,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
     try {
       const { data: sessData } = await supabase.auth.getSession();
-      if (
-        sessData?.session?.expires_at &&
-        sessData.session.expires_at * 1000 < Date.now() + 60000
-      ) {
+      if (sessData?.session?.expires_at && sessData.session.expires_at * 1000 < Date.now() + 60000) {
         await supabase.auth.refreshSession();
       }
     } catch {}
@@ -335,39 +391,95 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     return { ok: true };
   };
 
+  const handleCreateRecord = useCallback(
+    async (input: RecordInput) => {
+      const result = await createDepartmentRecord(recordScope, input);
+      if (!result.ok || !result.data) {
+        return { ok: false, error: result.error || 'The record could not be created.' };
+      }
+      setRecords((previous) => [result.data as DepartmentRecord, ...previous]);
+      return { ok: true };
+    },
+    [recordScope],
+  );
+
+  const handleUpdateRecord = useCallback(
+    async (id: string, input: Partial<RecordInput>) => {
+      const result = await updateDepartmentRecord(recordScope, id, input);
+      if (!result.ok || !result.data) {
+        return { ok: false, error: result.error || 'The record could not be updated.' };
+      }
+      const updated = result.data;
+      setRecords((previous) => previous.map((record) => (record.id === id ? updated : record)));
+      return { ok: true };
+    },
+    [recordScope],
+  );
+
+  const handleDeleteRecord = useCallback(
+    async (id: string) => {
+      const result = await deleteDepartmentRecord(recordScope, id);
+      if (!result.ok) {
+        return { ok: false, error: result.error || 'The record could not be deleted.' };
+      }
+      setRecords((previous) => previous.filter((record) => record.id !== id));
+      return { ok: true };
+    },
+    [recordScope],
+  );
+
   const openReview = (record: HeadRegistration) => {
+    if (!registrationAccess) return;
     setFocusRecord(record);
     setView('registrations');
   };
 
-  const navItems = [
+  const navigate = (id: string) => {
+    if (id === 'registrations' && !registrationAccess) return;
+    if (id === 'sponsors' && !isPr) return;
+    if (id === 'inquiries' && !isHr) return;
+    setView(id);
+  };
+
+  const workspaceNavItems: NavItem[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending },
+    ...workspaceModules.map((module) => ({
+      id: module.id,
+      label: module.navLabel,
+      icon: module.icon,
+    })),
+  ];
+
+  const operationsNavItems: NavItem[] = [
+    ...(registrationAccess
+      ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
+      : []),
     ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
     ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
     { id: 'department', label: 'Assignment', icon: Building2 },
   ];
 
   const navGroups: NavGroup[] = [
-    {
-      label: 'My department',
-      items: navItems,
-    },
+    { label: 'Department workspace', items: workspaceNavItems },
+    { label: 'Operations', items: operationsNavItems },
   ];
+
+  const activeModule = getWorkspaceModule(department, view);
 
   const viewLabel =
     view === 'overview'
       ? 'Overview'
       : view === 'registrations'
-      ? 'Applications'
-      : view === 'sponsors'
-      ? 'Sponsors & Partners'
-      : view === 'inquiries'
-      ? 'Inquiries & Messages'
-      : 'Assignment';
+        ? 'Applications'
+        : view === 'sponsors'
+          ? 'Sponsors & Partners'
+          : view === 'inquiries'
+            ? 'Inquiries & Messages'
+            : view === 'department'
+              ? 'Assignment'
+              : activeModule?.label || 'Workspace';
 
-  const displayName =
-    (headName && headName.trim()) || headEmail.split('@')[0] || 'Department head';
+  const displayName = (headName && headName.trim()) || headEmail.split('@')[0] || 'Department head';
 
   const user = {
     name: displayName,
@@ -380,7 +492,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       brandSubtitle="Department head portal"
       navGroups={navGroups}
       active={view}
-      onNavigate={(id) => setView(id as HeadView)}
+      onNavigate={navigate}
       user={user}
       onSignOut={onSignOut}
       topbarLabel={viewLabel}
@@ -388,13 +500,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         testMode?.isActive
           ? 'Super IT Test Session'
           : isGenderDivision && section
-          ? `${section} division`
-          : 'Department head'
+            ? `${section} division`
+            : 'Department head'
       }
     >
-      {/* ====================================================================
-          PERSISTENT SUPER IT TEST MODE BANNER (Exclusive to diavlo3444@gmail.com)
-          ==================================================================== */}
       {testMode?.isActive && (
         <div className="mb-5 rounded-md border-2 border-amber-500/80 bg-gradient-to-r from-amber-950/80 via-[#1a1408] to-neutral-950 p-4 shadow-xl shadow-amber-950/30">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -416,7 +525,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-neutral-300">
-                  Authorized IT Super Admin testing session (<span className="font-mono text-amber-300/90">{testMode.adminEmail}</span>). Elevated testing privileges are active across all departments; normal head accounts and RLS policies remain completely isolated.
+                  Authorized IT Super Admin testing session (
+                  <span className="font-mono text-amber-300/90">{testMode.adminEmail}</span>). Testing
+                  privileges are audit-logged server-side; normal head accounts and RLS policies remain
+                  isolated.
                 </p>
               </div>
             </div>
@@ -436,8 +548,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       )}
 
       <div key={view} className="wm-page-in space-y-5">
-        {loadError && (
-          <Notice tone="error" title="Records could not be loaded">
+        {loadError && registrationAccess && (
+          <Notice tone="error" title="Registrations could not be loaded">
             {loadError}{' '}
             <button
               type="button"
@@ -449,26 +561,62 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           </Notice>
         )}
 
-        {view === 'overview' && (
-          <HeadOverview
+        {view === 'overview' && registrationAccess && (
+          <>
+            <HeadOverview
+              meta={meta}
+              section={section}
+              headName={headName}
+              stats={stats}
+              registrations={registrations}
+              isOpen={isOpen}
+              loading={loading}
+              announcements={announcements}
+              onRefresh={loadDepartmentData}
+              onOpenRegistrations={() => setView('registrations')}
+              onReview={openReview}
+              onReplayUnlock={handleReplayUnlock}
+              onOpenSponsors={isPr ? () => setView('sponsors') : undefined}
+              onOpenInquiries={isHr ? () => setView('inquiries') : undefined}
+            />
+            <section aria-labelledby="registration-workspace-heading" className="space-y-3">
+              <div>
+                <h2
+                  id="registration-workspace-heading"
+                  className="text-[13.5px] font-semibold text-white"
+                >
+                  Department workspace
+                </h2>
+                <p className="mt-0.5 text-[11.5px] text-neutral-400">
+                  Operational tools for {meta.label}, stored in Supabase.
+                </p>
+              </div>
+              <WorkspaceModuleGrid
+                meta={meta}
+                records={records}
+                loading={recordsLoading}
+                onOpenModule={navigate}
+              />
+            </section>
+          </>
+        )}
+
+        {view === 'overview' && !registrationAccess && (
+          <WorkspaceOverview
             meta={meta}
             section={section}
             headName={headName}
-            stats={stats}
-            registrations={registrations}
-            isOpen={isOpen}
-            loading={loading}
+            records={records}
+            loading={recordsLoading}
+            storageError={recordsError}
             announcements={announcements}
             onRefresh={loadDepartmentData}
-            onOpenRegistrations={() => setView('registrations')}
-            onReview={openReview}
+            onOpenModule={navigate}
             onReplayUnlock={handleReplayUnlock}
-            onOpenSponsors={isPr ? () => setView('sponsors') : undefined}
-            onOpenInquiries={isHr ? () => setView('inquiries') : undefined}
           />
         )}
 
-        {view === 'registrations' && (
+        {view === 'registrations' && registrationAccess && (
           <HeadRegistrations
             registrations={registrations}
             loading={loading}
@@ -498,7 +646,24 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
             headEmail={headEmail}
             isOpen={isOpen}
             stats={stats}
+            registrationAccess={registrationAccess}
             onOpenRegistrations={() => setView('registrations')}
+            onOpenWorkspace={() => setView(workspaceModules[0]?.id || 'overview')}
+          />
+        )}
+
+        {activeModule && (
+          <DepartmentWorkspace
+            department={department}
+            section={section}
+            module={activeModule}
+            records={records}
+            loading={recordsLoading}
+            storageError={recordsError}
+            onReload={loadWorkspaceRecords}
+            onCreate={handleCreateRecord}
+            onUpdate={handleUpdateRecord}
+            onDelete={handleDeleteRecord}
           />
         )}
       </div>

@@ -47,8 +47,23 @@ export const GENDER_SEPARATED_DEPARTMENTS: readonly DepartmentKey[] = [
   'volunteers',
 ] as const;
 
+/**
+ * Only these departments may manage team registrations. This is enforced in
+ * the UI *and* in Supabase RLS (see supabase/migration_department_workspaces.sql).
+ * Nothing else should ever render or query registration data.
+ */
+export const REGISTRATION_DEPARTMENTS: readonly DepartmentKey[] = [
+  'media_press',
+  'security',
+  'volunteers',
+] as const;
+
 export function isGenderSeparated(dept: DepartmentKey): boolean {
   return GENDER_SEPARATED_DEPARTMENTS.includes(dept);
+}
+
+export function canManageRegistrations(dept: DepartmentKey | null | undefined): boolean {
+  return Boolean(dept && REGISTRATION_DEPARTMENTS.includes(dept));
 }
 
 export const DEPARTMENTS: Record<DepartmentKey, DepartmentMeta> = {

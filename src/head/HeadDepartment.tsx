@@ -28,7 +28,10 @@ interface HeadDepartmentProps {
   headEmail: string;
   isOpen: boolean;
   stats: HeadStats;
+  /** Only Media/Press, Security, and Volunteers may manage registrations. */
+  registrationAccess: boolean;
   onOpenRegistrations: () => void;
+  onOpenWorkspace?: () => void;
 }
 
 export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
@@ -38,7 +41,9 @@ export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
   headEmail,
   isOpen,
   stats,
+  registrationAccess,
   onOpenRegistrations,
+  onOpenWorkspace,
 }) => {
   const Icon = meta.icon;
 
@@ -47,12 +52,19 @@ export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
       <PageHeader
         eyebrow="Assignment & scope"
         title="Department"
-        description="Your verified assignment, registration channel and the exact data boundary your account operates within."
+        description="Your verified assignment and the exact data boundary your account operates within."
         actions={
-          <button type="button" onClick={onOpenRegistrations} className={btnPrimary}>
-            Open applications
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
+          registrationAccess ? (
+            <button type="button" onClick={onOpenRegistrations} className={btnPrimary}>
+              Open applications
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          ) : onOpenWorkspace ? (
+            <button type="button" onClick={onOpenWorkspace} className={btnPrimary}>
+              Open workspace
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          ) : undefined
         }
       />
 
@@ -134,10 +146,36 @@ export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
 
         <Panel className="lg:col-span-5">
           <PanelHeader
-            eyebrow="Public channel"
-            title="Registration status"
-            description="Controlled by the Secretariat. This view is read-only."
+            eyebrow={registrationAccess ? 'Public channel' : 'Data boundary'}
+            title={registrationAccess ? 'Registration status' : 'Workspace records'}
+            description={
+              registrationAccess
+                ? 'Controlled by the Secretariat. This view is read-only.'
+                : 'Registration data is not part of this department\u2019s authorized scope.'
+            }
           />
+          {!registrationAccess && (
+            <div className="p-5">
+              <div className="flex items-start gap-3 rounded-md border border-[#d4af37]/20 bg-[#d4af37]/[0.05] p-3.5">
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#d4af37]/25 bg-[#d4af37]/[0.08] text-[#e2c258]">
+                  <Database className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-[12px] font-medium text-[#f1e4bb]">Department workspace only</p>
+                  <p className="mt-0.5 text-[10.5px] leading-relaxed text-neutral-400">
+                    Your tools write to <span className="font-mono text-neutral-300">public.department_records</span>{' '}
+                    scoped to {meta.label}. Candidate applications for other teams, sponsor records, and
+                    inquiries stay outside your scope in PostgreSQL RLS.
+                  </p>
+                </div>
+              </div>
+              <p className="mt-4 border-t border-white/[0.06] pt-3 text-[10px] leading-relaxed text-neutral-400">
+                Only Media/Press, Security, and Volunteers are authorized for registration management. Your
+                department keeps its operational tools and this assignment record.
+              </p>
+            </div>
+          )}
+          {registrationAccess && (
           <div className="p-5">
             <div
               className={`flex items-start gap-3 rounded-md border p-3.5 ${
@@ -206,6 +244,7 @@ export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
               heads cannot change public registration settings.
             </p>
           </div>
+          )}
         </Panel>
       </div>
 
@@ -220,22 +259,25 @@ export const HeadDepartment: React.FC<HeadDepartmentProps> = ({
             {
               icon: Database,
               title: 'Visible records',
-              copy:
-                meta.key === 'pr'
+              copy: !registrationAccess
+                ? `public.department_records rows for ${meta.label}${section ? ` (${section} division)` : ''}, plus shared venue, equipment, and run-of-show records. No registration rows.`
+                : meta.key === 'pr'
                   ? `team_registrations for ${meta.label} plus all sponsor records in public.sponsors.`
                   : meta.key === 'hr'
-                  ? `team_registrations for ${meta.label} plus all contact submissions in public.inquiries.`
-                  : `Only team_registrations where team matches ${meta.label}${section ? ` and section is ${section}` : ''}.`,
+                    ? `team_registrations for ${meta.label} plus all contact submissions in public.inquiries.`
+                    : `Only team_registrations where team matches ${meta.label}${section ? ` and section is ${section}` : ''}.`,
             },
             {
               icon: UserCheck,
               title: 'Permitted actions',
               copy:
                 meta.key === 'pr'
-                  ? 'Review PR candidates; create, edit, reorder, publish, and delete sponsor records; upload logos to the site-files bucket.'
+                  ? 'Manage sponsor tiers and tasks, partner follow-ups, and approved logo records; review PR candidates and sponsor records.'
                   : meta.key === 'hr'
-                  ? 'Review HR candidates; view, search, and filter public inquiries; mark tickets as read or resolved; record internal notes.'
-                  : 'Read candidate records in scope, update status and internal notes. Deletion and account management are not permitted.',
+                    ? 'Triage and update public inquiries; record internal notes and follow-up tasks. Inquiries cannot be deleted and sponsors stay out of scope.'
+                    : registrationAccess
+                      ? 'Create, edit, and delete records in your department workspace; review candidate records in scope and update status and internal notes.'
+                      : 'Create, edit, and delete records only in your department workspace. Candidate records, account management, and other departments stay out of scope.',
             },
             {
               icon: KeyRound,

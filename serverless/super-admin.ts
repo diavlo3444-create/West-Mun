@@ -17,6 +17,11 @@ import {
   handleTestSessionData,
   handleTestSessionUpdate,
 } from '../src/server/superAdminHandler.ts';
+import {
+  handleTestSessionRecords,
+  handleTestSessionRecordSave,
+  handleTestSessionRecordDelete,
+} from '../src/server/departmentRecordsAdmin.ts';
 
 // Robust body parser for serverless Node/Vercel environments
 async function parseJsonBody(req: any): Promise<any> {
@@ -143,6 +148,29 @@ export default async function handler(req: any, res: any) {
       const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
       const body = await parseJsonBody(req);
       const result = await handleTestSessionUpdate(token, body);
+      return res.status(result.statusCode).json(result.body);
+    }
+
+    // Department workspace records during an active Super IT test session.
+    if (action === 'test-records') {
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      const dept = url.searchParams.get('department') || undefined;
+      const sec = url.searchParams.get('section') || undefined;
+      const result = await handleTestSessionRecords(token, { department: dept, section: sec });
+      return res.status(result.statusCode).json(result.body);
+    }
+
+    if (action === 'test-record-save') {
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      const body = await parseJsonBody(req);
+      const result = await handleTestSessionRecordSave(token, body);
+      return res.status(result.statusCode).json(result.body);
+    }
+
+    if (action === 'test-record-delete') {
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      const body = await parseJsonBody(req);
+      const result = await handleTestSessionRecordDelete(token, body);
       return res.status(result.statusCode).json(result.body);
     }
 

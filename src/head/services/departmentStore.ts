@@ -1,598 +1,381 @@
 import { supabase, supabaseConfigured } from '../../lib/supabase';
-import type { DepartmentKey, SectionKey } from '../departments';
+import { isDepartmentKey, isSectionKey, type DepartmentKey, type SectionKey } from '../departments';
+import { PRIORITY_OPTIONS, type Priority } from '../workspaces';
+
+/**
+ * Department records live in public.department_records.
+ *
+ * There is deliberately no localStorage fallback and no seeded sample data:
+ * a workspace either reads and writes real Supabase rows, or it surfaces a
+ * clear error explaining exactly what an administrator must run. Simulating a
+ * successful save would corrupt operational planning.
+ *
+ * Super IT test sessions have no Supabase Auth session, so their reads and
+ * writes go through the privileged server endpoints in /api/super-admin and
+ * are audit-logged there.
+ */
 
 export interface DepartmentRecord {
   id: string;
   department: DepartmentKey;
-  section?: SectionKey | null;
+  section: SectionKey | null;
   category: string;
   title: string;
   status: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-  data: Record<string, any>;
+  priority: Priority;
+  data: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
+  created_by?: string | null;
 }
 
-const STORAGE_PREFIX = 'wm_dept_records_';
+export interface RecordScope {
+  department: DepartmentKey;
+  section?: SectionKey | null;
+  /** Verified Super IT test session token, when testing as a head. */
+  testToken?: string | null;
+}
 
-// Initial MUN operational seeds by department
-const INITIAL_TEMPLATES: Record<DepartmentKey, Omit<DepartmentRecord, 'id' | 'department'>[]> = {
-  design: [
-    {
-      category: 'task',
-      title: 'Finalize UN Security Council Placard Template',
-      status: 'In Review',
-      priority: 'high',
-      data: {
-        assignee: 'Mallak Abbas',
-        deadline: '2027-02-15',
-        deliverableType: 'Committee Placards',
-        notes: 'Dimensions 297x105mm with diplomatic gold embossing border.',
-        revisionCount: 2,
-      },
-    },
-    {
-      category: 'task',
-      title: 'Design Social Media Announcement Banner (Delegate Tier 2)',
-      status: 'In Progress',
-      priority: 'medium',
-      data: {
-        assignee: 'Design Team',
-        deadline: '2027-02-20',
-        deliverableType: 'Instagram Post / Story',
-        notes: 'Ensure Cinzel typography matches brand constitution.',
-      },
-    },
-    {
-      category: 'asset',
-      title: 'Official WEST MUN 2027 Crest & Emblem (Vector Pack)',
-      status: 'Approved',
-      priority: 'high',
-      data: {
-        assetCategory: 'Logos & Emblems',
-        format: 'SVG / Vector',
-        fileUrl: '/assets/emblem.svg',
-        version: 'v2.4',
-        dimensions: 'Vector',
-        approvedBy: 'Secretariat',
-      },
-    },
-    {
-      category: 'asset',
-      title: 'Opening Ceremony Main Stage Backdrop (4K High-Res)',
-      status: 'Approved',
-      priority: 'high',
-      data: {
-        assetCategory: 'Banners & Backdrops',
-        format: 'TIFF / 300 DPI',
-        fileUrl: '/assets/stage-backdrop.png',
-        version: 'v1.0',
-        dimensions: '3840 x 2160',
-        approvedBy: 'Secretariat',
-      },
-    },
-  ],
-  marketing: [
-    {
-      category: 'campaign',
-      title: 'Institutional Delegation Outreach — GCC High Schools',
-      status: 'Active',
-      priority: 'high',
-      data: {
-        targetDelegates: 250,
-        currentRegistrations: 142,
-        startDate: '2027-01-15',
-        endDate: '2027-02-28',
-        channels: ['Email', 'Instagram', 'School Visits'],
-        notes: 'Follow-up with Model UN club advisors in Kuwait and UAE.',
-      },
-    },
-    {
-      category: 'post',
-      title: 'Early Bird Registration Deadline Countdown',
-      status: 'Ready for Review',
-      priority: 'high',
-      data: {
-        platform: 'Instagram',
-        scheduledDate: '2027-02-10',
-        caption:
-          'Diplomacy begins with decisive action. Less than 72 hours remain before Early Bird delegate registrations close for WEST MUN 2027. Secure your committee allocation today.',
-        assetId: 'banner_early_bird',
-        needsDesignApproval: true,
-      },
-    },
-    {
-      category: 'coordination',
-      title: 'Request: Crisis Committee Teaser Video Asset',
-      status: 'In Progress',
-      priority: 'medium',
-      data: {
-        targetDepartment: 'media_press',
-        deadline: '2027-02-18',
-        requirements: '30-second dramatic cinematic reel with typewriter SFX.',
-        notes: 'Script approved by DCC Head.',
-      },
-    },
-  ],
-  media_press: [
-    {
-      category: 'coverage',
-      title: 'Opening Plenary Keynote Speech Recording & Live Feed',
-      status: 'Confirmed',
-      priority: 'urgent',
-      data: {
-        assignedCrew: 'Selena & Broadcast Team',
-        time: 'Day 1 — 09:30 AM',
-        location: 'Grand Ballroom Plenary Hall',
-        gear: 'Sony FX3 + Wireless Lapels + Blackmagic switcher',
-      },
-    },
-    {
-      category: 'interview',
-      title: 'Exclusive Interview with Secretary-General & Keynote Dignitary',
-      status: 'Scheduled',
-      priority: 'high',
-      data: {
-        interviewer: 'Press Correspondent',
-        time: 'Day 1 — 11:45 AM',
-        location: 'VIP Press Lounge',
-        topic: 'Summit Vision & Multilateral Diplomatic Reform',
-      },
-    },
-    {
-      category: 'checklist',
-      title: 'Dais Camera Batteries & Dual SD Card Backups',
-      status: 'Completed',
-      priority: 'high',
-      data: { checked: true, verifiedBy: 'Media Head' },
-    },
-  ],
-  security: [
-    {
-      category: 'roster',
-      title: 'Main Hall Security Post — Delegate Credential Check',
-      status: 'Active',
-      priority: 'high',
-      data: {
-        officerInCharge: 'Yusef Saad',
-        assignedVolunteers: ['Karim Mansour', 'Rami Haddad'],
-        postLocation: 'Grand Hall Turnstiles (North & South)',
-        shift: 'Morning (08:00 - 13:00)',
-        radioChannel: 'Channel 1 (Primary Protocol)',
-      },
-    },
-    {
-      category: 'checklist',
-      title: 'Chamber Emergency Egress & Fire Exit Inspection',
-      status: 'Completed',
-      priority: 'urgent',
-      data: {
-        checked: true,
-        inspectedBy: 'Najla Rami',
-        verifiedAt: '2027-02-01',
-        notes: 'All 6 emergency exits clear of banners and cables.',
-      },
-    },
-    {
-      category: 'incident',
-      title: 'Unaccredited Visitor Attempted Committee Room Entry',
-      status: 'Resolved',
-      priority: 'high',
-      data: {
-        timestamp: 'Day 1 — 14:15 PM',
-        location: 'Chamber 3 (UNSC)',
-        involvedParties: 'External Visitor',
-        description: 'Individual without badge attempted entry. Stopped by floor protocol.',
-        actionTaken: 'Escorted to main reception for identity check and day pass issuance.',
-        resolutionNotes: 'Verified as school faculty advisor; credentials issued.',
-        confidential: true,
-      },
-    },
-  ],
-  volunteers: [
-    {
-      category: 'station',
-      title: 'Plenary Chamber Dais Runners Station',
-      status: 'Filled',
-      priority: 'high',
-      data: {
-        stationName: 'UNSC & DISEC Dais Runners',
-        requiredVolunteers: 4,
-        assignedVolunteers: ['Farah Zaid', 'Ali Qasim', 'Dana Shaker', 'Omar Fathi'],
-        shiftTime: '09:00 - 17:00',
-        responsibilities: 'Resolution note-passing, speaker list updates, water carafe replenishment.',
-      },
-    },
-    {
-      category: 'station',
-      title: 'Registration Desk & Delegate Welcome Ushers',
-      status: 'Needs Coverage',
-      priority: 'urgent',
-      data: {
-        stationName: 'Main Lobby Registration Desk',
-        requiredVolunteers: 6,
-        assignedVolunteers: ['Layla K.', 'Hassan M.'],
-        shiftTime: '07:30 - 10:30',
-        responsibilities: 'Placard distribution, badge verification, welcome bag handover.',
-      },
-    },
-    {
-      category: 'checklist',
-      title: 'Volunteer Handbook & Dress Code Orientation Briefing',
-      status: 'Completed',
-      priority: 'high',
-      data: {
-        briefingDate: '2027-02-12',
-        attendanceCount: 42,
-        notes: 'All volunteers received black suit / formal attire guidelines.',
-      },
-    },
-  ],
-  pr: [
-    {
-      category: 'deliverable',
-      title: 'Title Sponsor Logo Placement on Conference Badges',
-      status: 'Confirmed',
-      priority: 'high',
-      data: {
-        sponsor: 'Diplomatic Foundation',
-        tier: 'Title Sponsor',
-        deadline: '2027-02-10',
-        confirmedWith: 'Director of External Affairs',
-        notes: 'Gold metallic foil logo on reverse of all delegate lanyards.',
-      },
-    },
-    {
-      category: 'meeting',
-      title: 'Sponsorship Ratification Meeting with Bank of Amman',
-      status: 'Pending',
-      priority: 'medium',
-      data: {
-        date: '2027-02-16',
-        attendees: 'Mazen Alada, Dana Alnajjar, VP of Corporate CSR',
-        stage: 'Negotiating',
-        fundingOffer: '$5,000 Platinum Tier',
-      },
-    },
-  ],
-  hr: [
-    {
-      category: 'team',
-      title: 'Organizing Committee Onboarding & Conduct Accreditations',
-      status: 'Active',
-      priority: 'high',
-      data: {
-        totalStaff: 48,
-        accreditedStaff: 45,
-        pendingSignoffs: 3,
-        codeOfConductVersion: 'v2027.1',
-      },
-    },
-    {
-      category: 'task',
-      title: 'Delegate Dispute Resolution Protocol & Hearing Room Booking',
-      status: 'In Progress',
-      priority: 'medium',
-      data: {
-        leads: 'Hoorain & Seif Ayman',
-        deadline: '2027-02-15',
-        notes: 'Protocol for mediating parliamentary etiquette challenges.',
-      },
-    },
-  ],
-  logistics: [
-    {
-      category: 'venue',
-      title: 'Royal Amra Convention Center — Main Conference Hall A',
-      status: 'Confirmed',
-      priority: 'high',
-      data: {
-        roomName: 'Grand Plenary Hall A',
-        capacity: 450,
-        daisLayout: 'Elevated 8-seater dais with UN flags and audio podium',
-        avSetup: 'Dual 4K laser projectors, 16 floor condenser microphones',
-        operationalNotes: 'Catering access via service corridor B.',
-      },
-    },
-    {
-      category: 'equipment',
-      title: 'Chamber Audio & Delegate Floor Microphones (32 units)',
-      status: 'Delivered',
-      priority: 'high',
-      data: {
-        quantityNeeded: 32,
-        quantitySourced: 32,
-        vendor: 'Amman Sound & Staging Ltd.',
-        deliveryDate: '2027-02-14',
-      },
-    },
-    {
-      category: 'procurement',
-      title: 'Wooden Committee Gavels & Embroidered Dais Banners',
-      status: 'In Transit',
-      priority: 'medium',
-      data: {
-        costEstimate: '$850',
-        supplier: 'Heritage Crafts Co.',
-        targetDelivery: '2027-02-18',
-        poNumber: 'PO-2027-LOG-041',
-      },
-    },
-  ],
-  it: [
-    {
-      category: 'issue',
-      title: 'Dais Presentation Screen Mirroring Latency Check',
-      status: 'Open',
-      priority: 'high',
-      data: {
-        subsystem: 'AV & Networking',
-        reportedBy: 'Secretariat Dais Lead',
-        description: 'Verify HDMI over CAT6 extenders latency in Committee Room 4.',
-        troubleshootingNotes: 'Replaced extender power brick; awaiting final load test.',
-      },
-    },
-    {
-      category: 'issue',
-      title: 'Conference WiFi Guest SSID & Bandwidth Allocation',
-      status: 'Resolved',
-      priority: 'urgent',
-      data: {
-        subsystem: 'Venue Infrastructure',
-        reportedBy: 'IT Head',
-        description: 'Configure dedicated 500Mbps symmetrical fiber for delegates and dais.',
-        troubleshootingNotes: 'VLAN 40 configured with captive portal bypass for dais laptops.',
-      },
-    },
-    {
-      category: 'checklist',
-      title: 'Digital Voting System & Backup Dais Tablets Readiness',
-      status: 'Completed',
-      priority: 'high',
-      data: {
-        verifiedDevices: 12,
-        batteryHealth: '100%',
-        offlineFallbackReady: true,
-      },
-    },
-  ],
-  ceremonies: [
-    {
-      category: 'run_of_show',
-      title: 'Opening Ceremony Minute-by-Minute Run-of-Show Timeline',
-      status: 'Locked',
-      priority: 'urgent',
-      data: {
-        timeline: [
-          { time: '09:00', segment: 'Delegate & Dignitary Seating', cue: 'Ambient orchestral string suite' },
-          { time: '09:15', segment: 'National Anthem of the Hashemite Kingdom', cue: 'Royal Anthem brass fanfare' },
-          { time: '09:20', segment: 'Secretariat Procession & Intro Video', cue: 'Cinematic video playback on 4K wall' },
-          { time: '09:30', segment: 'Secretary-General Convocation Address', cue: 'Spotlight 1 & podium mic live' },
-          { time: '09:45', segment: 'Diplomatic Keynote Speaker Address', cue: 'VIP escort to stage' },
-          { time: '10:05', segment: 'Gavel Handover & Official Declaration of Opening', cue: 'Traditional 3 gavel strikes' },
-        ],
-      },
-    },
-    {
-      category: 'speaker',
-      title: 'Keynote Speaker: Former Ambassador to the United Nations',
-      status: 'Confirmed',
-      priority: 'high',
-      data: {
-        speakerName: 'Ambassador H.E. Karim Al-Faris',
-        affiliation: 'Diplomatic Institute',
-        arrivalTime: '08:45 AM',
-        speechDurationMinutes: 15,
-        stageRequirements: 'Podium microphone, water glass, translation headset',
-        assignedLiaison: 'Sultana (Ceremonies Lead)',
-      },
-    },
-    {
-      category: 'task',
-      title: 'Grand Gavel Ceremony Polishing & Award Plaque Inscriptions',
-      status: 'Completed',
-      priority: 'medium',
-      data: { verified: true, inspector: 'Ceremonies Team' },
-    },
-  ],
-  dcc: [
-    {
-      category: 'committee',
-      title: 'Historic Crisis Committee: 1962 Cuban Missile Crisis',
-      status: 'Ready',
-      priority: 'urgent',
-      data: {
-        chairs: 'Majd (Crisis Director)',
-        delegatesCount: 24,
-        studyGuideStatus: 'Published & Distributed',
-        crisisTimelineReady: true,
-        secretDirectivesCount: 8,
-        cabinetSetup: 'Bilateral Washington & Moscow crisis suites',
-      },
-    },
-    {
-      category: 'directive',
-      title: 'Midnight Directive Leak — DEFCON 2 Naval Blockade Simulation',
-      status: 'Scheduled',
-      priority: 'high',
-      data: {
-        triggerPhase: 'Session 3 (Day 2 — 14:00 PM)',
-        multimediaAsset: 'Teletype audio and redacted diplomatic dispatch',
-        scenarioObjective: 'Force emergency vote on Soviet transport ship interception',
-        leakStatus: 'Classified / Sealed in Red Envelope',
-      },
-    },
-    {
-      category: 'document',
-      title: 'Crisis Directives Dossier & Urgent Action Forms (100 copies)',
-      status: 'Printed',
-      priority: 'medium',
-      data: { location: 'Crisis Backroom Table 1' },
-    },
-  ],
-};
+export interface RecordInput {
+  category: string;
+  title: string;
+  status: string;
+  priority?: Priority;
+  data?: Record<string, unknown>;
+}
 
-/**
- * Loads department records. Checks Supabase first if available,
- * falling back to local storage and starter MUN templates.
- */
-export async function fetchDepartmentRecords(
-  department: DepartmentKey,
-  category?: string
-): Promise<DepartmentRecord[]> {
-  const localKey = `${STORAGE_PREFIX}${department}`;
+export interface StoreResult<T> {
+  ok: boolean;
+  data?: T;
+  error?: string;
+  code?: string;
+}
 
-  // 1. If Supabase is configured and caller has a session, attempt query
-  if (supabaseConfigured && supabase) {
-    try {
-      let query = supabase
-        .from('department_records')
-        .select('*')
-        .eq('department', department);
+export const WORKSPACE_STORAGE_MIGRATION = 'supabase/migration_department_workspaces.sql';
 
-      if (category) {
-        query = query.eq('category', category);
-      }
+const MAX_TITLE = 200;
+const MAX_STATUS = 60;
+const MAX_CATEGORY = 60;
 
-      const { data, error } = await query.order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        // Cache to local storage
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem(localKey, JSON.stringify(data));
-          } catch {}
-        }
-        return data as DepartmentRecord[];
-      }
-    } catch (err) {
-      console.warn('[DepartmentStore] Supabase query fallback:', err);
-    }
+export const WORKSPACE_STORAGE_ERROR =
+  'Department workspace storage is not initialized in this Supabase project. ' +
+  `An administrator must run ${WORKSPACE_STORAGE_MIGRATION} in the Supabase SQL Editor, then reload this page.`;
+
+function isMissingTable(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  if (error.code === 'PGRST205' || error.code === '42P01' || error.code === 'PGRST204') return true;
+  return /could not find the table|relation .* does not exist|schema cache/i.test(error.message || '');
+}
+
+export function explainStoreError(error: { code?: string; message?: string } | null | undefined): string {
+  if (!error) return 'The request failed for an unknown reason.';
+  if (isMissingTable(error)) return WORKSPACE_STORAGE_ERROR;
+  if (
+    error.code === '42501' ||
+    error.code === 'PGRST301' ||
+    /row-level security|permission denied|policy/i.test(error.message || '')
+  ) {
+    return 'Row Level Security blocked this operation. Your department assignment may be inactive, or the record belongs to another department.';
   }
-
-  // 2. Local storage retrieval
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem(localKey);
-      if (stored) {
-        const parsed = JSON.parse(stored) as DepartmentRecord[];
-        if (category) {
-          return parsed.filter((r) => r.category === category);
-        }
-        return parsed;
-      }
-    } catch {}
-
-    // 3. Seed initial templates if completely empty
-    const initial = (INITIAL_TEMPLATES[department] || []).map((item, index) => ({
-      id: `seed_${department}_${index + 1}_${Date.now()}`,
-      department,
-      created_at: new Date(Date.now() - (index + 1) * 3600000).toISOString(),
-      updated_at: new Date().toISOString(),
-      ...item,
-    })) as DepartmentRecord[];
-
-    try {
-      localStorage.setItem(localKey, JSON.stringify(initial));
-    } catch {}
-
-    if (category) {
-      return initial.filter((r) => r.category === category);
-    }
-    return initial;
+  if (/auth session missing|jwt expired|session expired|invalid claim/i.test(error.message || '')) {
+    return 'Your session expired. Sign in again to continue.';
   }
+  if (/failed to fetch|network|timeout|ECONN/i.test(error.message || '')) {
+    return 'Could not reach Supabase. Check the connection and retry.';
+  }
+  return error.message || 'The workspace request failed.';
+}
 
-  return [];
+function normalizePriority(value: unknown): Priority {
+  return typeof value === 'string' && (PRIORITY_OPTIONS as readonly string[]).includes(value)
+    ? (value as Priority)
+    : 'medium';
+}
+
+function normalizeSection(department: DepartmentKey, section?: SectionKey | null): SectionKey | null {
+  const separated = department === 'media_press' || department === 'security' || department === 'volunteers';
+  if (!separated) return null;
+  return isSectionKey(section) ? section : null;
+}
+
+function normalizeRecord(row: Record<string, unknown>): DepartmentRecord | null {
+  const department = String(row.department || '').trim().toLowerCase();
+  if (!isDepartmentKey(department)) return null;
+  const section = isSectionKey(row.section) ? row.section : null;
+  const rawPriority = row.priority;
+  return {
+    id: String(row.id || ''),
+    department,
+    section,
+    category: String(row.category || ''),
+    title: String(row.title || ''),
+    status: String(row.status || ''),
+    priority: normalizePriority(rawPriority),
+    data:
+      row.data && typeof row.data === 'object' && !Array.isArray(row.data)
+        ? (row.data as Record<string, unknown>)
+        : {},
+    created_at: typeof row.created_at === 'string' ? row.created_at : undefined,
+    updated_at: typeof row.updated_at === 'string' ? row.updated_at : undefined,
+    created_by: typeof row.created_by === 'string' ? row.created_by : null,
+  };
+}
+
+/** Validates user input before it reaches Supabase or the test-mode endpoint. */
+export function validateRecordInput(input: RecordInput): string | null {
+  const title = String(input.title || '').trim();
+  if (!title) return 'A title is required.';
+  if (title.length > MAX_TITLE) return `The title must be ${MAX_TITLE} characters or fewer.`;
+  const category = String(input.category || '').trim();
+  if (!category) return 'A record category is required.';
+  if (category.length > MAX_CATEGORY) return 'The record category is invalid.';
+  const status = String(input.status || '').trim();
+  if (!status) return 'A status is required.';
+  if (status.length > MAX_STATUS) return `The status must be ${MAX_STATUS} characters or fewer.`;
+  if (input.data !== undefined && (typeof input.data !== 'object' || Array.isArray(input.data))) {
+    return 'Record details must be a JSON object.';
+  }
+  return null;
+}
+
+async function ensureFreshSession(): Promise<void> {
+  if (!supabase) return;
+  try {
+    const { data } = await supabase.auth.getSession();
+    const expiresAt = data?.session?.expires_at;
+    if (expiresAt && expiresAt * 1000 < Date.now() + 60_000) {
+      await supabase.auth.refreshSession();
+    }
+  } catch {
+    // Non-fatal: the request below will surface an auth error if it matters.
+  }
+}
+
+async function testRequest<T>(
+  token: string,
+  path: string,
+  init?: RequestInit,
+): Promise<StoreResult<T>> {
+  try {
+    const response = await fetch(`/api/super-admin${path}`, {
+      ...init,
+      headers: {
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers || {}),
+      },
+    });
+    const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!response.ok || payload?.success === false) {
+      return {
+        ok: false,
+        code: String(payload?.code || response.status),
+        error: String(payload?.error || 'The Super IT test request failed.'),
+      };
+    }
+    return { ok: true, data: payload as T };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Network error while contacting the test endpoint.',
+    };
+  }
 }
 
 /**
- * Persists a new or updated department record.
+ * Reads every department record the caller is allowed to see. RLS scopes the
+ * result to the caller's department (plus intentionally shared categories such
+ * as venue and run-of-show). The explicit department filter keeps the request
+ * aligned with the UI even if a policy is later widened on purpose.
  */
-export async function saveDepartmentRecord(
-  record: Omit<DepartmentRecord, 'id'> & { id?: string }
-): Promise<{ ok: boolean; record?: DepartmentRecord; error?: string }> {
-  const resolvedRecord: DepartmentRecord = {
-    id: record.id || `rec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-    created_at: record.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    department: record.department,
-    section: record.section ?? null,
-    category: record.category,
-    title: record.title,
-    status: record.status,
-    priority: record.priority || 'medium',
-    data: record.data || {},
+export async function listDepartmentRecords(scope: RecordScope): Promise<StoreResult<DepartmentRecord[]>> {
+  if (!isDepartmentKey(scope.department)) {
+    return { ok: false, error: 'Unknown department.' };
+  }
+
+  if (scope.testToken) {
+    const params = new URLSearchParams({ action: 'test-records', department: scope.department });
+    if (scope.section) params.set('section', scope.section);
+    const result = await testRequest<{ records?: Record<string, unknown>[] }>(
+      scope.testToken,
+      `?${params.toString()}`,
+    );
+    if (!result.ok) return { ok: false, error: result.error, code: result.code };
+    const records = (result.data?.records || [])
+      .map((row) => normalizeRecord(row))
+      .filter((row): row is DepartmentRecord => Boolean(row));
+    return { ok: true, data: records };
+  }
+
+  if (!supabaseConfigured || !supabase) {
+    return {
+      ok: false,
+      code: 'NOT_CONFIGURED',
+      error: 'Supabase is not configured for this deployment. Contact the IT Super Admin.',
+    };
+  }
+
+  await ensureFreshSession();
+
+  const { data, error } = await supabase
+    .from('department_records')
+    .select('*')
+    .eq('department', scope.department)
+    .order('updated_at', { ascending: false })
+    .limit(500);
+
+  if (error) {
+    return { ok: false, code: error.code, error: explainStoreError(error) };
+  }
+
+  const records = (data || [])
+    .map((row) => normalizeRecord(row as Record<string, unknown>))
+    .filter((row): row is DepartmentRecord => Boolean(row));
+
+  return { ok: true, data: records };
+}
+
+export async function createDepartmentRecord(
+  scope: RecordScope,
+  input: RecordInput,
+): Promise<StoreResult<DepartmentRecord>> {
+  const validationError = validateRecordInput(input);
+  if (validationError) return { ok: false, error: validationError };
+
+  const section = normalizeSection(scope.department, scope.section);
+  const payload = {
+    department: scope.department,
+    section,
+    category: String(input.category).trim(),
+    title: String(input.title).trim(),
+    status: String(input.status).trim(),
+    priority: normalizePriority(input.priority),
+    data: input.data || {},
   };
 
-  // 1. Try Supabase
-  if (supabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('department_records')
-        .upsert(resolvedRecord)
-        .select('*')
-        .maybeSingle();
-
-      if (!error && data) {
-        syncToLocalStorage(data as DepartmentRecord);
-        return { ok: true, record: data as DepartmentRecord };
-      }
-    } catch (err) {
-      console.warn('[DepartmentStore] Supabase upsert error, saving locally:', err);
-    }
+  if (scope.testToken) {
+    const result = await testRequest<{ record?: Record<string, unknown> }>(
+      scope.testToken,
+      '?action=test-record-save',
+      { method: 'POST', body: JSON.stringify({ record: payload }) },
+    );
+    if (!result.ok) return { ok: false, error: result.error, code: result.code };
+    const record = result.data?.record ? normalizeRecord(result.data.record) : null;
+    return record ? { ok: true, data: record } : { ok: false, error: 'The record was saved but could not be read back.' };
   }
 
-  // 2. Fallback to LocalStorage
-  syncToLocalStorage(resolvedRecord);
-  return { ok: true, record: resolvedRecord };
+  if (!supabaseConfigured || !supabase) {
+    return { ok: false, code: 'NOT_CONFIGURED', error: 'Supabase is not configured for this deployment.' };
+  }
+
+  await ensureFreshSession();
+
+  const { data, error } = await supabase
+    .from('department_records')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (error) return { ok: false, code: error.code, error: explainStoreError(error) };
+
+  const record = data ? normalizeRecord(data as Record<string, unknown>) : null;
+  return record ? { ok: true, data: record } : { ok: false, error: 'The record was saved but could not be read back.' };
 }
 
-/**
- * Deletes a department record
- */
-export async function deleteDepartmentRecord(
+export async function updateDepartmentRecord(
+  scope: RecordScope,
   id: string,
-  department: DepartmentKey
-): Promise<{ ok: boolean; error?: string }> {
-  if (supabaseConfigured && supabase) {
-    try {
-      await supabase
-        .from('department_records')
-        .delete()
-        .eq('id', id)
-        .eq('department', department);
-    } catch (err) {
-      console.warn('[DepartmentStore] Supabase delete error:', err);
-    }
+  patch: Partial<RecordInput>,
+): Promise<StoreResult<DepartmentRecord>> {
+  if (!id) return { ok: false, error: 'A record id is required.' };
+
+  const validationError = validateRecordInput({
+    category: patch.category ?? 'unchanged',
+    title: patch.title ?? 'unchanged',
+    status: patch.status ?? 'unchanged',
+    data: patch.data,
+  });
+  if (validationError) return { ok: false, error: validationError };
+
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.title !== undefined) update.title = String(patch.title).trim();
+  if (patch.status !== undefined) update.status = String(patch.status).trim();
+  if (patch.priority !== undefined) update.priority = normalizePriority(patch.priority);
+  if (patch.data !== undefined) update.data = patch.data;
+
+  if (scope.testToken) {
+    const result = await testRequest<{ record?: Record<string, unknown> }>(
+      scope.testToken,
+      '?action=test-record-save',
+      { method: 'POST', body: JSON.stringify({ id, patch: update }) },
+    );
+    if (!result.ok) return { ok: false, error: result.error, code: result.code };
+    const record = result.data?.record ? normalizeRecord(result.data.record) : null;
+    return record ? { ok: true, data: record } : { ok: false, error: 'The change was saved but could not be read back.' };
   }
 
-  if (typeof window !== 'undefined') {
-    try {
-      const localKey = `${STORAGE_PREFIX}${department}`;
-      const stored = localStorage.getItem(localKey);
-      if (stored) {
-        const parsed = JSON.parse(stored) as DepartmentRecord[];
-        const filtered = parsed.filter((r) => r.id !== id);
-        localStorage.setItem(localKey, JSON.stringify(filtered));
-      }
-    } catch {}
+  if (!supabaseConfigured || !supabase) {
+    return { ok: false, code: 'NOT_CONFIGURED', error: 'Supabase is not configured for this deployment.' };
   }
 
-  return { ok: true };
+  await ensureFreshSession();
+
+  const { data, error } = await supabase
+    .from('department_records')
+    .update(update)
+    .eq('id', id)
+    .eq('department', scope.department)
+    .select('*')
+    .maybeSingle();
+
+  if (error) return { ok: false, code: error.code, error: explainStoreError(error) };
+  if (!data) {
+    return {
+      ok: false,
+      error:
+        'No record was updated. It may belong to another department, or your assignment no longer allows this change.',
+    };
+  }
+
+  const record = normalizeRecord(data as Record<string, unknown>);
+  return record ? { ok: true, data: record } : { ok: false, error: 'The change was saved but could not be read back.' };
 }
 
-function syncToLocalStorage(record: DepartmentRecord) {
-  if (typeof window === 'undefined') return;
-  try {
-    const localKey = `${STORAGE_PREFIX}${record.department}`;
-    const stored = localStorage.getItem(localKey);
-    let items: DepartmentRecord[] = stored ? JSON.parse(stored) : [];
-    const index = items.findIndex((r) => r.id === record.id);
-    if (index >= 0) {
-      items[index] = record;
-    } else {
-      items.unshift(record);
-    }
-    localStorage.setItem(localKey, JSON.stringify(items));
-  } catch {}
+export async function deleteDepartmentRecord(
+  scope: RecordScope,
+  id: string,
+): Promise<StoreResult<null>> {
+  if (!id) return { ok: false, error: 'A record id is required.' };
+
+  if (scope.testToken) {
+    const result = await testRequest<{ deleted?: number }>(
+      scope.testToken,
+      '?action=test-record-delete',
+      { method: 'POST', body: JSON.stringify({ id }) },
+    );
+    return result.ok ? { ok: true, data: null } : { ok: false, error: result.error, code: result.code };
+  }
+
+  if (!supabaseConfigured || !supabase) {
+    return { ok: false, code: 'NOT_CONFIGURED', error: 'Supabase is not configured for this deployment.' };
+  }
+
+  await ensureFreshSession();
+
+  const { data, error } = await supabase
+    .from('department_records')
+    .delete()
+    .eq('id', id)
+    .eq('department', scope.department)
+    .select('id');
+
+  if (error) return { ok: false, code: error.code, error: explainStoreError(error) };
+  if (!data || data.length === 0) {
+    return {
+      ok: false,
+      error: 'No record was deleted. It may belong to another department, or deletion is restricted for this category.',
+    };
+  }
+
+  return { ok: true, data: null };
 }

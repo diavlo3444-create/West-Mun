@@ -1772,7 +1772,13 @@ export interface TestAuditLogRecord {
   timestamp: string;
   adminEmail: string;
   adminId: string;
-  action: 'create_test_session' | 'consume_launch_credential' | 'access_data' | 'update_record' | 'terminate_test_session';
+  action:
+    | 'create_test_session'
+    | 'consume_launch_credential'
+    | 'access_data'
+    | 'update_record'
+    | 'department_record_write'
+    | 'terminate_test_session';
   headEmail: string;
   headDepartment: string;
   headSection: string | null;
@@ -1884,7 +1890,7 @@ export function verifySignedTestToken(token: string): TestSessionRecord | null {
   }
 }
 
-function recordTestAuditLog(
+export function recordTestAuditLog(
   action: TestAuditLogRecord['action'],
   adminEmail: string,
   adminId: string,

@@ -2115,6 +2115,244 @@ async function handleTestSessionUpdate(sessionToken, body) {
   return { statusCode: 200, body: { success: true } };
 }
 
+// src/server/departmentRecordsAdmin.ts
+var MISSING_TABLE_MESSAGE = "Department workspace storage is not initialized. Run supabase/migration_department_workspaces.sql in the Supabase SQL Editor.";
+var PRIORITIES = ["low", "medium", "high", "urgent"];
+var MAX_TITLE = 200;
+var MAX_STATUS = 60;
+var MAX_CATEGORY = 60;
+var MAX_DATA_BYTES = 2e4;
+function isMissingTable(code, message) {
+  if (code === "PGRST205" || code === "42P01" || code === "PGRST204") return true;
+  return /could not find the table|relation .* does not exist|schema cache/i.test(message || "");
+}
+function normalizeDepartment(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "media") return "media_press";
+  return VALID_DEPARTMENTS.includes(normalized) ? normalized : null;
+}
+function sanitizeData(value) {
+  if (value === void 0 || value === null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) return null;
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized.length > MAX_DATA_BYTES) return null;
+    const parsed = JSON.parse(serialized);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+function validateFields(input) {
+  if (input.category !== void 0) {
+    const category = String(input.category || "").trim();
+    if (!category || category.length > MAX_CATEGORY) return "Invalid record category.";
+  }
+  if (input.title !== void 0) {
+    const title = String(input.title || "").trim();
+    if (!title) return "A title is required.";
+    if (title.length > MAX_TITLE) return `The title must be ${MAX_TITLE} characters or fewer.`;
+  }
+  if (input.status !== void 0) {
+    const status = String(input.status || "").trim();
+    if (!status) return "A status is required.";
+    if (status.length > MAX_STATUS) return `The status must be ${MAX_STATUS} characters or fewer.`;
+  }
+  if (input.priority !== void 0 && !PRIORITIES.includes(String(input.priority))) {
+    return "Invalid priority.";
+  }
+  return null;
+}
+async function handleTestSessionRecords(sessionToken, params) {
+  const session = verifyTestSession(sessionToken);
+  if (!session) {
+    return {
+      statusCode: 401,
+      body: { success: false, error: "Unauthorized: a valid Super IT test session is required." }
+    };
+  }
+  const department = normalizeDepartment(params.department || session.department);
+  if (!department) {
+    return { statusCode: 400, body: { success: false, error: "Unknown department." } };
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) {
+    return {
+      statusCode: 503,
+      body: {
+        success: false,
+        error: "The server-side Supabase service role key is not configured, so test-mode workspace records cannot be read."
+      }
+    };
+  }
+  recordTestAuditLog(
+    "access_data",
+    session.adminEmail,
+    session.adminId,
+    session.headEmail,
+    department,
+    params.section ?? session.section ?? null,
+    sessionToken,
+    "Department workspace records read during an active test session"
+  );
+  const { data, error } = await supabaseAdmin.from("department_records").select("*").eq("department", department).order("updated_at", { ascending: false }).limit(500);
+  if (error) {
+    const missing = isMissingTable(error.code, error.message);
+    return {
+      statusCode: missing ? 409 : 400,
+      body: {
+        success: false,
+        code: error.code,
+        error: missing ? MISSING_TABLE_MESSAGE : error.message
+      }
+    };
+  }
+  return { statusCode: 200, body: { success: true, records: data || [] } };
+}
+async function handleTestSessionRecordSave(sessionToken, body) {
+  const session = verifyTestSession(sessionToken);
+  if (!session) {
+    return {
+      statusCode: 401,
+      body: { success: false, error: "Unauthorized: a valid Super IT test session is required." }
+    };
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) {
+    return {
+      statusCode: 503,
+      body: {
+        success: false,
+        error: "The server-side Supabase service role key is not configured, so test-mode workspace records cannot be written."
+      }
+    };
+  }
+  const isUpdate = Boolean(body.id);
+  let payload;
+  if (isUpdate) {
+    const patch = body.patch || {};
+    const validationError = validateFields({
+      title: patch.title,
+      status: patch.status,
+      priority: patch.priority
+    });
+    if (validationError) return { statusCode: 400, body: { success: false, error: validationError } };
+    payload = { updated_at: (/* @__PURE__ */ new Date()).toISOString() };
+    if (patch.title !== void 0) payload.title = String(patch.title).trim();
+    if (patch.status !== void 0) payload.status = String(patch.status).trim();
+    if (patch.priority !== void 0) payload.priority = String(patch.priority);
+    if (patch.data !== void 0) {
+      const data2 = sanitizeData(patch.data);
+      if (!data2) return { statusCode: 400, body: { success: false, error: "Invalid record details." } };
+      payload.data = data2;
+    }
+  } else {
+    const record = body.record || {};
+    const department = normalizeDepartment(record.department);
+    if (!department) {
+      return { statusCode: 400, body: { success: false, error: "Unknown department." } };
+    }
+    const validationError = validateFields({
+      category: record.category,
+      title: record.title,
+      status: record.status,
+      priority: record.priority
+    });
+    if (validationError) return { statusCode: 400, body: { success: false, error: validationError } };
+    const data2 = sanitizeData(record.data);
+    if (!data2) return { statusCode: 400, body: { success: false, error: "Invalid record details." } };
+    const section = isGenderSeparatedDepartment(department) && (record.section === "male" || record.section === "female") ? record.section : null;
+    payload = {
+      department,
+      section,
+      category: String(record.category).trim(),
+      title: String(record.title).trim(),
+      status: String(record.status).trim(),
+      priority: String(record.priority || "medium"),
+      data: data2
+    };
+  }
+  recordTestAuditLog(
+    "department_record_write",
+    session.adminEmail,
+    session.adminId,
+    session.headEmail,
+    session.department,
+    session.section,
+    sessionToken,
+    isUpdate ? `Workspace record ${body.id} updated (test mode)` : "Workspace record created (test mode)"
+  );
+  const query = isUpdate ? supabaseAdmin.from("department_records").update(payload).eq("id", body.id) : supabaseAdmin.from("department_records").insert(payload);
+  const { data, error } = await query.select("*").maybeSingle();
+  if (error) {
+    const missing = isMissingTable(error.code, error.message);
+    return {
+      statusCode: missing ? 409 : 400,
+      body: {
+        success: false,
+        code: error.code,
+        error: missing ? MISSING_TABLE_MESSAGE : error.message
+      }
+    };
+  }
+  if (!data) {
+    return {
+      statusCode: 404,
+      body: { success: false, error: "The workspace record was not found." }
+    };
+  }
+  return { statusCode: 200, body: { success: true, record: data } };
+}
+async function handleTestSessionRecordDelete(sessionToken, body) {
+  const session = verifyTestSession(sessionToken);
+  if (!session) {
+    return {
+      statusCode: 401,
+      body: { success: false, error: "Unauthorized: a valid Super IT test session is required." }
+    };
+  }
+  const id = String(body.id || "").trim();
+  if (!id) {
+    return { statusCode: 400, body: { success: false, error: "A record id is required." } };
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) {
+    return {
+      statusCode: 503,
+      body: {
+        success: false,
+        error: "The server-side Supabase service role key is not configured, so test-mode records cannot be deleted."
+      }
+    };
+  }
+  recordTestAuditLog(
+    "department_record_write",
+    session.adminEmail,
+    session.adminId,
+    session.headEmail,
+    session.department,
+    session.section,
+    sessionToken,
+    `Workspace record ${id} deleted (test mode)`
+  );
+  const { data, error } = await supabaseAdmin.from("department_records").delete().eq("id", id).select("id");
+  if (error) {
+    const missing = isMissingTable(error.code, error.message);
+    return {
+      statusCode: missing ? 409 : 400,
+      body: {
+        success: false,
+        code: error.code,
+        error: missing ? MISSING_TABLE_MESSAGE : error.message
+      }
+    };
+  }
+  if (!data || data.length === 0) {
+    return { statusCode: 404, body: { success: false, error: "The workspace record was not found." } };
+  }
+  return { statusCode: 200, body: { success: true, deleted: data.length } };
+}
+
 // serverless/super-admin.ts
 async function parseJsonBody(req) {
   if (req.body && typeof req.body === "object") {
@@ -2221,6 +2459,25 @@ async function handler(req, res) {
       const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
       const body = await parseJsonBody(req);
       const result = await handleTestSessionUpdate(token, body);
+      return res.status(result.statusCode).json(result.body);
+    }
+    if (action === "test-records") {
+      const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+      const dept = url.searchParams.get("department") || void 0;
+      const sec = url.searchParams.get("section") || void 0;
+      const result = await handleTestSessionRecords(token, { department: dept, section: sec });
+      return res.status(result.statusCode).json(result.body);
+    }
+    if (action === "test-record-save") {
+      const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+      const body = await parseJsonBody(req);
+      const result = await handleTestSessionRecordSave(token, body);
+      return res.status(result.statusCode).json(result.body);
+    }
+    if (action === "test-record-delete") {
+      const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+      const body = await parseJsonBody(req);
+      const result = await handleTestSessionRecordDelete(token, body);
       return res.status(result.statusCode).json(result.body);
     }
     if (scope === "admins" || action.startsWith("admin-")) {

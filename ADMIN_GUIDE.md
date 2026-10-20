@@ -40,6 +40,16 @@ Local development: copy `.env.example` to `.env.local`, fill both values, `npm i
   - Head Portal (`/head`) authenticates with genuine Supabase Auth passwords. `.env.local` / Vercel values: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and the server-only `SUPABASE_SERVICE_ROLE_KEY`. The old file-backed `HeadStore` and `/api/head-auth` login are local-development fallbacks only and are disabled on Vercel.
   - If you already ran an older `department_heads` migration, run `supabase/migration_department_heads_repair.sql` once. It only adds missing columns, backfills `user_id`, and keeps RLS enabled.
 
+## Department workspaces (required one-time SQL)
+
+Every head dashboard now has its own department workspace (tasks, campaigns, coverage, incidents, rosters, shifts, sponsor tasks, venue plans, run-of-show, directives, support tickets, …). All of it is stored in one shared table, `public.department_records`, and scoped by Row Level Security.
+
+1. Open Supabase → SQL Editor → New query.
+2. Paste the whole of `supabase/migration_department_workspaces.sql` and run it once. It is idempotent and additive: it never deletes or renames registration data and inserts no sample rows.
+3. Reload `/head`. The SQL Editor prints `department_records exists: true` and the policy count at the end.
+
+Until that file is run, workspaces show an explicit setup error instead of pretending to save. The migration also tightens `public.team_registrations` so that **only Media/Press, Security, and Volunteers heads** can read or update registrations; the other eight departments are blocked in PostgreSQL, not just in the sidebar.
+
 ## Weak points you still own
 
 - **Public sign-ups off** (step 3). Strong unique password + MFA: there is no login rate limit beyond Supabase's own.

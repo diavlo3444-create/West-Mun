@@ -3,8 +3,13 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 // Both values are PUBLIC by design (the "anon" key is only a doorway; the
 // Row Level Security rules in supabase/schema.sql protect the data).
 // NEVER put the Supabase "service_role" key anywhere in this project.
-let rawUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
-const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+// Vite injects import.meta.env at build time. The optional fallback keeps the
+// module importable under plain Node (tests, scripts) where import.meta.env is
+// undefined, without changing browser behaviour.
+const env =
+  (import.meta as unknown as { env?: Record<string, string | undefined> }).env || {};
+let rawUrl = (env.VITE_SUPABASE_URL as string | undefined)?.trim();
+const rawKey = (env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
 
 // If rawUrl is not a valid https URL (e.g. if VITE_SUPABASE_URL was set to sb_publishable key or project ref),
 // derive the https project URL from the JWT anon key ref or format it:
