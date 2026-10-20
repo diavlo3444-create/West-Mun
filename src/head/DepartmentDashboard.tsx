@@ -32,6 +32,7 @@ import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 import { HeadSponsorsManager } from './HeadSponsorsManager';
 import { HeadInquiriesManager } from './HeadInquiriesManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
+import { OperationsWorkspace } from './OperationsWorkspace';
 import { WorkspaceModuleGrid, WorkspaceOverview } from './WorkspaceOverview';
 import {
   createDepartmentRecord,
@@ -462,6 +463,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
     ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
+    { id: 'operations', label: 'Operations studio', icon: Users },
     { id: 'department', label: 'Assignment', icon: Building2 },
   ];
 
@@ -644,6 +646,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
         {view === 'inquiries' && isHr && (
           <HeadInquiriesManager headName={headName} headEmail={headEmail} />
+        )}
+
+        {view === 'operations' && (
+          <OperationsWorkspace department={department} section={section} testToken={testMode?.token || null} />
         )}
 
         {view === 'website-editor' && (
