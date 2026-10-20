@@ -28,6 +28,8 @@ async function boot() {
     Page = (await import('./head/HeadPortal')).default;
   } else if (path === '/signup') {
     Page = (await import('./pages/SignupPage')).default;
+  } else if (path === '/login') {
+    Page = (await import('./pages/LoginPage')).default;
   } else if (path === '/volunteer' || path === '/media' || path === '/security') {
     Page = (await import('./team/TeamMemberPortal')).default;
   } else if (path === '/terms') {
