@@ -669,14 +669,20 @@ const handleSignOut = useCallback(async () => {
       : assignment.section;
 
   return (
-    <DepartmentDashboard
-      department={activeDept}
-      section={activeSec}
-      headName={assignment.headName || undefined}
-      headEmail={headUser.email}
-      initialView={initialView}
-      testMode={testMode}
-      onSignOut={handleSignOut}
-    />
+    <>
+      <div className="flex items-center justify-end gap-3 border-b border-[#d4af37]/20 bg-[#070707] px-4 py-3">
+        <a href="/pass" className="rounded-md border border-[#d4af37]/35 px-3 py-2 text-xs font-medium text-[#e6cc78] hover:bg-[#d4af37]/10">My QR Pass</a>
+        {(String(activeDept).toLowerCase() === "security" || String(activeDept).toLowerCase() === "security_protocol") && <a href="/scanner" className="rounded-md bg-[#d4af37] px-3 py-2 text-xs font-semibold text-black">Open Scanner</a>}
+      </div>
+      <DepartmentDashboard
+        department={activeDept}
+        section={activeSec}
+        headName={assignment.headName || undefined}
+        headEmail={headUser.email}
+        initialView={initialView}
+        testMode={testMode}
+        onSignOut={handleSignOut}
+      />
+    </>
   );
 }
