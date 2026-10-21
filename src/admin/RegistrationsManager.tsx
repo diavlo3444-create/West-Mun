@@ -435,26 +435,32 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     const deletedName = activeItem.full_name;
 
     setSaving(true);
-    if (activeItem._type === 'team') {
-      // Remove the linked decision first because its FK intentionally restricts deleting the registration.
-      const { error: decisionError } = await supabase
-        .from('wm_staffing_decisions')
-        .delete()
-        .eq('registration_id', activeItem.id);
-      if (decisionError) {
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
         setSaving(false);
-        setModalNotice({ type: 'error', text: explainError(decisionError) });
+        setModalNotice({ type: 'error', text: 'Your session expired. Sign in again, then retry deletion.' });
         setPendingAction(null);
         return;
       }
-    }
-
-    const table = activeItem._type === 'delegate' ? 'delegates' : 'team_registrations';
-    const { error: deleteError } = await supabase.from(table).delete().eq('id', activeItem.id);
-    setSaving(false);
-
-    if (deleteError) {
-      setModalNotice({ type: 'error', text: explainError(deleteError) });
+      const response = await fetch('/api/super-admin?action=delete-application', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({ id: activeItem.id, type: activeItem._type }),
+      });
+      const result = await response.json().catch(() => ({}));
+      setSaving(false);
+      if (!response.ok || !result.success) {
+        setModalNotice({ type: 'error', text: result.error || 'The server could not delete this application.' });
+        setPendingAction(null);
+        return;
+      }
+    } catch (error) {
+      setSaving(false);
+      setModalNotice({ type: 'error', text: error instanceof Error ? error.message : 'Application deletion failed.' });
       setPendingAction(null);
       return;
     }
