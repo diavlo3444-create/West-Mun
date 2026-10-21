@@ -188,8 +188,9 @@ export default function ScannerPage() {
                 <button onClick={() => setDirection("exit")} className={direction === "exit" ? "rounded-md bg-[#d4af37] px-3 py-2 text-sm font-semibold text-black" : "rounded-md px-3 py-2 text-sm text-neutral-400"}>Check out</button>
               </div>
               <div className="overflow-hidden rounded-xl border border-white/10 bg-black p-2"><div id="westmun-qr-reader" className="min-h-16 w-full" /></div>
+              <p className="mb-3 text-xs leading-relaxed text-neutral-400">When you click <span className="font-semibold text-neutral-200">Allow camera in Chrome</span>, Chrome may show its official camera permission popup. Choose <span className="font-semibold text-neutral-200">Allow</span> to start scanning. WEST MUN never receives camera access unless your browser grants it.</p>
               <div className="mt-4 flex gap-2">
-                <button onClick={startCamera} disabled={scanning || busy} className="flex flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-[#e5c158] to-[#aa8232] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"><Camera className="h-4 w-4" /> {scanning ? "Camera active…" : "Start camera"}</button>
+                <button onClick={startCamera} disabled={scanning || busy} className="flex flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-[#e5c158] to-[#aa8232] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"><Camera className="h-4 w-4" /> {scanning ? "Camera active…" : "Allow camera in Chrome"}</button>
                 <button onClick={() => setScanning(false)} disabled={!scanning} className="flex items-center justify-center gap-2 rounded-md border border-white/15 px-4 py-3 text-sm text-neutral-300 disabled:opacity-40"><CameraOff className="h-4 w-4" /> Stop</button>
               </div>
               <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
