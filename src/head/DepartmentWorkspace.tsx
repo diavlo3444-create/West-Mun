@@ -348,6 +348,10 @@ export const DepartmentWorkspace: React.FC<DepartmentWorkspaceProps> = ({
     setToast({ message: 'Record deleted.', tone: 'success' });
   }, [pendingDelete, onDelete]);
 
+  const handleCloseForm = useCallback(() => {
+    if (!saving) setFormOpen(false);
+  }, [saving]);
+
   const statusOptions = useMemo(() => {
     const values = [...module.statuses];
     for (const record of moduleRecords) {
@@ -660,9 +664,7 @@ export const DepartmentWorkspace: React.FC<DepartmentWorkspaceProps> = ({
 
       <Modal
         open={formOpen}
-        onClose={() => {
-          if (!saving) setFormOpen(false);
-        }}
+        onClose={handleCloseForm}
         eyebrow={editing ? 'Edit record' : 'New record'}
         title={editing ? `Edit ${module.titleLabel.toLowerCase()}` : `Add ${module.titleLabel.toLowerCase()}`}
         description={`Saved to Supabase for the ${department} workspace.`}
@@ -670,7 +672,7 @@ export const DepartmentWorkspace: React.FC<DepartmentWorkspaceProps> = ({
         closeOnBackdrop={!saving}
         footer={
           <>
-            <button type="button" onClick={() => setFormOpen(false)} className={btnSecondary} disabled={saving}>
+            <button type="button" onClick={handleCloseForm} className={btnSecondary} disabled={saving}>
               Cancel
             </button>
             <button type="button" onClick={submit} className={btnPrimary} disabled={saving}>

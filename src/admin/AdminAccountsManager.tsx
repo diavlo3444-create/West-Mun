@@ -163,6 +163,13 @@ export const AdminAccountsManager: React.FC<AdminAccountsManagerProps> = ({
     setFormError('');
   };
 
+  const handleCloseCreateModal = useCallback(() => {
+    if (!creating) {
+      setCreateModalOpen(false);
+      setFormError('');
+    }
+  }, [creating]);
+
   /**
    * Create a normal Admin account
    */
@@ -752,12 +759,7 @@ export const AdminAccountsManager: React.FC<AdminAccountsManagerProps> = ({
       {/* ------------------------------------------------------------------ */}
       <Modal
         open={createModalOpen}
-        onClose={() => {
-          if (!creating) {
-            setCreateModalOpen(false);
-            setFormError('');
-          }
-        }}
+        onClose={handleCloseCreateModal}
         title="Create Administrator Account"
         eyebrow="SECRETARIAT ORGANISER PROVISIONING"
         description="Creates a genuine Supabase Auth user with confirmed email and grants normal Admin privileges for WEST MUN 2027 operations."

@@ -344,6 +344,14 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
     }
   };
 
+  const handleClosePosModal = useCallback(() => {
+    setIsPosModalOpen(false);
+  }, []);
+
+  const handleCloseTaskModal = useCallback(() => {
+    setIsTaskModalOpen(false);
+  }, []);
+
   // Open Position Modal (Create)
   const handleOpenCreatePos = (parentId?: string | null) => {
     setEditingPosition(null);
@@ -906,7 +914,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
       {/* ========================================================================= */}
       <Modal
         open={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
+        onClose={handleCloseTaskModal}
         size="md"
         eyebrow="Department Operational Assignment"
         title={editingTask ? 'Edit Role / Task Assignment' : 'Assign Role & Responsibilities'}
@@ -915,7 +923,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
           <>
             <button
               type="button"
-              onClick={() => setIsTaskModalOpen(false)}
+              onClick={handleCloseTaskModal}
               className={btnSecondary}
               disabled={saving}
             >
@@ -1111,7 +1119,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
       {/* ========================================================================= */}
       <Modal
         open={isPosModalOpen}
-        onClose={() => setIsPosModalOpen(false)}
+        onClose={handleClosePosModal}
         size="md"
         eyebrow="Organizational Hierarchy"
         title={editingPosition ? 'Edit Position' : 'Create Organizational Position'}
@@ -1120,7 +1128,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
           <>
             <button
               type="button"
-              onClick={() => setIsPosModalOpen(false)}
+              onClick={handleClosePosModal}
               className={btnSecondary}
               disabled={saving}
             >

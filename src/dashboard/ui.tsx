@@ -558,28 +558,68 @@ export function Modal({
   const titleId = useId();
   const descriptionId = useId();
 
+  // Stable callback ref: ensures effect does NOT re-run on parent re-renders/keystrokes
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Track the element that was focused BEFORE the modal opened so we can restore it on close
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    // Capture the element focused before opening
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
+    // Initial autofocus: runs once when modal transitions to open
     const focusTimer = window.setTimeout(() => {
       const root = panelRef.current;
       if (!root) return;
-      const target =
-        root.querySelector<HTMLElement>('[data-autofocus]') ||
-        root.querySelector<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        );
-      target?.focus();
-    }, 30);
+
+      // Guard: if user is already focused on an element inside this modal, never steal focus
+      if (root.contains(document.activeElement)) {
+        return;
+      }
+
+      // Priority 1: explicitly marked autofocus element
+      const autofocusEl = root.querySelector<HTMLElement>('[data-autofocus]');
+      if (autofocusEl && typeof autofocusEl.focus === 'function') {
+        autofocusEl.focus();
+        return;
+      }
+
+      // Priority 2: first interactive form control inside modal body (never the X close button)
+      const bodyContent = root.querySelector<HTMLElement>('.wm-modal-body');
+      const searchScope = bodyContent || root;
+      const firstFormInput = searchScope.querySelector<HTMLElement>(
+        'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])'
+      );
+      if (firstFormInput && typeof firstFormInput.focus === 'function') {
+        firstFormInput.focus();
+        return;
+      }
+
+      // Priority 3: first action button in modal body or footer
+      const firstBodyBtn = searchScope.querySelector<HTMLElement>(
+        'button:not([disabled]):not([data-modal-close]), [href], [tabindex]:not([tabindex="-1"])'
+      );
+      if (firstBodyBtn && typeof firstBodyBtn.focus === 'function') {
+        firstBodyBtn.focus();
+        return;
+      }
+
+      // Priority 4: fallback to close button only if modal has no interactive body children
+      const closeBtn = root.querySelector<HTMLElement>('[data-modal-close]');
+      closeBtn?.focus?.();
+    }, 40);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab' || !panelRef.current) return;
@@ -608,9 +648,13 @@ export function Modal({
       window.clearTimeout(focusTimer);
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
-      previouslyFocused?.focus?.();
+      // Restore previous focus only when the modal is closed or unmounted
+      const prev = previouslyFocusedRef.current;
+      if (prev && typeof prev.focus === 'function') {
+        prev.focus();
+      }
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -658,11 +702,18 @@ export function Modal({
               </div>
             )}
           </div>
-          <button type="button" onClick={onClose} className={iconButtonCls} aria-label="Close dialog">
-            <X className="h-4 w-4" />
+          <button
+            type="button"
+            data-modal-close
+            onClick={onClose}
+            className={iconButtonCls}
+            aria-label="Close dialog"
+            tabIndex={0}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
-        <div className="wm-scroll min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
+        <div className="wm-modal-body wm-scroll min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
         {footer && (
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-white/[0.07] bg-[#0a0a0c]/70 px-5 py-3.5 sm:px-6">
             {footer}
