@@ -78,7 +78,7 @@ export default function PassPage() {
               <div className="flex flex-col items-center px-6 py-7">
                 <div className="rounded-xl bg-white p-3 shadow-xl"><img src={qrImage} alt="Your unique WEST MUN QR pass" className="h-64 w-64 max-w-full" /></div>
                 <h2 className="mt-5 text-center font-serif text-2xl text-white">{pass.full_name}</h2>
-                <p className="mt-1 text-sm text-[#d4af37]">{pass.account_role === "admin" ? "WEST MUN Administrator" : pass.account_role === "head" ? "Executive / Department Head" : "WEST MUN Team Member"}</p>
+                <p className="mt-1 text-sm text-[#d4af37]">{pass.account_role === "admin" ? "WEST MUN Administrator" : pass.account_role === "head" ? "Executive / Department Head" : pass.account_role === "team_member" ? "WEST MUN Team Member" : pass.account_role.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}</p>
                 {(pass.team || pass.section) && <p className="mt-1 text-xs text-neutral-400">{[pass.team, pass.section].filter(Boolean).join(" · ")}</p>}
                 <div className="mt-5 w-full rounded-lg border border-white/10 bg-black/25 p-3 text-center">
                   <p className="text-xs text-neutral-400">Entry status</p>
