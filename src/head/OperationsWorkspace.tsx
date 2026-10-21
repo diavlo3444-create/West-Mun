@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, BriefcaseBusiness, Check, ChevronDown, LoaderCircle, Plus, RefreshCw, Trash2, Users, Video, Clock3 } from 'lucide-react';
 import type { DepartmentKey, SectionKey } from './departments';
+import { TeamDeploymentPlanner } from './TeamDeploymentPlanner';
 import {
   addProjectMember, assignPersonToShift, createDepartmentPerson, createDepartmentProject,
   createDepartmentShift, createProjectStage, createProjectTask, deleteDepartmentPerson,
@@ -14,7 +15,7 @@ import {
 } from './services/operationsStore';
 
 type Props = { department: DepartmentKey; section?: SectionKey | null; testToken?: string | null };
-type Tab = 'people' | 'projects' | 'shifts' | 'registrations';
+type Tab = 'people' | 'projects' | 'shifts' | 'registrations' | 'deployment';
 const field = 'w-full rounded-md border border-white/10 bg-[#111115] px-3 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#d4af37] focus:outline-none';
 const button = 'inline-flex items-center justify-center gap-2 rounded-md border border-[#d4af37]/40 bg-[#d4af37]/10 px-3 py-2 text-xs font-semibold text-[#f1d98c] hover:bg-[#d4af37]/20 disabled:opacity-50';
 const panel = 'rounded-lg border border-white/10 bg-[#111115]/90 p-4';
@@ -110,6 +111,7 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
     { id: 'people', label: 'Custom roles & people', icon: <Users size={15}/> },
     { id: 'projects', label: department === 'media_press' ? 'Media production' : department === 'design' ? 'Design projects' : 'Projects & tasks', icon: <Video size={15}/> },
     { id: 'shifts', label: 'Shifts & coverage', icon: <Clock3 size={15}/> },
+    ...(['media_press', 'security', 'volunteers'].includes(department) ? [{ id: 'deployment' as Tab, label: 'Team deployment', icon: <Users size={15}/> }] : []),
     { id: 'registrations', label: 'Registration windows', icon: <BriefcaseBusiness size={15}/> },
   ];
 
@@ -178,6 +180,8 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
         {shifts.map(s=><ShiftCard key={s.id} shift={s} people={people} testToken={effectiveTestToken} refresh={load}/>)}
       </div>
     </div>}
+
+    {tab === 'deployment' && ['media_press', 'security', 'volunteers'].includes(department) && <TeamDeploymentPlanner department={department} section={section}/>}
 
     {tab === 'registrations' && <div className="space-y-3"><div className={panel}><h2 className="font-semibold">Registration windows</h2><p className="mt-1 text-xs text-neutral-400">These controls use the database-backed windows. The database trigger remains the final enforcement layer.</p></div>{windows.length===0&&<div className={panel+' text-sm text-neutral-400'}>No windows returned for this account. This may be an RLS restriction; no changes were made.</div>}{windows.map(w=><div key={w.team} className={panel+' flex flex-wrap items-center justify-between gap-3'}><div><div className="font-medium">{w.team}</div><div className="text-xs text-neutral-500">Updated {new Date(w.updated_at).toLocaleString()}</div></div><button className={button} disabled={busy} onClick={()=>void run(()=>setRegistrationWindowStatus(w.team,!w.is_open,effectiveTestToken), 'Registration window updated.')}>{w.is_open?'Close registration':'Open registration'}</button></div>)}</div>}
     <div className="flex items-center gap-2 text-[11px] text-neutral-500"><LoaderCircle size={12} className={busy?'animate-spin':'hidden'}/> Live database operations · access is still restricted by Supabase RLS.</div>
