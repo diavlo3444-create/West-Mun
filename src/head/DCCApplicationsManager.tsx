@@ -35,7 +35,7 @@ export const DCCApplicationsManager: React.FC = () => {
     if (!supabase) return;
     const next = (settings[key] || 'false').toLowerCase() !== 'true';
     setBusy(key); setMessage('');
-    const {error}=await supabase.from('settings').upsert({key,value:String(next),updated_at:new Date().toISOString()},{onConflict:'key'});
+    const {error}=await supabase.from('settings').update({value:String(next),updated_at:new Date().toISOString()}).eq('key',key);
     if(error) setMessage(error.message); else {setSettings(p=>({...p,[key]:String(next)}));setMessage(next?'Applications opened.':'Applications closed.');}
     setBusy('');
   };
