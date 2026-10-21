@@ -378,12 +378,21 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     }
 
     const applicationTeam = String(record.team || department);
-    const decisionDepartment = applicationTeam === 'media' || applicationTeam === 'media_press'
+    // Canonicalize legacy/display labels before the decision is checked by RLS.
+    const normalizedTeam = applicationTeam.toLowerCase().replace(/[^a-z]/g, '');
+    const decisionDepartment = normalizedTeam.includes('media') || normalizedTeam === 'press'
       ? 'media_press'
-      : applicationTeam === 'volunteer' || applicationTeam === 'volunteers'
+      : normalizedTeam.includes('volunteer')
         ? 'volunteers'
-        : applicationTeam;
-    const decisionSection = record.section || section || 'general';
+        : normalizedTeam.includes('security') || normalizedTeam.includes('protocol')
+          ? 'security'
+          : department;
+    // A section-scoped head must use their assigned section, never trust a
+    // possibly stale section value from a cached application row.
+    if (section && record.section && String(record.section).toLowerCase() !== String(section).toLowerCase()) {
+      return { ok: false, error: `This application belongs to the ${record.section} section, but your head account is assigned to ${section}. Refresh the list or ask the Secretariat to correct the assignment.` };
+    }
+    const decisionSection = section || record.section || 'general';
     // Check for an existing recommendation before writing. Blind upsert can
     // attempt an UPDATE that RLS correctly blocks after Secretariat finalization.
     const { data: existingDecision, error: existingError } = await supabase
@@ -427,8 +436,9 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       : await supabase.from('wm_staffing_decisions').insert(payload);
 
     if (decision.error) {
-      const message = /row-level security|permission denied|policy/i.test(decision.error.message || '')
-        ? 'Supabase blocked this recommendation. The assignment may not match this application’s department/section, or the application may already be finalized. Refresh the page; if it continues, the Secretariat must review the assignment and decision record.'
+      const rawMessage = String(decision.error.message || '');
+      const message = /row-level security|permission denied|policy/i.test(rawMessage)
+        ? `Supabase rejected the recommendation for ${decisionDepartment}/${decisionSection}. Confirm the head account is assigned to this department and section, and that the application is still pending review (not accepted, rejected, or withdrawn). Database detail: ${rawMessage}`
         : explainAccessError(decision.error);
       return { ok: false, error: message };
     }
