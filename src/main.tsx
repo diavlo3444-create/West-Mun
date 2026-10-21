@@ -32,6 +32,10 @@ async function boot() {
     Page = (await import('./pages/LoginPage')).default;
   } else if (path === '/volunteer' || path === '/media' || path === '/security') {
     Page = (await import('./team/TeamMemberPortal')).default;
+  } else if (path === '/pass') {
+    Page = (await import('./pages/PassPage')).default;
+  } else if (path === '/scanner') {
+    Page = (await import('./pages/ScannerPage')).default;
   } else if (path === '/terms') {
     const { LegalPage } = await import('./pages/LegalPage');
     Page = () => <LegalPage kind="terms" />;
