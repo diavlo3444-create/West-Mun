@@ -75,7 +75,7 @@ Deno.serve(async (req: Request) => {
 
 
   if (body.action === "list_members") {
-    const bearer = (req.headers.get("authorization") ?? "").match(/^Bearer\\s+(.+)$/i);
+    const bearer = (req.headers.get("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
     if (!bearer) return json({ error: "Sign in as a WEST MUN admin first." }, 401);
     const auth = await db.auth.getUser(bearer[1]);
     if (auth.error || !auth.data.user) return json({ error: "Your session is invalid or expired." }, 401);
