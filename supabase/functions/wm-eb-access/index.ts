@@ -181,6 +181,40 @@ Deno.serve(async (req: Request) => {
 
     const team = ebRole === "co_head" ? String(reportingHead!.department) : ebRole === "designer" ? "Design" : "Marketing";
     const section = ebRole === "co_head" ? (reportingHead!.section || "Co-Head") : ebRole === "designer" ? "Design Team" : "Marketing Team";
+    // Only the two explicitly designated developer test emails may be recycled.
+    // Delete the old Auth identity only if it is orphaned from every live WEST MUN account table.
+    const reusableTestEmails = new Set(["run3444@gmail.com", "projectexpress35@gmail.com"]);
+    if (reusableTestEmails.has(email)) {
+      let staleUser: { id: string; email?: string } | null = null;
+      for (let page = 1; page <= 20 && !staleUser; page++) {
+        const listed = await db.auth.admin.listUsers({ page, perPage: 1000 });
+        if (listed.error) {
+          console.error("[wm-eb-access] Could not check reusable test account", { code: listed.error.name });
+          return json({ error: "Could not verify this test account safely. Please retry or ask an admin." }, 500);
+        }
+        staleUser = listed.data.users.find((u) => (u.email || "").toLowerCase() === email) || null;
+        if (listed.data.users.length < 1000) break;
+      }
+      if (staleUser) {
+        const [adminRecord, headRecord, passRecord] = await Promise.all([
+          db.from("admins").select("user_id").eq("user_id", staleUser.id).maybeSingle(),
+          db.from("department_heads").select("user_id").eq("user_id", staleUser.id).maybeSingle(),
+          db.from("wm_qr_passes").select("user_id").eq("user_id", staleUser.id).maybeSingle(),
+        ]);
+        if (adminRecord.error || headRecord.error || passRecord.error) {
+          return json({ error: "Could not verify this test account is unused. No account was deleted; please retry." }, 500);
+        }
+        if (adminRecord.data || headRecord.data || passRecord.data) {
+          return json({ error: "This email is already linked to an active WEST MUN record. Sign in with that account or ask an admin." }, 409);
+        }
+        const removed = await db.auth.admin.deleteUser(staleUser.id);
+        if (removed.error) {
+          console.error("[wm-eb-access] Could not recycle orphaned developer test account", { code: removed.error.name });
+          return json({ error: "Could not reset this unused test account safely. Please retry or ask an admin." }, 500);
+        }
+      }
+    }
+
     const created = await db.auth.admin.createUser({
       email, password, email_confirm: true,
       user_metadata: { full_name: fullName, phone, gender },
