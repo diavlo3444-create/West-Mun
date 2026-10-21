@@ -21,6 +21,7 @@ import {
   Globe,
   UserRoundCog,
   QrCode,
+  Crown,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '../lib/supabase';
@@ -35,6 +36,7 @@ import { StatisticsReports } from './StatisticsReports';
 import { SuperAdminManager } from './SuperAdminManager';
 import { AdminAccountsManager } from './AdminAccountsManager';
 import { HeadsManager } from './HeadsManager';
+import { ExecutiveBoardManager } from './ExecutiveBoardManager';
 import { WebsiteEditor } from './WebsiteEditor';
 import { CheckedInPeople } from '../components/CheckedInPeople';
 import { explainError, type Row } from './ui';
@@ -47,6 +49,7 @@ export type NavigationPage =
   | 'dashboard'
   | 'registrations'
   | 'heads'
+  | 'executive-board'
   | 'teams'
   | 'reports'
   | 'admin-accounts'
@@ -552,6 +555,7 @@ export default function AdminApp() {
       items: [
         { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
         { id: 'registrations', label: 'Registrations', icon: Users, badge: pendingCount },
+        { id: 'executive-board', label: 'Executive Board', icon: Crown },
         { id: 'heads', label: 'Heads', icon: UserRoundCog },
         { id: 'teams', label: 'Departments', icon: Layers },
         { id: 'reports', label: 'Reports', icon: BarChart3 },
@@ -648,6 +652,8 @@ export default function AdminApp() {
             isSuperAdmin={Boolean(isAdmin && isSuperAdmin)}
           />
         )}
+
+        {page === 'executive-board' && <ExecutiveBoardManager />}
 
         {page === 'heads' && (
           <HeadsManager
