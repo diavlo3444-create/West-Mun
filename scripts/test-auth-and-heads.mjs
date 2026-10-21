@@ -28,6 +28,8 @@ const tokens = new Map([
 const state = {
   users: [...users],
   heads: [],
+  qrPasses: [],
+  signupLinks: [],
   headColumnsOk: false,
   generateLinkCalls: 0,
   createUserCalls: 0,
@@ -81,6 +83,15 @@ const server = createServer(async (req, res) => {
     return json(res, 200, user);
   }
 
+  if (path.startsWith('/auth/v1/admin/users/') && req.method === 'DELETE') {
+    const uid = path.split('/').pop();
+    const before = state.users.length;
+    state.users = state.users.filter((u) => u.id !== uid);
+    if (before === state.users.length) return json(res, 404, { message: 'User not found' });
+    tokens.delete('token-affected');
+    return json(res, 200, { id: uid });
+  }
+
   if (path === '/auth/v1/admin/generate_link' && req.method === 'POST') {
     state.generateLinkCalls += 1;
     const body = await readBody(req);
@@ -127,6 +138,32 @@ const server = createServer(async (req, res) => {
   if (path === '/rest/v1/admins' && req.method === 'GET') {
     const uid = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
     return json(res, 200, adminIds.has(uid) ? [{ user_id: uid }] : []);
+  }
+
+  if (path === '/rest/v1/admins' && req.method === 'DELETE') {
+    const uid = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
+    adminIds.delete(uid);
+    return json(res, 200, []);
+  }
+
+  if (path === '/rest/v1/wm_eb_signup_links' && req.method === 'PATCH') {
+    const body = await readBody(req);
+    const creator = (url.searchParams.get('created_by') || '').replace(/^eq\./, '');
+    state.signupLinks = state.signupLinks.map((row) => row.created_by === creator ? { ...row, ...body } : row);
+    return json(res, 200, []);
+  }
+
+  if (path === '/rest/v1/wm_qr_passes' && req.method === 'DELETE') {
+    const uid = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
+    state.qrPasses = state.qrPasses.filter((row) => row.user_id !== uid);
+    return json(res, 200, []);
+  }
+
+  if (path === '/rest/v1/wm_qr_passes' && req.method === 'PATCH') {
+    const body = await readBody(req);
+    const reportingHeadId = (url.searchParams.get('reporting_head_id') || '').replace(/^eq\./, '');
+    state.qrPasses = state.qrPasses.map((row) => row.reporting_head_id === reportingHeadId ? { ...row, ...body } : row);
+    return json(res, 200, []);
   }
 
   // --- PostgREST: department_heads ---
@@ -419,12 +456,12 @@ check('deactivating a department-head assignment succeeds without an Auth ban', 
 check('assignment deactivation does not change Auth ban state', !(state.authAdminUpdates || []).some((entry) => entry.uid === AFFECTED && Object.hasOwn(entry.body || {}, 'ban_duration')), state.authAdminUpdates);
 
 r = await call('DELETE', '/api/super-admin?id=' + AFFECTED, { token: 'token-super', body: {} });
-check('authorized super admin can delete a head assignment', r.status === 200 && r.body?.success === true, r);
-check('deletion removes only the department_heads row', !state.heads.some((h) => h.user_id === AFFECTED), state.heads);
-check('deleting a head assignment does not ban or update the Auth user', !(state.authAdminUpdates || []).some((entry) => entry.uid === AFFECTED && Object.hasOwn(entry.body || {}, 'ban_duration')), state.authAdminUpdates);
-check('deleting a head assignment preserves the Auth user', state.users.some((u) => u.id === AFFECTED), state.users);
-r = await call('DELETE', '/api/super-admin?id=' + AFFECTED, { token: 'token-admin', body: {} });
-check('non-super-admin cannot delete a head assignment', r.status === 403, r);
+check('authorized super admin can permanently delete a head account', r.status === 200 && r.body?.success === true, r);
+check('deletion removes the department_heads assignment', !state.heads.some((h) => h.user_id === AFFECTED), state.heads);
+check('successful deletion removes the Supabase Auth identity', !state.users.some((u) => u.id === AFFECTED), state.users);
+check('successful deletion does not need a fallback Auth ban', !(state.authAdminUpdates || []).some((entry) => entry.uid === AFFECTED && Object.hasOwn(entry.body || {}, 'ban_duration')), state.authAdminUpdates);
+r = await call('DELETE', '/api/super-admin?id=' + ADMIN, { token: 'token-admin', body: {} });
+check('non-super-admin cannot delete a head account', r.status === 403, r);
 
 // ---------------------------------------------------------------------------
 // 4. Configuration fails closed
