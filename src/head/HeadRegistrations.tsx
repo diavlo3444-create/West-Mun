@@ -21,6 +21,7 @@ import {
   HeartHandshake,
 } from 'lucide-react';
 import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
+import { RegistrationExtraPhotos, stripExtraPhotoMarker } from '../components/RegistrationExtraPhotos';
 import { downloadText, toCsv } from '../lib/safe';
 import {
   EmptyState,
@@ -856,10 +857,11 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                   Statement of motivation
                 </h3>
                 <div className="wm-scroll max-h-32 overflow-y-auto whitespace-pre-wrap rounded-md border border-white/[0.07] bg-[#101013] p-3 text-[11.5px] leading-relaxed text-neutral-300">
-                  {activeItem.statement}
+                  {stripExtraPhotoMarker(activeItem.statement)}
                 </div>
               </div>
             )}
+            <RegistrationExtraPhotos statement={activeItem.statement} />
 
             {/* Security Team Assessment Section (All 4 Questions & Answers) */}
             {(() => {
