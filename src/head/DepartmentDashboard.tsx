@@ -35,6 +35,7 @@ import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 import { HeadSponsorsManager } from './HeadSponsorsManager';
 import { HeadInquiriesManager } from './HeadInquiriesManager';
 import { DCCCommitteeManager } from './DCCCommitteeManager';
+import { DCCApplicationsManager } from './DCCApplicationsManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
 import { OperationsWorkspace } from './OperationsWorkspace';
 import { WorkspaceModuleGrid, WorkspaceOverview } from './WorkspaceOverview';
@@ -73,6 +74,7 @@ type HeadView =
   | 'department'
   | 'sponsors'
   | 'inquiries'
+  | 'dcc-applications'
   | string;
 
 function explainAccessError(error: { code?: string; message?: string } | null | undefined): string {
@@ -122,6 +124,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const [view, setView] = useState<HeadView>(() => {
     if (initialView === 'sponsors' && isPr) return 'sponsors';
     if (initialView === 'inquiries' && isHr) return 'inquiries';
+    if (initialView === 'dcc-applications' && department === 'dcc') return 'dcc-applications';
+    if (initialView === 'dcc-committees' && department === 'dcc') return 'dcc-committees';
     if (initialView === 'roles' && rolesAccess) return 'roles';
     if (initialView === 'department') return 'department';
     if (initialView === 'registrations' && registrationAccess) return 'registrations';
@@ -502,6 +506,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (id === 'sponsors' && !isPr) return;
     if (id === 'inquiries' && !isHr) return;
     if (id === 'dcc-committees' && !committeeAccess) return;
+    if (id === 'dcc-applications' && !committeeAccess) return;
     setView(id);
   };
 
@@ -524,6 +529,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(rolesAccess ? [{ id: 'roles', label: 'Roles', icon: Network }] : []),
     ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
     ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
+    ...(committeeAccess ? [{ id: 'dcc-applications', label: 'Applications', icon: Users }] : []),
     ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
     ...(operationsAccess ? [{ id: 'operations', label: 'Operations studio', icon: Users }] : []),
@@ -552,6 +558,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
                 ? 'Inquiries & Messages'
                 : view === 'dcc-committees'
                   ? 'Committee Management'
+                : view === 'dcc-applications'
+                  ? 'Chair & Delegate Applications'
                 : view === 'department'
                   ? 'Assignment'
                   : activeModule?.label || 'Workspace';
@@ -727,6 +735,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         )}
 
         {view === 'dcc-committees' && committeeAccess && <DCCCommitteeManager />}
+        {view === 'dcc-applications' && committeeAccess && <DCCApplicationsManager />}
 
         {view === 'operations' && operationsAccess && (
           <OperationsWorkspace department={department} section={section} testToken={testMode?.token || null} />
