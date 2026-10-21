@@ -1262,6 +1262,10 @@ export async function handleDeleteHead(
         return { statusCode: 400, body: { success: false, error: 'Primary IT Super Admin account cannot be deleted.' } };
       }
 
+      // Transfer and disable any reusable signup link created by this identity before deleting it.
+      const links = await supabaseAdmin.from('wm_eb_signup_links').update({ created_by: auth.user.id, active: false }).eq('created_by', headId);
+      if (links.error) return { statusCode: 400, body: { success: false, error: `Could not safely transfer signup-link ownership: ${links.error.message}` } };
+
       // Remove every WEST MUN access assignment tied to this identity, then delete Auth.
       const passDelete = await supabaseAdmin.from('wm_qr_passes').delete().eq('user_id', headId);
       if (passDelete.error) return { statusCode: 400, body: { success: false, error: `Could not remove the account's EB/pass record: ${passDelete.error.message}` } };
@@ -1282,7 +1286,8 @@ export async function handleDeleteHead(
         const authDelete = await supabaseAdmin.auth.admin.deleteUser(headId);
         if (authDelete.error) {
           console.error('[SuperAdmin] Auth deletion failed for department head', { code: authDelete.error.name });
-          return { statusCode: 500, body: { success: false, error: 'Role assignments were removed, but the Supabase login could not be deleted. Retry this deletion; the system did not report success.' } };
+          await supabaseAdmin.auth.admin.updateUserById(headId, { ban_duration: '876000h', app_metadata: { wm_role: 'deleted', wm_access_revoked: true } }).catch(() => null);
+          return { statusCode: 500, body: { success: false, error: 'Role assignments were removed. Supabase could not fully delete the login, so access was revoked and the deletion must be retried.' } };
         }
       }
 
@@ -1747,7 +1752,8 @@ export async function handleDeleteAdmin(
         const authDelete = await supabaseAdmin.auth.admin.deleteUser(targetId);
         if (authDelete.error) {
           console.error('[SuperAdmin] Auth deletion failed for administrator', { code: authDelete.error.name });
-          return { statusCode: 500, body: { success: false, error: 'Role assignments were removed, but the Supabase login could not be deleted. Retry this deletion; the system did not report success.' } };
+          await supabaseAdmin.auth.admin.updateUserById(targetId, { ban_duration: '876000h', app_metadata: { wm_role: 'deleted', wm_access_revoked: true } }).catch(() => null);
+          return { statusCode: 500, body: { success: false, error: 'Role assignments were removed. Supabase could not fully delete the login, so access was revoked and the deletion must be retried.' } };
         }
       }
 
