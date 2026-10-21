@@ -9,6 +9,7 @@ import {
   LogOut,
   Globe,
   Network,
+  QrCode,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { WebsiteEditor } from '../admin/WebsiteEditor';
@@ -500,6 +501,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   };
 
   const navigate = (id: string) => {
+    if (id === 'security-website') { window.location.assign('/scanner'); return; }
     if (id === 'operations' && !operationsAccess) return;
     if (id === 'registrations' && !registrationAccess) return;
     if (id === 'roles' && !rolesAccess) return;
@@ -534,6 +536,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
     ...(operationsAccess ? [{ id: 'operations', label: 'Operations studio', icon: Users }] : []),
     { id: 'department', label: 'Assignment', icon: Building2 },
+    { id: 'security-website', label: 'Security Website', icon: QrCode },
   ];
 
   const navGroups: NavGroup[] = [
