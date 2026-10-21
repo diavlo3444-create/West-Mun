@@ -116,6 +116,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   onRefresh,
   selectedApp,
   onClearSelectedApp,
+  isSuperAdmin = false,
 }) => {
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -430,11 +431,25 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   };
 
   const deleteApplication = async () => {
-    if (!activeItem || !supabase) return;
-    const table = activeItem._type === 'delegate' ? 'delegates' : 'team_registrations';
+    if (!isSuperAdmin || !activeItem || !supabase) return;
     const deletedName = activeItem.full_name;
 
     setSaving(true);
+    if (activeItem._type === 'team') {
+      // Remove the linked decision first because its FK intentionally restricts deleting the registration.
+      const { error: decisionError } = await supabase
+        .from('wm_staffing_decisions')
+        .delete()
+        .eq('registration_id', activeItem.id);
+      if (decisionError) {
+        setSaving(false);
+        setModalNotice({ type: 'error', text: explainError(decisionError) });
+        setPendingAction(null);
+        return;
+      }
+    }
+
+    const table = activeItem._type === 'delegate' ? 'delegates' : 'team_registrations';
     const { error: deleteError } = await supabase.from(table).delete().eq('id', activeItem.id);
     setSaving(false);
 
@@ -447,7 +462,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     setActiveItem(null);
     setPendingAction(null);
     onClearSelectedApp?.();
-    setToast({ message: `${deletedName}'s record was permanently deleted.`, tone: 'success' });
+    setToast({ message: `${deletedName}'s application was permanently deleted. Its email can now be used for another section.`, tone: 'success' });
     onRefresh();
   };
 
@@ -1047,14 +1062,14 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         footer={
           activeItem ? (
             <>
-              <button
+              {isSuperAdmin && <button
                 type="button"
                 onClick={() => setPendingAction('delete')}
                 className="mr-auto inline-flex items-center gap-1.5 text-[10.5px] text-neutral-400 transition-colors hover:text-rose-300"
               >
                 <Trash2 className="h-3 w-3" aria-hidden="true" />
-                Delete record
-              </button>
+                Delete application
+              </button>}
               <button type="button" onClick={closeModal} className={btnSecondary} disabled={saving}>
                 Close
               </button>
@@ -1382,7 +1397,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                           ? `The application will be marked approved for ${activeItem._teamLabel}. The applicant record is preserved.`
                           : pendingAction === 'reject'
                             ? `The application will be marked rejected for ${activeItem._teamLabel}. You can reverse this later.`
-                            : 'This removes the record from Supabase permanently. It cannot be undone.'}
+                            : 'This permanently deletes the application and its linked head recommendation/invites. It cannot be undone, and the email can be used for another section.'}
                       </p>
                     </div>
                   </div>
@@ -1401,7 +1416,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                       onClick={() => {
                         if (pendingAction === 'approve') saveApplication('accepted');
                         else if (pendingAction === 'reject') saveApplication('rejected');
-                        else deleteApplication();
+                        else if (pendingAction === 'delete' && isSuperAdmin) deleteApplication();
                       }}
                       disabled={saving}
                       className={pendingAction === 'delete' ? btnDanger : btnPrimary}
