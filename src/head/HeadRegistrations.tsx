@@ -110,6 +110,9 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
   const [signupUrl, setSignupUrl] = useState<string | null>(null);
   const [signupMessage, setSignupMessage] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
+  const [bulkSignupBusy, setBulkSignupBusy] = useState(false);
+  const [bulkSignupLinks, setBulkSignupLinks] = useState<Array<{ signupUrl: string; message: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>>([]);
+  const [bulkSignupNotice, setBulkSignupNotice] = useState<string | null>(null);
 
   const openItem = (record: HeadRegistration) => {
     setActiveItem(record);
@@ -247,15 +250,15 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
     });
   };
 
-  const createSignupLink = async () => {
-    if (!supabase || !activeItem || activeItem.status !== 'accepted' || signupBusy) return;
+  const createSignupLink = async (target: HeadRegistration | null = activeItem) => {
+    if (!supabase || !target || target.status !== 'accepted' || !target.admin_finalized_at || !target.admin_finalized_by || signupBusy) return;
     setSignupBusy(true);
     setSignupUrl(null);
     setSignupMessage(null);
     setSignupNotice(null);
     try {
       const { data, error } = await supabase.functions.invoke('team-signup', {
-        body: { action: 'create', registrationId: activeItem.id },
+        body: { action: 'create', registrationId: target.id },
       });
       if (error || !data?.success || typeof data.signupUrl !== 'string') {
         setSignupNotice(data?.error || error?.message || 'Could not create a signup link.');
@@ -274,6 +277,48 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       setSignupNotice('Could not create the signup link. Try again or contact an admin.');
     } finally {
       setSignupBusy(false);
+    }
+  };
+
+  const bulkSignupCandidates = filtered.filter((record) =>
+    record.status === 'accepted' && Boolean(record.admin_finalized_at) && Boolean(record.admin_finalized_by)
+  );
+
+  const generateBulkSignupLinks = async () => {
+    if (!supabase || bulkSignupBusy || bulkSignupCandidates.length === 0) return;
+    if (bulkSignupCandidates.length > 25) {
+      setBulkSignupNotice('Filter to 25 or fewer finally accepted applications before generating links.');
+      return;
+    }
+    if (!window.confirm(`Generate one-time signup links for ${bulkSignupCandidates.length} finally accepted application(s)? Existing unused links for these applicants will be revoked. No emails will be sent.`)) return;
+    setBulkSignupBusy(true);
+    setBulkSignupNotice(null);
+    setBulkSignupLinks([]);
+    try {
+      const { data, error } = await supabase.functions.invoke('team-signup', {
+        body: { action: 'create_batch', registrationIds: bulkSignupCandidates.map((record) => record.id) },
+      });
+      if (error || !data?.success || !Array.isArray(data.links)) {
+        setBulkSignupNotice(data?.error || error?.message || 'Could not create bulk signup links.');
+        return;
+      }
+      setBulkSignupLinks(data.links);
+      setBulkSignupNotice(`Created ${data.links.length} signup link(s). Copy and send them manually; no emails were sent.`);
+      const messages = data.links.map((link: any) => link.message || link.signupUrl).join('\\n\\n---\\n\\n');
+      try { await navigator.clipboard.writeText(messages); setBulkSignupNotice(`Created and copied ${data.links.length} signup link(s). No emails were sent.`); } catch {}
+    } catch {
+      setBulkSignupNotice('Could not create bulk signup links. Check your connection and try again.');
+    } finally {
+      setBulkSignupBusy(false);
+    }
+  };
+
+  const copyAllBulkSignupLinks = async () => {
+    try {
+      await navigator.clipboard.writeText(bulkSignupLinks.map((link) => link.message || link.signupUrl).join('\\n\\n---\\n\\n'));
+      setBulkSignupNotice(`Copied ${bulkSignupLinks.length} signup link(s). Send them manually; no emails were sent.`);
+    } catch {
+      setBulkSignupNotice('Clipboard access is blocked. Select and copy the links manually.');
     }
   };
 
@@ -338,6 +383,10 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
               Export CSV
             </button>
+            <button type="button" onClick={() => void generateBulkSignupLinks()} disabled={bulkSignupBusy || bulkSignupCandidates.length === 0 || bulkSignupCandidates.length > 25} className={btnSecondary} title="Create one-time signup links for finally accepted applications in your assigned scope.">
+              {bulkSignupBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Link2 className="h-3.5 w-3.5" aria-hidden="true" />}
+              {bulkSignupBusy ? 'Generating links…' : `Generate bulk signup links (${bulkSignupCandidates.length})`}
+            </button>
           </>
         }
       />
@@ -390,6 +439,24 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
           </select>
         </div>
       </div>
+
+      {(bulkSignupNotice || bulkSignupLinks.length > 0) && (
+        <Panel>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-neutral-100">Bulk signup links</h3>
+            <button type="button" onClick={() => void copyAllBulkSignupLinks()} disabled={!bulkSignupLinks.length} className={btnSecondary}>
+              <Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy all links
+            </button>
+          </div>
+          {bulkSignupNotice && <p role="status" className="mt-2 text-[11px] text-neutral-300">{bulkSignupNotice}</p>}
+          {bulkSignupLinks.map((link) => (
+            <div key={link.signupUrl} className="mt-3 rounded-md border border-white/[0.07] bg-black/20 p-3">
+              <p className="text-xs font-medium text-neutral-100">{link.applicantEmail} · {link.team}{link.section ? ` / ${link.section}` : ''}</p>
+              <textarea readOnly rows={3} value={link.message || link.signupUrl} onFocus={(e) => e.currentTarget.select()} className={`${inputCls} mt-2 w-full resize-y text-xs`} aria-label={`Signup message for ${link.applicantEmail}`} />
+            </div>
+          ))}
+        </Panel>
+      )}
 
       <Panel className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3 sm:px-5">
@@ -497,15 +564,29 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                         {formatDate(record.created_at)}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => openItem(record)}
-                          className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] px-2 py-1 text-[10.5px] font-medium text-neutral-400 transition-colors hover:border-[#d4af37]/35 hover:bg-[#d4af37]/[0.06] hover:text-[#e2c258]"
-                          aria-label={`Open ${record.full_name}'s dossier`}
-                        >
-                          <Eye className="h-3 w-3" aria-hidden="true" />
-                          View
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openItem(record)}
+                            className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] px-2 py-1 text-[10.5px] font-medium text-neutral-400 transition-colors hover:border-[#d4af37]/35 hover:bg-[#d4af37]/[0.06] hover:text-[#e2c258]"
+                            aria-label={`Open ${record.full_name}'s dossier`}
+                          >
+                            <Eye className="h-3 w-3" aria-hidden="true" />
+                            Review
+                          </button>
+                          {record.status === 'accepted' && record.admin_finalized_at && record.admin_finalized_by && (
+                            <button
+                              type="button"
+                              onClick={() => { openItem(record); void createSignupLink(record); }}
+                              disabled={signupBusy}
+                              className="inline-flex items-center gap-1 rounded-md border border-[#d4af37]/25 px-2 py-1 text-[10px] font-medium text-[#e2c258] transition-colors hover:bg-[#d4af37]/[0.08] disabled:opacity-50"
+                              aria-label={`Generate signup link for ${record.full_name}`}
+                            >
+                              <Link2 className="h-3 w-3" aria-hidden="true" />
+                              Generate signup link
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
