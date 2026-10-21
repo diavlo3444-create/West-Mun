@@ -62,6 +62,34 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [extraPhotoPaths, setExtraPhotoPaths] = useState<string[]>([]);
+  const [extraPhotoBusy, setExtraPhotoBusy] = useState(false);
+  const [extraPhotoError, setExtraPhotoError] = useState('');
+
+  const uploadExtraPhotos = async (files: FileList | null) => {
+    if (!files?.length) return;
+    if (!supabase) { setExtraPhotoError('Photo uploads are unavailable right now.'); return; }
+    setExtraPhotoBusy(true);
+    setExtraPhotoError('');
+    const added: string[] = [];
+    try {
+      for (const file of Array.from(files)) {
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(file.type)) throw new Error(`${file.name}: use JPG, PNG, WEBP, or HEIC images.`);
+        if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name}: each photo must be 10 MB or smaller.`);
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100) || 'photo';
+        const path = `registration-extra/${crypto.randomUUID()}/${Date.now()}-${safeName}`;
+        const { error } = await supabase.storage.from('registration-extra').upload(path, file, { contentType: file.type, upsert: false });
+        if (error) throw error;
+        added.push(path);
+      }
+      setExtraPhotoPaths((current) => [...current, ...added]);
+    } catch (error) {
+      setExtraPhotoError(error instanceof Error ? error.message : 'One or more photos could not be uploaded.');
+      if (added.length) await supabase.storage.from('registration-extra').remove(added);
+    } finally {
+      setExtraPhotoBusy(false);
+    }
+  };
 
   // Authoritative open check from database settings
   const isTeamOpen = (teamId: 'security' | 'media' | 'volunteers') => {
@@ -216,6 +244,10 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
         })
       : form.statement.trim();
 
+    const statementWithExtras = extraPhotoPaths.length
+      ? `${formattedStatement}\n\n[EXTRA_PHOTOS]\n${extraPhotoPaths.join('\n')}\n[/EXTRA_PHOTOS]`
+      : formattedStatement;
+
     const fullPayload = {
       full_name: name,
       email,
@@ -224,7 +256,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
       team,
       section: form.section,
       experience: form.experience.trim(),
-      statement: formattedStatement,
+      statement: statementWithExtras,
       security_emergency_steps: team === 'security' ? form.security_emergency_steps.trim() : '',
       security_teamwork: team === 'security' ? form.security_teamwork.trim() : '',
       security_motivation: team === 'security' ? form.security_motivation.trim() : '',
@@ -262,7 +294,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
             team,
             section: form.section,
             experience: form.experience.trim(),
-            statement: formattedStatement,
+            statement: statementWithExtras,
             age_confirmed: true,
             consent_version: settings.legal_version || '2026-10-17',
           };
@@ -571,6 +603,22 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
             </div>
 
             <div>
+              <div className="mt-5 border border-neutral-800 rounded-sm p-4 bg-black/20">
+                <label className={labelCls}>Extra — Photos of Past Experiences (Optional)</label>
+                <p className="text-xs text-neutral-500 mb-3">Upload photos from previous events, projects, volunteering, or relevant experience. JPG, PNG, WEBP, or HEIC; max 10 MB per photo. Only authorised WEST MUN admins and department heads can view them.</p>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic"
+                  multiple
+                  disabled={extraPhotoBusy}
+                  onChange={(e) => { void uploadExtraPhotos(e.currentTarget.files); e.currentTarget.value = ''; }}
+                  className="block w-full text-xs text-neutral-300 file:mr-3 file:rounded-sm file:border-0 file:bg-[#d4af37] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-black hover:file:bg-[#e8c85a] disabled:opacity-50"
+                  aria-label="Upload photos of past experiences"
+                />
+                {extraPhotoBusy && <p className="mt-2 text-xs text-[#d4af37]">Uploading photos…</p>}
+                {extraPhotoPaths.length > 0 && <p className="mt-2 text-xs text-emerald-300">{extraPhotoPaths.length} photo(s) attached.</p>}
+                {extraPhotoError && <p role="alert" className="mt-2 text-xs text-red-300">{extraPhotoError}</p>}
+              </div>
               <label className={labelCls}>Relevant Experience (Optional)</label>
               <textarea
                 rows={2}
