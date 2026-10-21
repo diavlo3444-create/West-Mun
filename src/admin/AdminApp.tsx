@@ -36,6 +36,7 @@ import { SuperAdminManager } from './SuperAdminManager';
 import { AdminAccountsManager } from './AdminAccountsManager';
 import { HeadsManager } from './HeadsManager';
 import { WebsiteEditor } from './WebsiteEditor';
+import { CheckedInPeople } from '../components/CheckedInPeople';
 import { explainError, type Row } from './ui';
 import { DashboardShell, type NavGroup } from '../dashboard/DashboardShell';
 import { Notice, btnPrimary, inputCls, labelCls } from '../dashboard/ui';
@@ -53,6 +54,7 @@ export type NavigationPage =
   | 'website-editor'
   | 'messages'
   | 'settings'
+  | 'checked-in'
   | `section:${string}`;
 
 export default function AdminApp() {
@@ -554,6 +556,7 @@ export default function AdminApp() {
         { id: 'teams', label: 'Departments', icon: Layers },
         { id: 'reports', label: 'Reports', icon: BarChart3 },
         { id: 'security-website', label: 'Security Website', icon: QrCode },
+        { id: 'checked-in', label: 'Checked-In People', icon: UserCheck },
       ],
     },
     ...(isSuperAdmin
@@ -691,6 +694,8 @@ export default function AdminApp() {
             authorEmail={session.user.email || ''}
           />
         )}
+
+        {page === 'checked-in' && <CheckedInPeople />}
 
         {page === 'messages' && <InquiriesManager />}
 
