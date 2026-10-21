@@ -73,6 +73,32 @@ Deno.serve(async (req: Request) => {
     }, 201);
   }
 
+
+  if (body.action === "list_members") {
+    const bearer = (req.headers.get("authorization") ?? "").match(/^Bearer\\s+(.+)$/i);
+    if (!bearer) return json({ error: "Sign in as a WEST MUN admin first." }, 401);
+    const auth = await db.auth.getUser(bearer[1]);
+    if (auth.error || !auth.data.user) return json({ error: "Your session is invalid or expired." }, 401);
+    const admin = await db.from("admins").select("user_id").eq("user_id", auth.data.user.id).maybeSingle();
+    if (admin.error) return json({ error: "Could not verify admin permissions." }, 500);
+    if (!admin.data) return json({ error: "Only a WEST MUN admin can view the Executive Board directory." }, 403);
+
+    const [inviteResult, passResult, headResult] = await Promise.all([
+      db.from("wm_eb_invites").select("email").not("redeemed_at", "is", null),
+      db.from("wm_qr_passes").select("user_id,full_name,email,account_role,team,section,active,created_at").order("full_name"),
+      db.from("department_heads").select("user_id,email,head_name,department,section,active,created_at").order("department").order("section"),
+    ]);
+    if (inviteResult.error || passResult.error || headResult.error) {
+      console.error("[wm-eb-access] Directory query failed", {
+        invites: inviteResult.error?.code, passes: passResult.error?.code, heads: headResult.error?.code
+      });
+      return json({ error: "Could not load the Executive Board directory. Check the database setup and try again." }, 500);
+    }
+    const ebEmails = new Set((inviteResult.data || []).map((row: { email: string }) => row.email.toLowerCase()));
+    const members = (passResult.data || []).filter((row: { email: string }) => ebEmails.has(row.email.toLowerCase()));
+    return json({ success: true, members, heads: headResult.data || [] });
+  }
+
   if (body.action === "signup") {
     const token = clean(body.token).toLowerCase();
     const email = emailNorm(body.email);
