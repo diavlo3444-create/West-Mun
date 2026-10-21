@@ -265,7 +265,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
         return;
       }
       setSignupUrl(data.signupUrl);
-      const message = typeof data.message === 'string' ? data.message : `Hi ${(activeItem.full_name || '').split(/\s+/)[0] || 'there'}, congratulations! Your WEST MUN 2027 application has been accepted. Create your team account here: ${data.signupUrl}`;
+      const message = typeof data.message === 'string' ? data.message : `Hi ${(target.full_name || '').split(/\s+/)[0] || 'there'}, congratulations! Your WEST MUN 2027 application has been accepted. Create your team account here: ${data.signupUrl}`;
       setSignupMessage(message);
       try {
         await navigator.clipboard.writeText(message);

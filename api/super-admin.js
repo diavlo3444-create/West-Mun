@@ -520,7 +520,8 @@ async function verifyAdminCaller(authHeader) {
       error: "Your session is invalid or has expired. Please sign in again."
     };
   }
-  const isAdmin = await isRegisteredAdmin(verified.user.id, token);
+  const isSuperAdmin = (verified.user.email || "").toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+  const isAdmin = isSuperAdmin || await isRegisteredAdmin(verified.user.id, token);
   if (!isAdmin) {
     return {
       authorized: false,
@@ -535,7 +536,7 @@ async function verifyAdminCaller(authHeader) {
     statusCode: 200,
     user: verified.user,
     isAdmin: true,
-    isSuperAdmin: verified.user.email === SUPER_ADMIN_EMAIL.toLowerCase()
+    isSuperAdmin
   };
 }
 async function verifySuperAdminCaller(authHeader) {
@@ -3145,6 +3146,26 @@ async function handler(req, res) {
     const action = url.searchParams.get("action") || "";
     const scope = url.searchParams.get("scope") || url.searchParams.get("target") || "";
     const headId = url.searchParams.get("id") || "";
+    if (action === "delete-application" && method === "POST") {
+      const auth = await verifySuperAdminCaller(authHeader);
+      if (!auth.authorized) {
+        return res.status(auth.statusCode).json({ success: false, code: auth.code, error: auth.error });
+      }
+      const body = await parseJsonBody(req);
+      const id = String(body.id || "").trim();
+      const type = body.type === "delegate" ? "delegate" : body.type === "team" ? "team" : "";
+      if (!id || !type) return res.status(400).json({ success: false, error: "Application id and type are required." });
+      const db = getSupabaseAdmin();
+      if (!db) return res.status(503).json({ success: false, error: "Server-side Supabase admin credentials are not configured." });
+      if (type === "team") {
+        const { error: decisionError } = await db.from("wm_staffing_decisions").delete().eq("registration_id", id);
+        if (decisionError) return res.status(400).json({ success: false, error: decisionError.message });
+      }
+      const table = type === "delegate" ? "delegates" : "team_registrations";
+      const { error: deleteError } = await db.from(table).delete().eq("id", id);
+      if (deleteError) return res.status(400).json({ success: false, error: deleteError.message });
+      return res.status(200).json({ success: true });
+    }
     if (action === "session" || action === "verify" || url.pathname.endsWith("/verify")) {
       const check = await verifyAdminCaller(authHeader);
       return res.status(check.statusCode).json({
