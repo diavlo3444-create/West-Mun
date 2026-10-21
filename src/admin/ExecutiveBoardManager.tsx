@@ -7,7 +7,7 @@ type Member = { user_id: string; full_name: string; email: string; account_role:
 type Head = { user_id: string; email: string; head_name: string | null; department: string; section: string | null; active: boolean; created_at: string };
 type Person = { id: string; name: string; email: string; role: string; department: string; section: string; active: boolean; created_at: string; kind: 'member' | 'head' };
 
-const pretty = (value?: string | null) => String(value || '—').replace(/[_-]/g, ' ').replace(/\\b\\w/g, (c) => c.toUpperCase());
+const pretty = (value?: string | null) => String(value || '—').replace(/[_-]/g, ' ').split(' ').map((word) => word ? word[0].toUpperCase() + word.slice(1) : word).join(' ');
 
 export const ExecutiveBoardManager: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
