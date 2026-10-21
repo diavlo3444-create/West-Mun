@@ -229,7 +229,10 @@ export async function verifyAdminCaller(
     };
   }
 
-  const isAdmin = await isRegisteredAdmin(verified.user.id, token);
+  // The fixed Super Admin identity is authorized by the verified Supabase Auth token
+  // itself. Do not require a duplicate public.admins row for this account.
+  const isSuperAdmin = (verified.user.email || '').toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+  const isAdmin = isSuperAdmin || await isRegisteredAdmin(verified.user.id, token);
   if (!isAdmin) {
     return {
       authorized: false,
@@ -245,7 +248,7 @@ export async function verifyAdminCaller(
     statusCode: 200,
     user: verified.user,
     isAdmin: true,
-    isSuperAdmin: verified.user.email === SUPER_ADMIN_EMAIL.toLowerCase(),
+    isSuperAdmin,
   };
 }
 
