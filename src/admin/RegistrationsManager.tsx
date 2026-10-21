@@ -162,14 +162,14 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     return () => { current = false; };
   }, [activeItem?.id, activeItem?._type]);
 
-  const createSignupLink = async () => {
-    if (!supabase || !activeItem || activeItem._type !== 'team' || activeItem.status !== 'accepted' || signupBusy) return;
+  const createSignupLink = async (target: UnifiedRegistration | null = activeItem) => {
+    if (!supabase || !target || target._type !== 'team' || target.status !== 'accepted' || !target.admin_finalized_at || !target.admin_finalized_by || signupBusy) return;
     setSignupBusy(true);
     setSignupNotice(null);
     setSignupUrl(null);
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('team-signup', {
-        body: { action: 'create', registrationId: activeItem.id },
+        body: { action: 'create', registrationId: target.id },
       });
       if (invokeError || !data?.success || typeof data.signupUrl !== 'string') {
         let message = data?.error || invokeError?.message || 'Could not create a signup link.';
@@ -959,6 +959,18 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                             <Eye className="h-3 w-3" aria-hidden="true" />
                             Review
                           </button>
+                          {item._type === 'team' && item.status === 'accepted' && item.admin_finalized_at && item.admin_finalized_by && (
+                            <button
+                              type="button"
+                              onClick={() => { openItem(item); void createSignupLink(item); }}
+                              disabled={signupBusy}
+                              className="inline-flex items-center gap-1 rounded-md border border-[#d4af37]/25 px-2 py-1 text-[10.5px] font-medium text-[#e2c258] transition-colors hover:bg-[#d4af37]/[0.08] disabled:opacity-50"
+                              aria-label={`Generate signup link for ${item.full_name}`}
+                            >
+                              <Link2 className="h-3 w-3" aria-hidden="true" />
+                              Generate signup link
+                            </button>
+                          )}
                           {isSuperAdmin && (
                             <button
                               type="button"
