@@ -31,6 +31,7 @@ import {
   btnSecondary,
 } from '../dashboard/ui';
 import type { DepartmentMeta, SectionKey } from './departments';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 
 export interface HeadRegistration {
   id: string;
@@ -409,32 +410,62 @@ export const HeadOverview: React.FC<HeadOverviewProps> = ({
           ) : (
             <ul className="divide-y divide-white/[0.045]">
               {recent.map((record) => (
-                <li key={record.id}>
-                  <button
-                    type="button"
-                    onClick={() => onReview(record)}
-                    className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-white/[0.025]"
-                  >
-                    <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[9.5px] font-semibold text-neutral-300 sm:flex">
-                      {initials(record.full_name)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate text-[12px] font-medium text-neutral-100">
-                          {record.full_name}
-                        </span>
-                        <StatusBadge status={record.status} className="hidden sm:inline-flex" />
-                      </span>
-                      <span className="mt-0.5 block truncate text-[10.5px] text-neutral-400">
-                        {record.institution || record.email}
-                        {record.section ? ` · ${record.section} division` : ''}
-                      </span>
-                    </span>
-                    <span className="hidden shrink-0 font-mono text-[10px] text-neutral-400 md:inline">
+                <li
+                  key={record.id}
+                  className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/[0.025]"
+                >
+                  <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[9.5px] font-semibold text-neutral-300 sm:flex">
+                    {initials(record.full_name)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onReview(record)}
+                        className="truncate text-[12px] font-medium text-neutral-100 hover:text-[#d4af37] text-left cursor-pointer"
+                      >
+                        {record.full_name}
+                      </button>
+                      <StatusBadge status={record.status} className="hidden sm:inline-flex" />
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-neutral-400">
+                      <ApplicantEmailLink
+                        applicantName={record.full_name}
+                        applicantEmail={record.email}
+                        type="team"
+                        department={meta.key}
+                        section={record.section || section}
+                        status={record.status}
+                        institution={record.institution}
+                      />
+                      {record.institution && (
+                        <>
+                          <span className="text-neutral-700" aria-hidden="true">·</span>
+                          <span className="truncate max-w-[12rem]">{record.institution}</span>
+                        </>
+                      )}
+                      {record.section && (
+                        <>
+                          <span className="text-neutral-700" aria-hidden="true">·</span>
+                          <span>{record.section} division</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="hidden font-mono text-[10px] text-neutral-400 md:inline">
                       {shortDate(record.created_at)}
                     </span>
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => onReview(record)}
+                      className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] px-2 py-1 text-[10px] font-medium text-neutral-400 transition-colors hover:border-[#d4af37]/35 hover:bg-[#d4af37]/[0.06] hover:text-[#e2c258] cursor-pointer"
+                      aria-label={`Review ${record.full_name}`}
+                    >
+                      Review
+                      <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

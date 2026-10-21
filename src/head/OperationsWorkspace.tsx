@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, BriefcaseBusiness, Check, ChevronDown, LoaderCircle, Plus, RefreshCw, Trash2, Users, Video, Clock3 } from 'lucide-react';
 import type { DepartmentKey, SectionKey } from './departments';
 import { TeamDeploymentPlanner } from './TeamDeploymentPlanner';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import {
   addProjectMember, assignPersonToShift, createDepartmentPerson, createDepartmentProject,
   createDepartmentShift, createProjectStage, createProjectTask, deleteDepartmentPerson,
@@ -136,7 +137,28 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
       <div className="space-y-3"><div className="flex items-center justify-between"><h2 className="font-semibold">People & custom roles</h2><span className="text-xs text-neutral-500">{people.length} records</span></div>
         {people.length===0 && <div className={panel+' text-sm text-neutral-400'}>No operational people yet. Create the first custom position.</div>}
         {people.map(p=><article key={p.id} className={panel+' flex flex-wrap items-start justify-between gap-3'}>
-          <div className="min-w-0 flex-1"><div className="font-medium">{p.display_name}</div><div className="mt-1 text-xs text-[#d4af37]">{p.role_title}</div><div className="mt-1 text-xs text-neutral-500">{p.email || 'No email'} · {p.status} · {p.section || 'Department-wide'}</div>{p.private_notes && <p className="mt-2 whitespace-pre-wrap text-xs text-neutral-400">{p.private_notes}</p>}</div>
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-white">{p.display_name}</div>
+            <div className="mt-1 text-xs text-[#d4af37]">{p.role_title}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-400">
+              {p.email ? (
+                <ApplicantEmailLink
+                  applicantName={p.display_name}
+                  applicantEmail={p.email}
+                  type="team"
+                  department={department}
+                  section={p.section || section}
+                  status={p.status}
+                  roleTitle={p.role_title}
+                  variant="inline"
+                />
+              ) : (
+                <span className="text-neutral-500">No email</span>
+              )}
+              <span>· {p.status} · {p.section || 'Department-wide'}</span>
+            </div>
+            {p.private_notes && <p className="mt-2 whitespace-pre-wrap text-xs text-neutral-400">{p.private_notes}</p>}
+          </div>
           <div className="flex gap-2"><button className={button} onClick={()=>{const title=window.prompt('Edit custom role title',p.role_title); if(title?.trim()) void run(()=>updateDepartmentPerson(p.id,{role_title:title.trim()},effectiveTestToken),'Role updated.');}}>Edit role</button><button aria-label={'Delete '+p.display_name} className="rounded-md border border-red-400/20 p-2 text-red-300" onClick={()=>{if(window.confirm('Delete this person/role record? Related assignments may prevent deletion.')) void run(()=>deleteDepartmentPerson(p.id,effectiveTestToken),'Person/role deleted.');}}><Trash2 size={14}/></button></div>
         </article>)}
       </div>

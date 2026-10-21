@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { downloadText, toCsv } from '../lib/safe';
 import { INQUIRY_STATUSES } from './config';
 import { btnDanger, btnGhost, btnGold, cardCls, explainError, inputCls, type Row } from './ui';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 
 export const InquiriesManager: React.FC = () => {
   const [rows, setRows] = useState<Row[]>([]);
@@ -83,7 +84,25 @@ export const InquiriesManager: React.FC = () => {
           {filtered.map((r) => (
             <article key={r.id} className={`${cardCls} p-4 ${r.status === 'new' ? 'border-[#d4af37]/40' : ''}`}>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <div className="text-sm text-white">{r.name} <a href={`mailto:${r.email}?subject=${encodeURIComponent('Re: ' + r.subject)}`} className="text-xs text-[#d4af37] ml-1 break-all">{r.email}</a></div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-white">{r.name}</span>
+                  <ApplicantEmailLink
+                    applicantName={r.name}
+                    applicantEmail={r.email}
+                    inquirySubject={r.subject}
+                    templateType="inquiry_reply"
+                    variant="inline"
+                  />
+                  <ApplicantEmailLink
+                    applicantName={r.name}
+                    applicantEmail={r.email}
+                    inquirySubject={r.subject}
+                    templateType="inquiry_reply"
+                    variant="button"
+                    buttonLabel="Reply in Gmail"
+                    align="right"
+                  />
+                </div>
                 <span className="text-[11px] font-mono text-neutral-400">{new Date(r.created_at).toLocaleString()}</span>
               </div>
               <div className="text-sm text-neutral-200 mb-1"><span className="text-neutral-400">Subject: </span>{r.subject}</div>

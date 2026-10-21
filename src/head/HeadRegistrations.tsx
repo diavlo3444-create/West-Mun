@@ -14,10 +14,12 @@ import {
   Inbox,
   FileText,
   Shield,
-  CalendarDays,
   Copy,
   Link2,
+  Mail,
+  CalendarDays,
 } from 'lucide-react';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import { downloadText, toCsv } from '../lib/safe';
 import {
   EmptyState,
@@ -46,6 +48,7 @@ type StatusTab = 'all' | 'pending' | 'approved' | 'accepted-secretariat' | 'wait
 interface HeadRegistrationsProps {
   registrations: HeadRegistration[];
   loading: boolean;
+  department?: string;
   departmentLabel: string;
   section?: SectionKey | null;
   isGenderDivision: boolean;
@@ -81,6 +84,7 @@ function formatDate(value?: string | null, withTime = false): string {
 export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
   registrations,
   loading,
+  department = '',
   departmentLabel,
   section,
   isGenderDivision,
@@ -540,7 +544,15 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                             <p className="truncate text-[12px] font-medium text-neutral-100">
                               {record.full_name}
                             </p>
-                            <p className="truncate font-mono text-[10px] text-neutral-400">{record.email}</p>
+                            <ApplicantEmailLink
+                              applicantName={record.full_name}
+                              applicantEmail={record.email}
+                              type="team"
+                              department={department}
+                              section={record.section || section}
+                              status={record.status}
+                              institution={record.institution}
+                            />
                           </div>
                         </div>
                       </td>
@@ -607,9 +619,17 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                         <p className="truncate text-[12.5px] font-medium text-neutral-100">
                           {record.full_name}
                         </p>
-                        <p className="mt-0.5 truncate font-mono text-[10px] text-neutral-400">
-                          {record.email}
-                        </p>
+                        <div className="mt-0.5" onClick={(e) => e.stopPropagation()}>
+                          <ApplicantEmailLink
+                            applicantName={record.full_name}
+                            applicantEmail={record.email}
+                            type="team"
+                            department={department}
+                            section={record.section || section}
+                            status={record.status}
+                            institution={record.institution}
+                          />
+                        </div>
                       </div>
                       <StatusBadge status={record.status} />
                     </div>
@@ -666,11 +686,20 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
         title={activeItem?.full_name || 'Candidate'}
         description={
           activeItem ? (
-            <span className="font-mono text-[10.5px]">
-              {activeItem.email}
-              {activeItem.phone ? ` · ${activeItem.phone}` : ''}
-              {activeItem.institution ? ` · ${activeItem.institution}` : ''}
-            </span>
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              <ApplicantEmailLink
+                applicantName={activeItem.full_name}
+                applicantEmail={activeItem.email}
+                type="team"
+                department={department}
+                section={activeItem.section || section}
+                status={activeItem.status}
+                institution={activeItem.institution}
+                variant="badge"
+              />
+              {activeItem.phone ? <span className="font-mono text-[10.5px] text-neutral-400">· {activeItem.phone}</span> : null}
+              {activeItem.institution ? <span className="text-[10.5px] text-neutral-400">· {activeItem.institution}</span> : null}
+            </div>
           ) : undefined
         }
         footer={
@@ -716,6 +745,32 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
               ))}
             </div>
 
+            {/* Contact Applicant Action */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#d4af37]/25 bg-[#d4af37]/[0.05] p-3">
+              <div>
+                <p className="text-xs font-medium text-white flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 text-[#d4af37]" />
+                  <span>Contact Candidate via Gmail</span>
+                </p>
+                <p className="mt-0.5 text-[10.5px] text-neutral-400">
+                  Compose approval notification, shift briefing, or ask for missing information with a prefilled message.
+                </p>
+              </div>
+              <ApplicantEmailLink
+                applicantName={activeItem.full_name}
+                applicantEmail={activeItem.email}
+                type="team"
+                department={department}
+                section={activeItem.section || section}
+                status={activeItem.status}
+                institution={activeItem.institution}
+                missingInfoNote={draftNotes}
+                variant="button"
+                buttonLabel="Compose Email"
+                align="right"
+              />
+            </div>
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-3">
                 <p className="mb-2 flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
@@ -723,6 +778,21 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                   Candidate
                 </p>
                 <dl className="space-y-1.5 text-[11px]">
+                  <div className="flex justify-between items-center gap-3">
+                    <dt className="text-neutral-400">Email</dt>
+                    <dd className="text-right">
+                      <ApplicantEmailLink
+                        applicantName={activeItem.full_name}
+                        applicantEmail={activeItem.email}
+                        type="team"
+                        department={department}
+                        section={activeItem.section || section}
+                        status={activeItem.status}
+                        institution={activeItem.institution}
+                        align="right"
+                      />
+                    </dd>
+                  </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-neutral-400">Institution</dt>
                     <dd className="truncate text-right text-neutral-300">{activeItem.institution || '—'}</dd>

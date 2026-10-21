@@ -682,6 +682,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           <HeadRegistrations
             registrations={registrations}
             loading={loading}
+            department={meta.key}
             departmentLabel={meta.label}
             section={section}
             isGenderDivision={isGenderDivision}

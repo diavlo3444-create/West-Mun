@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type { Row } from './ui';
 import { downloadText, toCsv } from '../lib/safe';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import {
   EmptyState,
   MetricBar,
@@ -581,11 +582,25 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       </p>
                       <StatusBadge status={application.status} className="hidden sm:inline-flex" />
                     </div>
-                    <p className="mt-0.5 truncate text-[10.5px] text-neutral-400">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-neutral-400">
                       <span className="text-[#c9a64a]/90">{application._teamLabel}</span>
-                      <span className="mx-1.5 text-neutral-700" aria-hidden="true">·</span>
-                      {application.institution || application.email}
-                    </p>
+                      <span className="text-neutral-700" aria-hidden="true">·</span>
+                      <ApplicantEmailLink
+                        applicantName={application.full_name}
+                        applicantEmail={application.email}
+                        type={application._type}
+                        department={application._teamId}
+                        section={application.section}
+                        status={application.status}
+                        institution={application.institution}
+                      />
+                      {application.institution && (
+                        <>
+                          <span className="text-neutral-700" aria-hidden="true">·</span>
+                          <span className="truncate max-w-[12rem]">{application.institution}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="hidden text-[10px] font-mono text-neutral-400 md:inline">

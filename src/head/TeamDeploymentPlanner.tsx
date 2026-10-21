@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarClock, ClipboardList, LoaderCircle, MapPin, Plus, RefreshCw, Trash2, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import type { DepartmentKey, SectionKey } from './departments';
 
 type Applicant = { id: string; full_name: string; email: string; team: string; section: string; status: string };
@@ -116,7 +117,36 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
     <div className="grid gap-4 xl:grid-cols-[minmax(280px,.85fr)_minmax(0,1.4fr)]">
       <form className={panel+' space-y-3'} onSubmit={submit}>
         <h3 className="flex items-center gap-2 font-semibold"><Plus size={15} className="text-[#d4af37]"/> Create deployment assignment</h3>
-        <div><label className={label}>Approved team member</label><select className={field} value={registrationId} onChange={e=>setRegistrationId(e.target.value)} required><option value="">Choose applicant…</option>{applicants.map(a=><option key={a.id} value={a.id}>{a.full_name} · {a.section}</option>)}</select>{applicants.length===0&&<p className="mt-1 text-xs text-amber-200">No approved applicants are visible for this department/section yet.</p>}</div>
+        <div>
+          <label className={label}>Approved team member</label>
+          <select className={field} value={registrationId} onChange={e=>setRegistrationId(e.target.value)} required>
+            <option value="">Choose applicant…</option>
+            {applicants.map(a=><option key={a.id} value={a.id}>{a.full_name} · {a.section}</option>)}
+          </select>
+          {selectedApplicant && (
+            <div className="mt-1.5 flex items-center justify-between text-xs">
+              <span className="text-neutral-400">Applicant email:</span>
+              <ApplicantEmailLink
+                applicantName={selectedApplicant.full_name}
+                applicantEmail={selectedApplicant.email}
+                type="team"
+                department={department}
+                section={selectedApplicant.section || section}
+                status="accepted"
+                assignment={{
+                  title: assignmentTitle,
+                  station,
+                  startsAt,
+                  endsAt,
+                  reportingTo,
+                  notes,
+                  section: selectedApplicant.section || section,
+                }}
+              />
+            </div>
+          )}
+          {applicants.length===0&&<p className="mt-1 text-xs text-amber-200">No approved applicants are visible for this department/section yet.</p>}
+        </div>
         <div><label className={label}>Duty / role</label><input className={field} placeholder={department==='volunteers'?'e.g. Dais runner / delegate support':department==='security'?'e.g. Entrance checkpoint / floor patrol':'e.g. Plenary photographer / committee reporter'} value={assignmentTitle} onChange={e=>setAssignmentTitle(e.target.value)} required/></div>
         <div><label className={label}>Station / location</label><input className={field} placeholder="e.g. Main entrance, A-201, Press desk" value={station} onChange={e=>setStation(e.target.value)} required/></div>
         <div><label className={label}>Shift starts</label><input type="datetime-local" className={field} value={startsAt} onChange={e=>setStartsAt(e.target.value)} required/></div>
@@ -129,7 +159,38 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
         <div className={panel+' flex flex-wrap items-center justify-between gap-3'}><div><h3 className="font-semibold">Deployment roster</h3><p className="mt-1 text-xs text-neutral-400">{assignments.length} assignment(s) · {assignments.filter(a=>a.status==='assigned'||a.status==='in_progress').length} active</p></div><div className="flex items-center gap-2 text-xs text-neutral-400"><Users size={14}/>{applicants.length} approved people</div></div>
         {assignments.length===0 && <div className={panel+' py-8 text-center text-sm text-neutral-400'}><ClipboardList size={24} className="mx-auto mb-2 text-[#d4af37]"/>No deployment assignments yet. Create the first one using an approved applicant.</div>}
         {assignments.map(a=><article key={a.id} className={panel+' space-y-3'}>
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="font-semibold">{a.registration?.full_name || 'Team member'} <span className="text-neutral-500 font-normal">· {a.assignment_title}</span></h4><p className="mt-1 flex items-center gap-1.5 text-xs text-neutral-300"><MapPin size={12}/>{a.station} · {a.section}</p><p className="mt-1 flex items-center gap-1.5 text-xs text-neutral-400"><CalendarClock size={12}/>{fmt(a.starts_at)} – {fmt(a.ends_at)}</p><p className="mt-1 text-xs text-neutral-400">Reports to: <span className="text-neutral-200">{a.reporting_to}</span></p>{a.notes&&<p className="mt-2 whitespace-pre-wrap text-xs text-neutral-400">{a.notes}</p>}</div><button type="button" aria-label="Remove assignment" className="rounded-md border border-red-400/20 p-2 text-red-300 hover:bg-red-400/10" onClick={()=>void remove(a)}><Trash2 size={14}/></button></div>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h4 className="font-semibold">{a.registration?.full_name || 'Team member'} <span className="text-neutral-500 font-normal">· {a.assignment_title}</span></h4>
+              {a.registration?.email && (
+                <div className="mt-1">
+                  <ApplicantEmailLink
+                    applicantName={a.registration.full_name}
+                    applicantEmail={a.registration.email}
+                    type="team"
+                    department={department}
+                    section={a.section || section}
+                    status="accepted"
+                    assignment={{
+                      title: a.assignment_title,
+                      station: a.station,
+                      startsAt: a.starts_at,
+                      endsAt: a.ends_at,
+                      reportingTo: a.reporting_to,
+                      notes: a.notes,
+                      section: a.section,
+                    }}
+                    templateType="shift_assignment"
+                  />
+                </div>
+              )}
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-neutral-300"><MapPin size={12}/>{a.station} · {a.section}</p>
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-neutral-400"><CalendarClock size={12}/>{fmt(a.starts_at)} – {fmt(a.ends_at)}</p>
+              <p className="mt-1 text-xs text-neutral-400">Reports to: <span className="text-neutral-200">{a.reporting_to}</span></p>
+              {a.notes&&<p className="mt-2 whitespace-pre-wrap text-xs text-neutral-400">{a.notes}</p>}
+            </div>
+            <button type="button" aria-label="Remove assignment" className="rounded-md border border-red-400/20 p-2 text-red-300 hover:bg-red-400/10" onClick={()=>void remove(a)}><Trash2 size={14}/></button>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3"><span className="text-[10px] uppercase tracking-wider text-neutral-500">Shift status</span><select className={field+' w-auto'} value={a.status} onChange={e=>void updateStatus(a,e.target.value as Assignment['status'])}><option value="assigned">Assigned</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="no_show">No show</option><option value="cancelled">Cancelled</option></select></div>
         </article>)}
       </div>

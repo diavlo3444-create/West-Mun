@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { downloadText, toCsv } from '../lib/safe';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import {
   Panel,
   PanelHeader,
@@ -403,16 +404,13 @@ export const HeadInquiriesManager: React.FC<{
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-white">{item.name}</span>
-                      <a
-                        href={`mailto:${item.email}?subject=${encodeURIComponent(
-                          `WEST MUN 2027 — Re: ${item.subject}`,
-                        )}`}
-                        className="text-xs text-[#d4af37] hover:underline flex items-center gap-1"
-                        title="Open email client"
-                      >
-                        <Mail className="h-3 w-3" />
-                        <span>{item.email}</span>
-                      </a>
+                      <ApplicantEmailLink
+                        applicantName={item.name}
+                        applicantEmail={item.email}
+                        inquirySubject={item.subject}
+                        templateType="inquiry_reply"
+                        variant="inline"
+                      />
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -512,15 +510,15 @@ export const HeadInquiriesManager: React.FC<{
                         </button>
                       )}
 
-                      <a
-                        href={`mailto:${item.email}?subject=${encodeURIComponent(
-                          `WEST MUN 2027 — Re: ${item.subject}`,
-                        )}`}
-                        className="inline-flex items-center gap-1.5 rounded border border-white/[0.1] bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-[#d4af37] hover:border-[#d4af37]/40 hover:bg-[#d4af37]/10 transition-colors"
-                      >
-                        <Send className="h-3 w-3" />
-                        <span>Reply by Email</span>
-                      </a>
+                      <ApplicantEmailLink
+                        applicantName={item.name}
+                        applicantEmail={item.email}
+                        inquirySubject={item.subject}
+                        templateType="inquiry_reply"
+                        variant="button"
+                        buttonLabel="Reply in Gmail"
+                        align="right"
+                      />
                     </div>
 
                     {/* Private Internal HR Note */}

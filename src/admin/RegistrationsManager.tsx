@@ -24,8 +24,10 @@ import {
   ListFilter,
   Link2,
   Copy,
+  Mail,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import { explainError, type Row } from './ui';
 import { downloadText, toCsv } from '../lib/safe';
 import { SECURITY_QUESTIONS, countWords, extractSecurityAnswers, getWordCountFeedback } from '../lib/securityQuestions';
@@ -920,7 +922,15 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                             <p className="truncate text-[12px] font-medium text-neutral-100">
                               {item.full_name || 'Unnamed applicant'}
                             </p>
-                            <p className="truncate font-mono text-[10px] text-neutral-400">{item.email}</p>
+                            <ApplicantEmailLink
+                              applicantName={item.full_name}
+                              applicantEmail={item.email}
+                              type={item._type}
+                              department={item._teamId}
+                              section={item.section}
+                              status={item.status}
+                              institution={item.institution}
+                            />
                           </div>
                         </div>
                       </td>
@@ -1004,7 +1014,17 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                         <p className="truncate text-[12.5px] font-medium text-neutral-100">
                           {item.full_name || 'Unnamed applicant'}
                         </p>
-                        <p className="mt-0.5 truncate font-mono text-[10px] text-neutral-400">{item.email}</p>
+                        <div className="mt-0.5" onClick={(e) => e.stopPropagation()}>
+                          <ApplicantEmailLink
+                            applicantName={item.full_name}
+                            applicantEmail={item.email}
+                            type={item._type}
+                            department={item._teamId}
+                            section={item.section}
+                            status={item.status}
+                            institution={item.institution}
+                          />
+                        </div>
                       </div>
                       <StatusBadge status={item.status} />
                     </div>
@@ -1083,11 +1103,20 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         title={activeItem?.full_name || 'Application'}
         description={
           activeItem ? (
-            <span className="font-mono text-[10.5px]">
-              {activeItem.email}
-              {activeItem.phone ? ` · ${activeItem.phone}` : ''}
-              {activeItem.institution ? ` · ${activeItem.institution}` : ''}
-            </span>
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              <ApplicantEmailLink
+                applicantName={activeItem.full_name}
+                applicantEmail={activeItem.email}
+                type={activeItem._type}
+                department={activeItem._teamId}
+                section={activeItem.section}
+                status={activeItem.status}
+                institution={activeItem.institution}
+                variant="badge"
+              />
+              {activeItem.phone ? <span className="font-mono text-[10.5px] text-neutral-400">· {activeItem.phone}</span> : null}
+              {activeItem.institution ? <span className="text-[10.5px] text-neutral-400">· {activeItem.institution}</span> : null}
+            </div>
           ) : undefined
         }
         footer={
@@ -1148,6 +1177,32 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
               ))}
             </div>
 
+            {/* Contact Applicant Action */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#d4af37]/25 bg-[#d4af37]/[0.05] p-3">
+              <div>
+                <p className="text-xs font-medium text-white flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 text-[#d4af37]" />
+                  <span>Contact Applicant via Gmail</span>
+                </p>
+                <p className="mt-0.5 text-[10.5px] text-neutral-400">
+                  Prewritten approval, status update, or request missing information with a single click.
+                </p>
+              </div>
+              <ApplicantEmailLink
+                applicantName={activeItem.full_name}
+                applicantEmail={activeItem.email}
+                type={activeItem._type}
+                department={activeItem._teamId}
+                section={activeItem.section}
+                status={activeItem.status}
+                institution={activeItem.institution}
+                missingInfoNote={draftNotes}
+                variant="button"
+                buttonLabel="Compose Email"
+                align="right"
+              />
+            </div>
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-3">
                 <p className="mb-2 flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
@@ -1155,6 +1210,21 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                   Applicant details
                 </p>
                 <dl className="space-y-1.5 text-[11px]">
+                  <div className="flex justify-between items-center gap-3">
+                    <dt className="text-neutral-400">Email</dt>
+                    <dd className="text-right">
+                      <ApplicantEmailLink
+                        applicantName={activeItem.full_name}
+                        applicantEmail={activeItem.email}
+                        type={activeItem._type}
+                        department={activeItem._teamId}
+                        section={activeItem.section}
+                        status={activeItem.status}
+                        institution={activeItem.institution}
+                        align="right"
+                      />
+                    </dd>
+                  </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-neutral-400">Institution</dt>
                     <dd className="truncate text-right text-neutral-300">{activeItem.institution || '—'}</dd>

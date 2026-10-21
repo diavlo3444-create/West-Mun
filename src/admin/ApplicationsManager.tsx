@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { downloadText, toCsv } from '../lib/safe';
 import { DELEGATE_STATUSES, PAYMENT_STATUSES, TIER_LABELS, TYPE_LABELS } from './config';
 import { btnDanger, btnGhost, btnGold, cardCls, explainError, inputCls, labelCls, type Row } from './ui';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 
 const label = (list: Array<{ value: string; label: string }>, v: string) => list.find((x) => x.value === v)?.label ?? v;
 const badge: Record<string, string> = {
@@ -164,7 +165,19 @@ export const ApplicationsManager: React.FC = () => {
               <tbody className="divide-y divide-neutral-800/70">
                 {filtered.map((r) => (
                   <tr key={r.id} onClick={() => open(r)} className={`cursor-pointer hover:bg-neutral-800/30 ${openId === r.id ? 'bg-neutral-800/40' : ''}`}>
-                    <td className="p-3"><div className="text-white">{r.full_name}</div><div className="text-neutral-400 truncate max-w-[16rem]">{r.institution}</div></td>
+                    <td className="p-3">
+                      <div className="text-white font-medium">{r.full_name}</div>
+                      <div className="mt-0.5" onClick={(e) => e.stopPropagation()}>
+                        <ApplicantEmailLink
+                          applicantName={r.full_name}
+                          applicantEmail={r.email}
+                          type="delegate"
+                          status={r.status}
+                          institution={r.institution}
+                        />
+                      </div>
+                      <div className="text-neutral-400 truncate max-w-[16rem] mt-0.5">{r.institution}</div>
+                    </td>
                     <td className="p-3 text-neutral-300">{TIER_LABELS[r.tier] ?? r.tier}</td>
                     <td className="p-3"><Pill v={r.status} l={label(DELEGATE_STATUSES, r.status)} /></td>
                     <td className="p-3"><Pill v={r.payment_status} l={label(PAYMENT_STATUSES, r.payment_status)} /></td>
@@ -182,9 +195,30 @@ export const ApplicationsManager: React.FC = () => {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-lg wm-serif text-white">{current.full_name}</div>
-                  <a href={`mailto:${current.email}`} className="text-xs text-[#d4af37] break-all">{current.email}</a>
+                  <div className="mt-1">
+                    <ApplicantEmailLink
+                      applicantName={current.full_name}
+                      applicantEmail={current.email}
+                      type="delegate"
+                      status={current.status}
+                      institution={current.institution}
+                      variant="badge"
+                    />
+                  </div>
                 </div>
-                <button type="button" className="text-neutral-400 hover:text-white cursor-pointer" onClick={() => setOpenId(null)} aria-label="Close"><X className="w-4 h-4" /></button>
+                <div className="flex items-center gap-2">
+                  <ApplicantEmailLink
+                    applicantName={current.full_name}
+                    applicantEmail={current.email}
+                    type="delegate"
+                    status={current.status}
+                    institution={current.institution}
+                    variant="button"
+                    buttonLabel="Email delegate"
+                    align="right"
+                  />
+                  <button type="button" className="text-neutral-400 hover:text-white cursor-pointer p-1" onClick={() => setOpenId(null)} aria-label="Close"><X className="w-4 h-4" /></button>
+                </div>
               </div>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                 <dt className="text-neutral-400">School / organisation</dt><dd className="text-neutral-200">{current.institution}</dd>

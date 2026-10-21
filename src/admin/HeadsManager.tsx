@@ -3,6 +3,7 @@ import { Users, Search, RefreshCw, Eye, CheckCircle2, Clock3, ShieldCheck, Loade
 import { supabase } from '../lib/supabase';
 import { EmptyState, Notice, PageHeader, Panel, PanelHeader, Skeleton, StatusBadge, btnPrimary, btnSecondary, inputCls } from '../dashboard/ui';
 import type { Row } from './ui';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 
 type HeadRow = {
   user_id: string;
@@ -148,7 +149,51 @@ export const HeadsManager: React.FC<Props> = ({ teamRegistrations, loading: regi
             {registrationsLoading && headRegistrations.length === 0 ? <div className="space-y-3 p-4">{[1,2,3].map((n) => <Skeleton key={n} className="h-12 w-full" />)}</div> : headRegistrations.length === 0 ? <EmptyState icon={Users} title="No applications yet" description="No team registrations match this head’s department and section." /> : <div className="divide-y divide-white/[0.05]">
               {headRegistrations.map((r) => {
                 const d = decisionByRegistration.get(String(r.id));
-                return <div key={String(r.id)} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="text-sm font-medium text-neutral-100">{String(r.full_name || 'Unnamed applicant')}</p><p className="mt-0.5 text-[11px] text-neutral-400">{String(r.email || '')} · {String(r.institution || 'No institution')}</p><p className="mt-1 text-[10px] text-neutral-500">{d ? `Recommendation: ${label(d.head_decision)} · ${d.role_title || 'General'}` : 'No recommendation submitted yet'}{d?.head_notes ? ` · ${d.head_notes}` : ''}</p></div><div className="flex flex-wrap items-center gap-2"><StatusBadge status={String(r.status || 'received')} />{d && <span className={`rounded border px-2 py-1 text-[9px] ${d.admin_decision === 'approved' ? 'border-emerald-400/20 text-emerald-300' : d.admin_decision === 'rejected' ? 'border-rose-400/20 text-rose-300' : 'border-amber-400/20 text-amber-300'}`}>{d.admin_decision === 'approved' ? 'Secretariat approved' : d.admin_decision === 'rejected' ? 'Secretariat rejected' : 'Awaiting Secretariat'}</span>}</div></div>;
+                return (
+                  <div key={String(r.id)} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-neutral-100">{String(r.full_name || 'Unnamed applicant')}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-400">
+                        <ApplicantEmailLink
+                          applicantName={String(r.full_name || '')}
+                          applicantEmail={String(r.email || '')}
+                          type="team"
+                          department={selectedHead?.department || String(r.team || '')}
+                          section={selectedHead?.section || (r.section ? String(r.section) : null)}
+                          status={String(r.status || '')}
+                          roleTitle={d?.role_title}
+                          institution={r.institution ? String(r.institution) : null}
+                        />
+                        {r.institution && <span>· {String(r.institution)}</span>}
+                      </div>
+                      <p className="mt-1 text-[10px] text-neutral-500">
+                        {d ? `Recommendation: ${label(d.head_decision)} · ${d.role_title || 'General'}` : 'No recommendation submitted yet'}
+                        {d?.head_notes ? ` · ${d.head_notes}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <ApplicantEmailLink
+                        applicantName={String(r.full_name || '')}
+                        applicantEmail={String(r.email || '')}
+                        type="team"
+                        department={selectedHead?.department || String(r.team || '')}
+                        section={selectedHead?.section || (r.section ? String(r.section) : null)}
+                        status={String(r.status || '')}
+                        roleTitle={d?.role_title}
+                        institution={r.institution ? String(r.institution) : null}
+                        variant="button"
+                        buttonLabel="Email applicant"
+                        align="right"
+                      />
+                      <StatusBadge status={String(r.status || 'received')} />
+                      {d && (
+                        <span className={`rounded border px-2 py-1 text-[9px] ${d.admin_decision === 'approved' ? 'border-emerald-400/20 text-emerald-300' : d.admin_decision === 'rejected' ? 'border-rose-400/20 text-rose-300' : 'border-amber-400/20 text-amber-300'}`}>
+                          {d.admin_decision === 'approved' ? 'Secretariat approved' : d.admin_decision === 'rejected' ? 'Secretariat rejected' : 'Awaiting Secretariat'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
               })}
             </div>}
           </Panel>
