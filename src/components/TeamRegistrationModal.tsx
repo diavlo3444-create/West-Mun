@@ -138,10 +138,12 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     const name = form.fullName.trim();
     const email = form.email.trim().toLowerCase();
     const inst = form.institution.trim();
+    const phone = form.phone.trim();
 
     if (name.length < 2 || name.length > 100) errs.fullName = 'Please enter your full name.';
     if (!EMAIL_RE.test(email) || email.length > 120) errs.email = 'Please enter a valid email address.';
     if (inst.length < 2 || inst.length > 150) errs.institution = 'Please enter your school or organisation.';
+    if (phone.length < 7 || phone.length > 25) errs.phone = 'Please enter a valid phone number (7–25 characters).';
     if (!form.ageOk) errs.ageOk = 'Please confirm this.';
     if (!form.consent) errs.consent = 'You must agree to the Terms and Privacy Policy.';
 
@@ -545,15 +547,20 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Phone Number (Optional)</label>
+                <label className={labelCls}>Phone Number *</label>
                 <input
                   type="tel"
+                  required
                   disabled={!currentlyOpen || busy}
                   className={inputCls}
                   placeholder="+966 50 123 4567"
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, phone: e.target.value });
+                    if (errors.phone) setErrors((prev) => { const next = { ...prev }; delete next.phone; return next; });
+                  }}
                 />
+                {errors.phone && <p className="text-[11px] text-red-400 mt-1">{errors.phone}</p>}
               </div>
 
               <div>
