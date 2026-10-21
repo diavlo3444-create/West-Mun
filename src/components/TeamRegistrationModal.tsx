@@ -48,6 +48,12 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     volunteer_teamwork_conflict: '',
     volunteer_emergency_reaction: '',
     volunteer_delegate_professionalism: '',
+    // Media team application questions
+    media_motivation: '',
+    media_capture_strategy: '',
+    media_unique_skills: '',
+    media_equipment: '',
+    media_portfolio: '',
     ageOk: false,
     consent: false,
     website: '', // honeypot
@@ -125,6 +131,25 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
       }
     }
 
+    // Media questions are required; portfolio must be a valid HTTP(S) link.
+    if (team === 'media') {
+      const mediaRequired: Array<[string, string]> = [
+        ['media_motivation', form.media_motivation],
+        ['media_capture_strategy', form.media_capture_strategy],
+        ['media_unique_skills', form.media_unique_skills],
+        ['media_portfolio', form.media_portfolio],
+      ];
+      for (const [key, value] of mediaRequired) {
+        if (!value.trim()) errs[key] = 'This question is required.';
+      }
+      try {
+        const url = new URL(form.media_portfolio.trim());
+        if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid protocol');
+      } catch {
+        errs.media_portfolio = 'Please provide a valid portfolio URL starting with https:// or http://.';
+      }
+    }
+
     // Strict validation for Volunteer team required scenario questions
     if (team === 'volunteers') {
       const volVal = validateVolunteerAnswers({
@@ -156,7 +181,26 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
 
     setBusy(true);
 
-    const formattedStatement = team === 'security'
+    const formattedStatement = team === 'media'
+      ? [
+          'MEDIA DEPARTMENT APPLICATION RESPONSES',
+          '',
+          '1. Motivation and contribution to WEST MUN visual identity and coverage:',
+          form.media_motivation.trim(),
+          '',
+          '2. Strategy for capturing key moments and delegate interactions in real time:',
+          form.media_capture_strategy.trim(),
+          '',
+          '3. Unique skills, creative strengths, and prior experience:',
+          form.media_unique_skills.trim(),
+          '',
+          '4. Personal media equipment and current setup:',
+          form.media_equipment.trim() || 'Not provided',
+          '',
+          '5. Photography, videography, or design portfolio:',
+          form.media_portfolio.trim(),
+        ].join('\\n')
+      : team === 'security'
       ? formatSecurityAnswers({
           security_emergency_steps: form.security_emergency_steps,
           security_teamwork: form.security_teamwork,
@@ -710,6 +754,94 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+
+            {/* MEDIA TEAM ONLY: Required application questions */}
+            {team === 'media' && (
+              <div className="space-y-5 pt-3 border-t border-[#d4af37]/30">
+                <div className="rounded-sm border border-[#d4af37]/35 bg-[#14120a] p-3.5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Camera className="w-4 h-4 text-[#d4af37]" />
+                    <span className="text-xs font-serif font-semibold text-white tracking-wide">
+                      Media Department Application (5 Questions)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
+                    Please answer the questions below and share a link to your best creative work. GitHub, Google Drive, Behance, and personal websites are accepted.
+                  </p>
+                </div>
+                {([
+                  {
+                    key: 'media_motivation',
+                    title: "What motivates you to apply for the WESTMUN Media Department, and how do you plan to contribute to the visual identity and coverage of next year’s conference?",
+                    value: form.media_motivation,
+                    placeholder: 'Explain your motivation and how you would contribute...',
+                    rows: 4,
+                  },
+                  {
+                    key: 'media_capture_strategy',
+                    title: 'MUN conferences are fast-paced and dynamic. What strategies or techniques will you use to reliably capture key moments, intense debates, and delegate interactions in real time?',
+                    value: form.media_capture_strategy,
+                    placeholder: 'Describe your approach to planning, timing, and capturing moments...',
+                    rows: 4,
+                  },
+                  {
+                    key: 'media_unique_skills',
+                    title: 'What unique skills, creative strengths, or prior experience set you apart from other applicants for this role?',
+                    value: form.media_unique_skills,
+                    placeholder: 'Describe your skills, strengths, and relevant experience...',
+                    rows: 3,
+                  },
+                  {
+                    key: 'media_equipment',
+                    title: 'Do you have personal media equipment (e.g., DSLR/mirrorless camera, lenses, gimbal, editing software)? If yes, please specify your current setup.',
+                    value: form.media_equipment,
+                    placeholder: 'List your equipment and software, or write “None currently”.',
+                    rows: 3,
+                    optional: true,
+                  },
+                  {
+                    key: 'media_portfolio',
+                    title: 'Please provide a link to your best photography, videography, or design work. GitHub, Google Drive, Behance, personal websites, or other online portfolios are accepted.',
+                    value: form.media_portfolio,
+                    placeholder: 'https://...',
+                    rows: 2,
+                  },
+                ] as const).map((q, idx) => (
+                  <div key={q.key} className="space-y-1.5 bg-[#101014] p-3.5 rounded-sm border border-neutral-800/90">
+                    <label className="text-xs font-medium text-white flex items-start gap-2">
+                      <span className="w-5 h-5 rounded-full bg-[#d4af37]/20 border border-[#d4af37]/50 text-[#d4af37] text-[10.5px] font-mono flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <span className="font-serif text-[12.5px] text-neutral-100">
+                        {q.title}{'optional' in q && q.optional ? ' (Optional)' : ' *'}
+                      </span>
+                    </label>
+                    <textarea
+                      rows={q.rows}
+                      required={!('optional' in q && q.optional)}
+                      disabled={!currentlyOpen || busy}
+                      className={`${inputCls} font-normal leading-relaxed text-[11.5px] ${errors[q.key] ? 'border-red-500/80 focus:border-red-400' : ''}`}
+                      placeholder={q.placeholder}
+                      value={q.value}
+                      onChange={(e) => {
+                        const nextVal = e.target.value;
+                        setForm((prev) => ({ ...prev, [q.key]: nextVal }));
+                        if (errors[q.key]) setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next[q.key];
+                          return next;
+                        });
+                      }}
+                    />
+                    {q.key === 'media_portfolio' && (
+                      <p className="text-[10.5px] text-neutral-500">Paste a shareable link. Make sure reviewers have permission to open it.</p>
+                    )}
+                    {errors[q.key] && <p className="text-[11px] text-red-400 mt-1">{errors[q.key]}</p>}
+                  </div>
+                ))}
               </div>
             )}
 
