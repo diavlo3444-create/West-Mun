@@ -107,7 +107,7 @@ Deno.serve(async (req: Request) => {
 
     const [inviteResult, passResult, headResult] = await Promise.all([
       db.from("wm_eb_invites").select("email").not("redeemed_at", "is", null),
-      db.from("wm_qr_passes").select("user_id,full_name,email,account_role,team,section,active,created_at").order("full_name"),
+      db.from("wm_qr_passes").select("user_id,full_name,email,account_role,team,section,phone,gender,active,created_at").order("full_name"),
       db.from("department_heads").select("user_id,email,head_name,department,section,active,created_at").order("department").order("section"),
     ]);
     if (inviteResult.error || passResult.error || headResult.error) {
@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Could not load the Executive Board directory. Check the database setup and try again." }, 500);
     }
     const ebEmails = new Set((inviteResult.data || []).map((row: { email: string }) => row.email.toLowerCase()));
-    const members = (passResult.data || []).filter((row: { email: string }) => ebEmails.has(row.email.toLowerCase()));
+    const members = (passResult.data || []).filter((row: { email: string; account_role: string }) => ebEmails.has(row.email.toLowerCase()) || ["co_head", "designer", "marketing"].includes(String(row.account_role || "").toLowerCase()));
     return json({ success: true, members, heads: headResult.data || [] });
   }
 
