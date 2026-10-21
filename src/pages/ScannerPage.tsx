@@ -121,7 +121,36 @@ export default function ScannerPage() {
     };
   }, [scanning, allowed, handleDecoded]);
 
-  const startCamera = () => { setMessage(null); setScanning(true); };
+  // Request camera permission directly inside the button click. Starting permission
+  // from an effect after an async device enumeration can lose browser user activation.
+  const startCamera = async () => {
+    setMessage(null);
+    if (!window.isSecureContext) {
+      setMessage({ success: false, outcome: "denied", error: "Camera access requires HTTPS. Open https://west-mun.vercel.app and try again." });
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMessage({ success: false, outcome: "denied", error: "This browser does not provide camera access. Open WEST MUN in the latest Chrome or Edge." });
+      return;
+    }
+    try {
+      // This call runs directly from the user's click so the browser can show its prompt.
+      const permissionStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      permissionStream.getTracks().forEach((track) => track.stop());
+      setScanning(true);
+    } catch (e) {
+      const errorName = e instanceof DOMException ? e.name : "";
+      let detail = e instanceof Error ? e.message : String(e);
+      if (errorName === "NotAllowedError" || errorName === "PermissionDeniedError" || errorName === "SecurityError") {
+        detail = "Chrome/Edge is blocking camera access for this site, so it will not show a prompt. Click the site-controls icon beside the address bar → Site settings → Camera → Allow, then reload WEST MUN. Also check Windows Settings → Privacy & security → Camera and enable desktop-app camera access.";
+      } else if (errorName === "NotFoundError" || errorName === "DevicesNotFoundError") {
+        detail = "No camera was found. Connect a webcam or use a phone with a working camera.";
+      } else if (errorName === "NotReadableError" || errorName === "TrackStartError") {
+        detail = "The camera may be in use by another app. Close Camera, Teams, Zoom, or other browser tabs using it, then try again.";
+      }
+      setMessage({ success: false, outcome: "denied", error: `Camera permission could not be obtained: ${detail}` });
+    }
+  };
   const statusClass = message?.success ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-200" : "border-rose-500/30 bg-rose-950/20 text-rose-200";
 
   return (
