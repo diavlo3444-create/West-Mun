@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Crown, Users, UserRoundCog, Search, RefreshCw, ShieldCheck, Mail, ExternalLink, Loader2, Trash2, Trash2 } from 'lucide-react';
+import { Crown, Users, UserRoundCog, Search, RefreshCw, ShieldCheck, Mail, ExternalLink, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { EmptyState, Notice, PageHeader, Panel, PanelHeader, Skeleton, btnSecondary, inputCls } from '../dashboard/ui';
 
@@ -13,8 +13,6 @@ export const ExecutiveBoardManager: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [heads, setHeads] = useState<Head[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,35 +63,6 @@ export const ExecutiveBoardManager: React.FC = () => {
     }
   }, [deletingId, isSuperAdmin, load]);
 
-  useEffect(() => {
-    let alive = true;
-    if (!supabase) return;
-    supabase.auth.getUser().then(({ data }) => {
-      if (alive) setIsSuperAdmin((data.user?.email || '').toLowerCase() === 'diavlo3444@gmail.com');
-    }).catch(() => { if (alive) setIsSuperAdmin(false); });
-    return () => { alive = false; };
-  }, []);
-
-  const deleteEbMember = useCallback(async (person: Person) => {
-    if (!supabase || person.kind !== 'member' || !isSuperAdmin || deletingId) return;
-    const confirmed = window.confirm(
-      `Permanently delete ${person.name} (${person.email})? This removes their EB record and Supabase login. This cannot be undone.`
-    );
-    if (!confirmed) return;
-    setDeletingId(person.id);
-    setNotice(null);
-    try {
-      const { data, error } = await supabase.functions.invoke('wm-eb-access', { body: { action: 'delete_member', userId: person.id } });
-      if (error || !data?.success) throw new Error(data?.error || error?.message || 'Could not permanently delete this EB account.');
-      setNotice({ tone: 'success', message: `${person.email}: EB record and login permanently deleted.` });
-      await load();
-    } catch (err) {
-      setNotice({ tone: 'error', message: err instanceof Error ? err.message : 'Could not permanently delete this EB account.' });
-    } finally {
-      setDeletingId(null);
-    }
-  }, [deletingId, isSuperAdmin, load]);
-
   const people = useMemo<Person[]>(() => [
     ...members.map((m) => ({ id: m.user_id, name: m.full_name || 'Unnamed EB member', email: m.email, role: pretty(m.account_role), department: m.team || '', section: m.section || '', phone: m.phone || '', gender: m.gender || '', active: m.active, created_at: m.created_at, kind: 'member' as const })),
     ...heads.map((h) => ({ id: h.user_id, name: h.head_name || 'Unnamed head', email: h.email, role: 'Department Head', department: h.department || '', section: h.section || '', phone: '', gender: '', active: h.active, created_at: h.created_at, kind: 'head' as const })),
@@ -124,7 +93,6 @@ export const ExecutiveBoardManager: React.FC = () => {
         {filtered.map((p) => <div key={`${p.kind}:${p.id}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#d4af37]/25 bg-[#d4af37]/[0.07] text-[#e2c66f]">{p.kind === 'head' ? <UserRoundCog className="h-4 w-4" /> : <Crown className="h-4 w-4" />}</span><div className="min-w-0"><p className="truncate text-sm font-medium text-neutral-100">{p.name}</p><p className="mt-1 flex items-center gap-1.5 break-all text-[11px] text-neutral-400"><Mail className="h-3 w-3 shrink-0" />{p.email}</p><p className="mt-1 text-[11px] text-neutral-300">{pretty(p.role)} · {pretty(p.department)}{p.section ? ` · ${pretty(p.section)}` : ''}</p>{(p.phone || p.gender) && <p className="mt-1 text-[11px] text-neutral-500">{p.phone ? `Phone: ${p.phone}` : ''}{p.phone && p.gender ? ' · ' : ''}{p.gender ? `Gender: ${pretty(p.gender)}` : ''}</p>}</div></div>
           <div className="flex shrink-0 items-center gap-2 sm:pl-4"><span className={`rounded border px-2 py-1 text-[9px] uppercase tracking-wider ${p.kind === 'head' ? 'border-sky-400/20 text-sky-300' : 'border-[#d4af37]/25 text-[#e2c66f]'}`}>{p.kind === 'head' ? 'Head' : 'EB Member'}</span><span className={`rounded border px-2 py-1 text-[9px] uppercase tracking-wider ${p.active ? 'border-emerald-400/20 text-emerald-300' : 'border-neutral-700 text-neutral-500'}`}>{p.active ? 'Active' : 'Inactive'}</span>{isSuperAdmin && p.kind === 'member' && <button type="button" onClick={() => void deleteEbMember(p)} disabled={deletingId !== null} className="inline-flex items-center gap-1.5 rounded-md border border-rose-400/25 px-2 py-1.5 text-[10px] text-rose-300 hover:bg-rose-400/10 disabled:opacity-50" title="Permanently delete EB account">{deletingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}{deletingId === p.id ? 'Deleting…' : 'Delete'}</button>}</div>
-          {isSuperAdmin && p.kind === 'member' && <button type="button" onClick={() => void deleteEbMember(p)} disabled={deletingId !== null} className="inline-flex items-center gap-1.5 rounded-md border border-rose-400/25 px-2 py-1.5 text-[10px] text-rose-300 hover:bg-rose-400/10 disabled:opacity-50" title="Permanently delete EB account">{deletingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}{deletingId === p.id ? 'Deleting…' : 'Delete'}</button>}
         </div>)}
       </div>}
     </Panel>
