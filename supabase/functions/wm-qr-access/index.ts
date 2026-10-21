@@ -52,7 +52,8 @@ Deno.serve(async (req: Request) => {
 
   const department = head?.department ?? (typeof meta.wm_team === "string" ? meta.wm_team : null);
   const section = head?.section ?? (typeof meta.wm_section === "string" ? meta.wm_section : null);
-  const fullName = clean(userMeta.full_name) || clean(head?.head_name);
+  const requestedFullName = clean(body.fullName);
+  const fullName = clean(userMeta.full_name) || clean(head?.head_name) || requestedFullName;
   const accountRole = isAdmin ? "admin" : head ? "head" : isEbMember ? (typeof meta.wm_eb_role === "string" ? meta.wm_eb_role : "eb_member") : (typeof meta.wm_role === "string" ? meta.wm_role : "team_member");
   const isSecurity = normalized(department) === "security" || normalized(department) === "security & protocol";
   const canScan = isAdmin || (isTeamMember && normalized(meta.wm_team) === "security") || (Boolean(head) && isSecurity);
@@ -76,6 +77,12 @@ Deno.serve(async (req: Request) => {
     }
     if (fullName.length < 5 || fullName.length > 120 || fullName.split(/\s+/).filter(Boolean).length < 2) {
       return json({ error: "Your WEST MUN account needs your full real name before a QR pass can be issued. Contact an admin." }, 409);
+    }
+    if (!clean(userMeta.full_name) && !clean(head?.head_name) && requestedFullName) {
+      const metadataUpdate = await db.auth.admin.updateUserById(actor.id, {
+        user_metadata: { ...userMeta, full_name: fullName },
+      });
+      if (metadataUpdate.error) return json({ error: "Could not save your name to your WEST MUN account. Please try again." }, 500);
     }
     const existing = await db.from("wm_qr_passes").select("user_id,qr_token,full_name,email,account_role,team,section,active,inside,last_scanned_at")
       .eq("user_id", actor.id).maybeSingle();
