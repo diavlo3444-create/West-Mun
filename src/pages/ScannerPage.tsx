@@ -79,20 +79,21 @@ export default function ScannerPage() {
       try {
         instance = new Html5Qrcode("westmun-qr-reader", { verbose: false });
         scannerRef.current = instance;
-        // Prefer a real camera device ID; some browsers fail to resolve facingMode="environment".
-        const cameras = await Html5Qrcode.getCameras();
-        if (!live) return;
-        if (!cameras.length) throw new Error("No camera was found. Connect a camera or open this page on a phone with camera access.");
-        const preferred = cameras.find((camera) => /back|rear|environment|world/i.test(camera.label)) ?? cameras[cameras.length - 1];
+        // Start with the browser's native camera selector first. The explicit permission
+        // request already ran from the user's click, so don't enumerate devices before startup.
+        // If this selector is unsupported by a device, fall back to a concrete camera ID.
         try {
-          await instance.start(preferred.id, config, onDecoded, () => {});
-        } catch (deviceError) {
+          await instance.start({ facingMode: "environment" }, config, onDecoded, () => {});
+        } catch (facingModeError) {
           if (!live) return;
-          // Fall back to the browser's environment-camera selector.
+          const cameras = await Html5Qrcode.getCameras();
+          if (!live) return;
+          if (!cameras.length) throw new Error("No camera was found. Check that a webcam is connected and enabled in Windows.");
+          const preferred = cameras.find((camera) => /back|rear|environment|world/i.test(camera.label) && camera.id) ?? cameras[0];
           try {
-            await instance.start({ facingMode: "environment" }, config, onDecoded, () => {});
+            await instance.start(preferred.id, config, onDecoded, () => {});
           } catch {
-            throw deviceError;
+            throw facingModeError;
           }
         }
         started = true;
