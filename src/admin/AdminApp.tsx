@@ -20,6 +20,7 @@ import {
   UserCheck,
   Globe,
   UserRoundCog,
+  QrCode,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '../lib/supabase';
@@ -552,6 +553,7 @@ export default function AdminApp() {
         { id: 'heads', label: 'Heads', icon: UserRoundCog },
         { id: 'teams', label: 'Departments', icon: Layers },
         { id: 'reports', label: 'Reports', icon: BarChart3 },
+        { id: 'security-website', label: 'Security Website', icon: QrCode },
       ],
     },
     ...(isSuperAdmin
@@ -606,12 +608,16 @@ export default function AdminApp() {
       brandSubtitle="Secretariat command"
       navGroups={navGroups}
       active={page}
-      onNavigate={(id) => setPage(id as NavigationPage)}
+      onNavigate={(id) => { if (id === 'security-website') { window.location.assign('/scanner'); return; } setPage(id as NavigationPage); }}
       user={user}
       onSignOut={signOut}
       topbarLabel={activeLabel}
       roleBadge={isSuperAdmin ? 'Super admin' : 'Organiser'}
     >
+      <div className="mb-4 flex flex-wrap justify-end gap-2">
+        <a href="/pass" className="rounded-md border border-[#d4af37]/35 px-3 py-2 text-xs font-medium text-[#bfa04a] hover:bg-[#d4af37]/10">My QR Pass</a>
+        <a href="/admin/eb-invites" className="rounded-md border border-[#d4af37]/35 px-3 py-2 text-xs font-medium text-[#bfa04a] hover:bg-[#d4af37]/10">EB Signup Links</a>
+      </div>
       <div key={page} className="wm-page-in">
         {page === 'dashboard' && (
           <DashboardOverview

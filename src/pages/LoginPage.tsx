@@ -20,6 +20,10 @@ export default function LoginPage() {
         return;
       }
       const meta = data.user.app_metadata as Record<string, unknown>;
+      if (meta?.wm_role === "eb_member") {
+        window.location.replace("/eb");
+        return;
+      }
       if (meta?.wm_role === "team_member") {
         const team = meta.wm_team;
         window.location.replace(team === "security" ? "/security" : team === "media" ? "/media" : team === "volunteers" ? "/volunteer" : "/");

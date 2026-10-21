@@ -22,7 +22,13 @@ import './index.css';
 async function boot() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
   let Page: React.ComponentType;
-  if (path === '/admin' || path.startsWith('/admin/')) {
+  if (path === '/admin/eb-invites') {
+    Page = (await import('./admin/EbInviteAdminPage')).default;
+  } else if (path === '/eb-signup') {
+    Page = (await import('./pages/EbSignupPage')).default;
+  } else if (path === '/eb') {
+    Page = (await import('./pages/EbPortal')).default;
+  } else if (path === '/admin' || path.startsWith('/admin/')) {
     Page = (await import('./admin/AdminApp')).default;
   } else if (path === '/head' || path.startsWith('/head/')) {
     Page = (await import('./head/HeadPortal')).default;
@@ -32,6 +38,10 @@ async function boot() {
     Page = (await import('./pages/LoginPage')).default;
   } else if (path === '/volunteer' || path === '/media' || path === '/security') {
     Page = (await import('./team/TeamMemberPortal')).default;
+  } else if (path === '/pass') {
+    Page = (await import('./pages/PassPage')).default;
+  } else if (path === '/scanner') {
+    Page = (await import('./pages/ScannerPage')).default;
   } else if (path === '/terms') {
     const { LegalPage } = await import('./pages/LegalPage');
     Page = () => <LegalPage kind="terms" />;
