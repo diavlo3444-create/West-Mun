@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Calendar, Clock, MapPin, Users } from 'lucide-react';
+import { ShieldCheck, Calendar, Clock, MapPin, Users, LogIn, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 import { useSettings, orTba } from '../lib/content';
@@ -46,7 +46,7 @@ export const RegistrationSection: React.FC = React.memo(() => {
         </motion.div>
 
         {/* Balanced Registration Tiers (All Status: TBA) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {/* Tier 01: Early Bird */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
@@ -128,6 +128,36 @@ export const RegistrationSection: React.FC = React.memo(() => {
               <span>Eligibility: Open to All Registered Delegates</span>
               <span className="font-mono text-[#d4af37]">TBA</span>
             </div>
+          </motion.div>
+          {/* Team Member Sign In */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+            transition={{ duration: 0.5, delay: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            className="p-8 bg-gradient-to-b from-[#17150f] to-[#0c0c0e] border border-[#d4af37]/30 rounded-sm relative flex flex-col justify-between hover:border-[#d4af37]/70 transition-[transform,border-color,box-shadow] duration-300"
+          >
+            <div>
+              <div className="flex justify-between items-start mb-5">
+                <span className="text-[11px] font-mono uppercase tracking-widest text-[#d4af37]">Team Portal</span>
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase text-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Secure Access
+                </span>
+              </div>
+              <div className="w-12 h-12 mb-5 flex items-center justify-center rounded-sm border border-[#d4af37]/30 bg-[#d4af37]/10 text-[#d4af37]">
+                <LogIn className="w-5 h-5" />
+              </div>
+              <h3 className="text-xl font-serif text-white mb-3">Sign in as Team Member</h3>
+              <p className="text-xs text-neutral-400 mb-6 font-light leading-relaxed">
+                Already accepted into Security, Media, or Volunteers? Sign in to access your assigned WEST MUN team workspace.
+              </p>
+            </div>
+            <a
+              href="/login"
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 px-5 py-3 text-xs uppercase tracking-widest font-semibold text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 transition-all shadow-[0_2px_12px_rgba(212,175,55,0.15)]"
+            >
+              Sign in <ArrowRight className="w-3.5 h-3.5" />
+            </a>
           </motion.div>
         </div>
 
