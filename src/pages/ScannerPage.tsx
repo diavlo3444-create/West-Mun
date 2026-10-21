@@ -14,6 +14,7 @@ export default function ScannerPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<ScanReply | null>(null);
   const [accessError, setAccessError] = useState("");
+  const [backDestination, setBackDestination] = useState<{ href: string; label: string }>({ href: "/security", label: "Security dashboard" });
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scanBusyRef = useRef(false);
@@ -57,7 +58,23 @@ export default function ScannerPage() {
     const check = async () => {
       if (!supabase) { if (live) { setAccessError("The WEST MUN sign-in service is unavailable."); setLoading(false); } return; }
       const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) { window.location.replace("/login"); return; }
+      const user = sessionData.session?.user;
+      if (!user) { window.location.replace("/login"); return; }
+      // Route the Back link to the signed-in user's actual workspace.
+      const meta = user.app_metadata as Record<string, unknown>;
+      if (meta?.wm_role === "team_member") {
+        const team = meta.wm_team;
+        if (team === "security") setBackDestination({ href: "/security", label: "Security dashboard" });
+        else if (team === "media") setBackDestination({ href: "/media", label: "Media dashboard" });
+        else if (team === "volunteers") setBackDestination({ href: "/volunteer", label: "Volunteer dashboard" });
+      } else {
+        const { data: admin } = await supabase.from("admins").select("user_id").eq("user_id", user.id).maybeSingle();
+        if (admin) setBackDestination({ href: "/admin", label: "Admin dashboard" });
+        else {
+          const { data: head } = await supabase.from("department_heads").select("user_id").eq("user_id", user.id).eq("active", true).limit(1).maybeSingle();
+          if (head) setBackDestination({ href: "/head", label: "Head dashboard" });
+        }
+      }
       const { data, error } = await supabase.functions.invoke("wm-qr-access", { body: { action: "access" } });
       if (!live) return;
       if (error || !data?.success) setAccessError(data?.error || error?.message || "Could not verify scanner permissions.");
@@ -177,7 +194,7 @@ export default function ScannerPage() {
     <main className="min-h-screen bg-[#070707] px-4 py-10 text-[#f5f5f5]">
       <div className="mx-auto max-w-2xl">
         <header className="mb-7 flex items-center justify-between border-b border-[#d4af37]/20 pb-5">
-          <a href="/" className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white"><ArrowLeft className="h-4 w-4" /> WEST MUN</a>
+          <a href={backDestination.href} className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white"><ArrowLeft className="h-4 w-4" /> {backDestination.label}</a>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#d4af37]">Authorized Scanner</span>
         </header>
         <section className="rounded-2xl border border-[#d4af37]/25 bg-gradient-to-b from-[#17150f] to-[#0b0b0c] p-5 shadow-2xl sm:p-7">
