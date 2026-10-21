@@ -994,7 +994,7 @@ export const AdminAccountsManager: React.FC<AdminAccountsManagerProps> = ({
             <p className="text-xs text-neutral-300 leading-relaxed">
               Are you sure you want to permanently remove{' '}
               <strong className="text-white">{deleteTarget.full_name || deleteTarget.email}</strong>?
-              This will delete their admin status from{' '}
+              This permanently deletes their Supabase login and removes their admin, head, and EB/pass assignments. This cannot be undone. It will also delete their admin status from{' '}
               <code className="text-[#d4af37] font-mono">public.admins</code> and revoke their
               administrative access.
             </p>
