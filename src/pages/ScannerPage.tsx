@@ -31,8 +31,17 @@ export default function ScannerPage() {
       } catch {}
       if (!supabase) throw new Error("The WEST MUN sign-in service is unavailable.");
       const { data, error } = await supabase.functions.invoke("wm-qr-access", { body: { action: "scan", qrToken: token, direction } });
-      if (error && !data) throw new Error(error.message || "Could not verify this QR code.");
-      setMessage((data ?? { success: false, outcome: "denied", error: error?.message }) as ScanReply);
+      if (error) {
+        let detail = "";
+        const context = (error as unknown as { context?: Response }).context;
+        if (context && typeof context.clone === "function") {
+          try { const payload = await context.clone().json(); detail = typeof payload?.error === "string" ? payload.error : ""; } catch {}
+        }
+        if (!data) throw new Error(detail || error.message || "Could not verify this QR code.");
+        setMessage({ ...(data as ScanReply), error: detail || (data as ScanReply).error });
+        return;
+      }
+      setMessage((data ?? { success: false, outcome: "denied", error: "No response received from the scanner service." }) as ScanReply);
     } catch (e) {
       setMessage({ success: false, outcome: "denied", error: e instanceof Error ? e.message : "Could not verify this QR code." });
     } finally {
