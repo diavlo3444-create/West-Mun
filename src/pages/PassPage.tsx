@@ -21,8 +21,9 @@ export default function PassPage() {
   const [qrImage, setQrImage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [fullNameInput, setFullNameInput] = useState("");
 
-  const loadPass = async () => {
+  const loadPass = async (providedName = fullNameInput) => {
     setLoading(true);
     setError("");
     try {
@@ -32,7 +33,7 @@ export default function PassPage() {
         window.location.replace("/login");
         return;
       }
-      const { data, error: invokeError } = await supabase.functions.invoke("wm-qr-access", { body: { action: "pass" } });
+      const { data, error: invokeError } = await supabase.functions.invoke("wm-qr-access", { body: { action: "pass", fullName: providedName.trim() } });
       if (invokeError || !data?.success || !data?.pass) throw new Error(data?.error || invokeError?.message || "Could not load your QR pass.");
       const current = data.pass as PassData;
       const image = await QRCode.toDataURL(current.qr_token, {
@@ -71,7 +72,14 @@ export default function PassPage() {
           ) : error ? (
             <div className="p-6">
               <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/20 p-4 text-sm text-rose-200">{error}</p>
-              <button onClick={() => void loadPass()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-[#d4af37] px-4 py-3 text-sm font-semibold text-black"><RefreshCw className="h-4 w-4" /> Try again</button>
+              {error.toLowerCase().includes("full real name") && (
+                <div className="mt-4">
+                  <label htmlFor="pass-full-name" className="mb-2 block text-sm text-neutral-300">Your full real name</label>
+                  <input id="pass-full-name" value={fullNameInput} onChange={(e) => setFullNameInput(e.target.value)} autoComplete="name" placeholder="First and last name" className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-3 text-sm text-white outline-none focus:border-[#d4af37]" />
+                  <p className="mt-2 text-xs text-neutral-500">This name will be saved to your WEST MUN account and printed on your official pass.</p>
+                </div>
+              )}
+              <button onClick={() => void loadPass()} disabled={error.toLowerCase().includes("full real name") && fullNameInput.trim().split(/\s+/).filter(Boolean).length < 2} className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-[#d4af37] px-4 py-3 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw className="h-4 w-4" /> {error.toLowerCase().includes("full real name") ? "Save name & issue pass" : "Try again"}</button>
             </div>
           ) : pass && (
             <>
