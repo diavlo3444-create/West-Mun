@@ -464,7 +464,23 @@ r = await call('DELETE', '/api/super-admin?id=' + ADMIN, { token: 'token-admin',
 check('non-super-admin cannot delete a head account', r.status === 403, r);
 
 // ---------------------------------------------------------------------------
-// 4. Configuration fails closed
+// 4. Admin deletion must remove the Auth identity and every role assignment
+// ---------------------------------------------------------------------------
+r = await call('DELETE', '/api/super-admin?scope=admins&id=' + SUPER, { token: 'token-super', body: {} });
+check('primary Super Admin cannot delete their own account', r.status === 400, r);
+check('primary Super Admin remains present after self-delete rejection', state.users.some((u) => u.id === SUPER), state.users);
+
+r = await call('DELETE', '/api/super-admin?scope=admins&id=' + ADMIN, { token: 'token-admin', body: {} });
+check('non-super-admin cannot delete an admin account', r.status === 403, r);
+check('blocked admin deletion leaves the target Auth user intact', state.users.some((u) => u.id === ADMIN), state.users);
+
+r = await call('DELETE', '/api/super-admin?scope=admins&id=' + ADMIN, { token: 'token-super', body: {} });
+check('Super Admin can permanently delete another admin account', r.status === 200 && r.body?.success === true, r);
+check('admin deletion removes the admins assignment', !adminIds.has(ADMIN), Array.from(adminIds));
+check('admin deletion removes the Supabase Auth identity', !state.users.some((u) => u.id === ADMIN), state.users);
+
+// ---------------------------------------------------------------------------
+// 5. Configuration fails closed
 // ---------------------------------------------------------------------------
 delete process.env.SUPABASE_URL;
 delete process.env.VITE_SUPABASE_URL;
