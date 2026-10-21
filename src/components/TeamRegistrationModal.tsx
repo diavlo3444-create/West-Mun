@@ -926,12 +926,12 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
 
               <button
                 type="submit"
-                disabled={!currentlyOpen || busy || (team === 'security' && !securityValidation.valid)}
+                disabled={!currentlyOpen || busy || extraPhotoBusy || (team === 'security' && !securityValidation.valid)}
                 className="px-6 py-2.5 text-xs font-semibold uppercase tracking-widest text-black bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] rounded-sm hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all inline-flex items-center gap-2"
                 title={team === 'security' && !securityValidation.valid ? 'Please satisfy all 4 minimum word count requirements before submitting' : undefined}
               >
                 {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {currentlyOpen ? 'Submit Application' : 'Department Closed'}
+                {extraPhotoBusy ? 'Uploading Photos…' : currentlyOpen ? 'Submit Application' : 'Department Closed'}
               </button>
             </div>
           </form>
