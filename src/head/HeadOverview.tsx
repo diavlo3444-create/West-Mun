@@ -58,6 +58,10 @@ export interface HeadRegistration {
   security_teamwork?: string;
   security_motivation?: string;
   security_handling_harassment?: string;
+  volunteer_special_skills?: string;
+  volunteer_teamwork_conflict?: string;
+  volunteer_emergency_reaction?: string;
+  volunteer_delegate_professionalism?: string;
 }
 
 export interface HeadAnnouncement {

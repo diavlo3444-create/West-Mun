@@ -11,6 +11,12 @@ import {
   validateSecurityAnswers,
   formatSecurityAnswers,
 } from '../lib/securityQuestions';
+import {
+  VOLUNTEER_QUESTIONS,
+  getVolunteerWordCountFeedback,
+  validateVolunteerAnswers,
+  formatVolunteerAnswers,
+} from '../lib/volunteerQuestions';
 
 interface TeamRegistrationModalProps {
   settings: Settings;
@@ -37,6 +43,11 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     security_teamwork: '',
     security_motivation: '',
     security_handling_harassment: '',
+    // Volunteer team 4 mandatory assessment questions
+    volunteer_special_skills: '',
+    volunteer_teamwork_conflict: '',
+    volunteer_emergency_reaction: '',
+    volunteer_delegate_professionalism: '',
     ageOk: false,
     consent: false,
     website: '', // honeypot
@@ -67,6 +78,16 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
         security_teamwork: form.security_teamwork,
         security_motivation: form.security_motivation,
         security_handling_harassment: form.security_handling_harassment,
+      })
+    : { valid: true, errors: {}, counts: {} };
+
+  // Compute live Volunteer validation state if team is volunteers
+  const volunteerValidation = team === 'volunteers'
+    ? validateVolunteerAnswers({
+        volunteer_special_skills: form.volunteer_special_skills,
+        volunteer_teamwork_conflict: form.volunteer_teamwork_conflict,
+        volunteer_emergency_reaction: form.volunteer_emergency_reaction,
+        volunteer_delegate_professionalism: form.volunteer_delegate_professionalism,
       })
     : { valid: true, errors: {}, counts: {} };
 
@@ -104,10 +125,26 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
       }
     }
 
+    // Strict validation for Volunteer team required scenario questions
+    if (team === 'volunteers') {
+      const volVal = validateVolunteerAnswers({
+        volunteer_special_skills: form.volunteer_special_skills,
+        volunteer_teamwork_conflict: form.volunteer_teamwork_conflict,
+        volunteer_emergency_reaction: form.volunteer_emergency_reaction,
+        volunteer_delegate_professionalism: form.volunteer_delegate_professionalism,
+      });
+
+      if (!volVal.valid) {
+        Object.assign(errs, volVal.errors);
+      }
+    }
+
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       if (team === 'security' && !securityValidation.valid) {
         setSubmitError('Please complete all 4 Security Assessment questions with their minimum required word counts.');
+      } else if (team === 'volunteers' && !volunteerValidation.valid) {
+        setSubmitError('Please complete all 4 Volunteer Assessment questions.');
       }
       return;
     }
@@ -126,6 +163,13 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
           security_motivation: form.security_motivation,
           security_handling_harassment: form.security_handling_harassment,
         })
+      : team === 'volunteers'
+      ? formatVolunteerAnswers({
+          volunteer_special_skills: form.volunteer_special_skills,
+          volunteer_teamwork_conflict: form.volunteer_teamwork_conflict,
+          volunteer_emergency_reaction: form.volunteer_emergency_reaction,
+          volunteer_delegate_professionalism: form.volunteer_delegate_professionalism,
+        })
       : form.statement.trim();
 
     const fullPayload = {
@@ -141,6 +185,10 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
       security_teamwork: team === 'security' ? form.security_teamwork.trim() : '',
       security_motivation: team === 'security' ? form.security_motivation.trim() : '',
       security_handling_harassment: team === 'security' ? form.security_handling_harassment.trim() : '',
+      volunteer_special_skills: team === 'volunteers' ? form.volunteer_special_skills.trim() : '',
+      volunteer_teamwork_conflict: team === 'volunteers' ? form.volunteer_teamwork_conflict.trim() : '',
+      volunteer_emergency_reaction: team === 'volunteers' ? form.volunteer_emergency_reaction.trim() : '',
+      volunteer_delegate_professionalism: team === 'volunteers' ? form.volunteer_delegate_professionalism.trim() : '',
       age_confirmed: true,
       consent_version: settings.legal_version || '2026-10-17',
     };
@@ -157,9 +205,9 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
         const isColumnSchemaError =
           error.code === 'PGRST204' ||
           error.code === '42703' ||
-          /could not find the 'security_.*' column/i.test(error.message || '') ||
-          /column "security_.*" of relation .* does not exist/i.test(error.message || '') ||
-          /permission denied for column 'security_.*'/i.test(error.message || '');
+          /could not find the '(security|volunteer)_.*' column/i.test(error.message || '') ||
+          /column "(security|volunteer)_.*" of relation .* does not exist/i.test(error.message || '') ||
+          /permission denied for column '(security|volunteer)_.*'/i.test(error.message || '');
 
         if (isColumnSchemaError) {
           const fallbackPayload = {
@@ -209,6 +257,22 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
           return;
         } else if (error.message?.includes('security_handling_harassment_min_words_50')) {
           setSubmitError('Handling Bullying and Harassment response requires at least 50 words.');
+          setBusy(false);
+          return;
+        } else if (error.message?.includes('volunteer_special_skills_required')) {
+          setSubmitError('Special skills response is required.');
+          setBusy(false);
+          return;
+        } else if (error.message?.includes('volunteer_teamwork_conflict_required')) {
+          setSubmitError('Teamwork & accountability response is required.');
+          setBusy(false);
+          return;
+        } else if (error.message?.includes('volunteer_emergency_reaction_required')) {
+          setSubmitError('Emergency reaction response is required.');
+          setBusy(false);
+          return;
+        } else if (error.message?.includes('volunteer_delegate_professionalism_required')) {
+          setSubmitError('Professionalism response is required.');
           setBusy(false);
           return;
         }
@@ -474,8 +538,8 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
               />
             </div>
 
-            {/* Non-Security Teams: Standard Statement of Motivation */}
-            {team !== 'security' && (
+            {/* Media Team: Standard Statement of Motivation */}
+            {team !== 'security' && team !== 'volunteers' && (
               <div>
                 <label className={labelCls}>Statement of Motivation (Optional)</label>
                 <textarea
@@ -549,6 +613,86 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
                           if (errors[q.key]) {
                             const newWords = countWords(nextVal);
                             if (newWords >= q.minWords) {
+                              const nextErrs = { ...errors };
+                              delete nextErrs[q.key];
+                              setErrors(nextErrs);
+                            }
+                          }
+                        }}
+                      />
+
+                      {errors[q.key] && (
+                        <p className="text-[11px] text-red-400 font-medium flex items-center gap-1.5 mt-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{errors[q.key]}</span>
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* VOLUNTEER TEAM ONLY: The 4 Required Assessment Questions */}
+            {team === 'volunteers' && (
+              <div className="space-y-5 pt-3 border-t border-[#d4af37]/30">
+                <div className="rounded-sm border border-[#d4af37]/35 bg-[#14120a] p-3.5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <HeartHandshake className="w-4 h-4 text-[#d4af37]" />
+                    <span className="text-xs font-serif font-semibold text-white tracking-wide">
+                      Volunteers Team Assessment (4 Required Questions)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-300 font-light leading-relaxed">
+                    Volunteers provide operational excellence and diplomatic support across all conference chambers, ceremonies, and logistics. All four questions below are required.
+                  </p>
+                </div>
+
+                {VOLUNTEER_QUESTIONS.map((q, idx) => {
+                  const currentWords = countWords(form[q.key as keyof typeof form] as string);
+                  const meetsMin = currentWords >= 1;
+                  const feedback = getVolunteerWordCountFeedback(currentWords);
+                  const hasError = Boolean(errors[q.key]);
+
+                  return (
+                    <div key={q.key} className="space-y-1.5 bg-[#101014] p-3.5 rounded-sm border border-neutral-800/90">
+                      <div className="flex items-start justify-between gap-2">
+                        <label className="text-xs font-medium text-white flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-[#d4af37]/20 border border-[#d4af37]/50 text-[#d4af37] text-[10.5px] font-mono flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="font-serif text-[12.5px] text-neutral-100">{q.title} *</span>
+                        </label>
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-sm border shrink-0 transition-colors ${
+                            meetsMin
+                              ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400 font-semibold'
+                              : 'bg-amber-950/50 border-amber-500/40 text-amber-300'
+                          }`}
+                        >
+                          {feedback}
+                        </span>
+                      </div>
+
+                      <p className="text-[11.5px] text-neutral-300 font-light leading-relaxed italic bg-black/40 p-2.5 rounded-sm border border-neutral-800">
+                        "{q.prompt}"
+                      </p>
+
+                      <textarea
+                        rows={3}
+                        required
+                        disabled={!currentlyOpen || busy}
+                        className={`${inputCls} font-normal leading-relaxed text-[11.5px] ${
+                          hasError ? 'border-red-500/80 focus:border-red-400' : ''
+                        }`}
+                        placeholder="Provide your detailed answer here..."
+                        value={(form[q.key as keyof typeof form] as string) || ''}
+                        onChange={(e) => {
+                          const nextVal = e.target.value;
+                          setForm({ ...form, [q.key]: nextVal });
+                          if (errors[q.key]) {
+                            const newWords = countWords(nextVal);
+                            if (newWords >= 1) {
                               const nextErrs = { ...errors };
                               delete nextErrs[q.key];
                               setErrors(nextErrs);

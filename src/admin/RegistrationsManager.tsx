@@ -31,6 +31,7 @@ import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import { explainError, type Row } from './ui';
 import { downloadText, toCsv } from '../lib/safe';
 import { SECURITY_QUESTIONS, countWords, extractSecurityAnswers, getWordCountFeedback } from '../lib/securityQuestions';
+import { VOLUNTEER_QUESTIONS, extractVolunteerAnswers, getVolunteerWordCountFeedback } from '../lib/volunteerQuestions';
 import {
   EmptyState,
   Modal,
@@ -60,6 +61,10 @@ export interface UnifiedRegistration extends Row {
   security_teamwork?: string;
   security_motivation?: string;
   security_handling_harassment?: string;
+  volunteer_special_skills?: string;
+  volunteer_teamwork_conflict?: string;
+  volunteer_emergency_reaction?: string;
+  volunteer_delegate_professionalism?: string;
 }
 
 interface RegistrationsManagerProps {
@@ -569,12 +574,17 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
       'security_teamwork',
       'security_motivation',
       'security_handling_harassment',
+      'volunteer_special_skills',
+      'volunteer_teamwork_conflict',
+      'volunteer_emergency_reaction',
+      'volunteer_delegate_professionalism',
       'admin_notes',
       'submitted_at',
     ];
 
     const body = filteredList.map((item) => {
       const sec = extractSecurityAnswers(item);
+      const vol = extractVolunteerAnswers(item);
       return [
         item.id,
         item._type === 'delegate' ? 'Delegate' : 'Staff',
@@ -590,6 +600,10 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
         sec.security_teamwork || '',
         sec.security_motivation || '',
         sec.security_handling_harassment || '',
+        vol.volunteer_special_skills || '',
+        vol.volunteer_teamwork_conflict || '',
+        vol.volunteer_emergency_reaction || '',
+        vol.volunteer_delegate_professionalism || '',
         item.admin_notes || '',
         item.created_at,
       ];
@@ -1451,7 +1465,10 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
               </div>
             )}
 
-            {activeItem.statement && (
+            {activeItem.statement &&
+              !activeItem.statement.startsWith('=== SECURITY TEAM ASSESSMENT ===') &&
+              !activeItem.statement.startsWith('=== SECURITY TEAM SCENARIO QUESTIONS ===') &&
+              !activeItem.statement.startsWith('=== VOLUNTEER TEAM ASSESSMENT ===') && (
               <div>
                 <h3 className="mb-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
                   Statement of motivation
@@ -1507,6 +1524,74 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                             <span
                               className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded-sm border ${
                                 meetsMin
+                                  ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400 font-semibold'
+                                  : 'bg-amber-950/50 border-amber-500/40 text-amber-300'
+                              }`}
+                            >
+                              {feedback}
+                            </span>
+                          </div>
+
+                          <p className="text-[10.5px] text-neutral-400 italic font-light leading-relaxed">
+                            "{q.prompt}"
+                          </p>
+
+                          <div className="wm-scroll max-h-36 overflow-y-auto whitespace-pre-wrap rounded border border-white/[0.06] bg-[#141418] p-2.5 text-[11px] leading-relaxed text-neutral-200">
+                            {ans ? ans : <span className="text-neutral-500 italic">No response submitted.</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Volunteer Team Assessment Section (All 4 Questions & Answers) */}
+            {(() => {
+              const volAnswers = extractVolunteerAnswers(activeItem);
+              const isVolTeam = activeItem._teamId === 'volunteers';
+              const hasAnyVolAnswers =
+                isVolTeam ||
+                Boolean(
+                  volAnswers.volunteer_special_skills ||
+                  volAnswers.volunteer_teamwork_conflict ||
+                  volAnswers.volunteer_emergency_reaction ||
+                  volAnswers.volunteer_delegate_professionalism
+                );
+
+              if (!hasAnyVolAnswers) return null;
+
+              return (
+                <div className="space-y-3 rounded-md border border-[#d4af37]/35 bg-[#12110c] p-3.5">
+                  <div className="flex items-center justify-between gap-2 border-b border-[#d4af37]/20 pb-2">
+                    <div className="flex items-center gap-1.5 text-[9.5px] font-mono uppercase tracking-[0.14em] text-[#d4af37]">
+                      <HeartHandshake className="h-3.5 w-3.5" aria-hidden="true" />
+                      Volunteer Team Assessment (4 Required Questions)
+                    </div>
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-sm bg-[#d4af37]/15 border border-[#d4af37]/40 text-[#d4af37]">
+                      Official Responses
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 pt-1">
+                    {VOLUNTEER_QUESTIONS.map((q, idx) => {
+                      const ans = volAnswers[q.key];
+                      const words = countWords(ans);
+                      const feedback = getVolunteerWordCountFeedback(words);
+
+                      return (
+                        <div key={q.key} className="rounded-md border border-white/[0.07] bg-[#0c0c0f] p-3 space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-[10.5px] font-mono uppercase tracking-wider text-neutral-200 font-semibold flex items-center gap-1.5">
+                              <span className="w-4 h-4 rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 text-[#d4af37] text-[9px] flex items-center justify-center">
+                                {idx + 1}
+                              </span>
+                              {q.title}
+                            </span>
+                            <span
+                              className={`text-[9.5px] font-mono px-2 py-0.5 rounded-sm border ${
+                                words >= 1
                                   ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400 font-semibold'
                                   : 'bg-amber-950/50 border-amber-500/40 text-amber-300'
                               }`}
