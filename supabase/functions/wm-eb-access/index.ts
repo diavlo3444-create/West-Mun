@@ -122,7 +122,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (body.action === "list_active_heads") {
-    const result = await db.from("department_heads").select("id,head_name,department,section")
+    const result = await db.from("department_heads").select("user_id,head_name,department,section")
       .eq("active", true).order("department").order("section").order("head_name");
     if (result.error) return json({ error: "Could not load the active department heads. Please try again." }, 500);
     return json({ success: true, heads: result.data || [] });
@@ -133,12 +133,12 @@ Deno.serve(async (req: Request) => {
     if (!bearer) return json({ error: "Sign in as a department head first." }, 401);
     const auth = await db.auth.getUser(bearer[1]);
     if (auth.error || !auth.data.user) return json({ error: "Your session is invalid or expired." }, 401);
-    const head = await db.from("department_heads").select("id,department,section,active")
+    const head = await db.from("department_heads").select("user_id,department,section,active")
       .eq("user_id", auth.data.user.id).eq("active", true).maybeSingle();
     if (head.error) return json({ error: "Could not verify your head assignment." }, 500);
     if (!head.data) return json({ error: "Only an active department head can view their Co-Head list." }, 403);
     const result = await db.from("wm_qr_passes").select("user_id,full_name,email,phone,gender,created_at,reporting_head_id")
-      .eq("reporting_head_id", head.data.id).eq("account_role", "co_head").eq("active", true).order("full_name");
+      .eq("reporting_head_id", head.data.user_id).eq("account_role", "co_head").eq("active", true).order("full_name");
     if (result.error) return json({ error: "Could not load your Co-Heads." }, 500);
     return json({ success: true, coHeads: result.data || [] });
   }
@@ -166,10 +166,10 @@ Deno.serve(async (req: Request) => {
     if (link.error) return json({ error: "Could not verify the signup link. Please try again." }, 500);
     if (!link.data) return json({ error: "This EB signup link is no longer active. Ask an admin for the current link." }, 403);
 
-    let reportingHead: { id: string; head_name: string | null; department: string; section: string | null } | null = null;
+    let reportingHead: { user_id: string; head_name: string | null; department: string; section: string | null } | null = null;
     if (ebRole === "co_head") {
-      const selected = await db.from("department_heads").select("id,head_name,department,section,active")
-        .eq("id", requestedHeadId).eq("active", true).maybeSingle();
+      const selected = await db.from("department_heads").select("user_id,head_name,department,section,active")
+        .eq("user_id", requestedHeadId).eq("active", true).maybeSingle();
       if (selected.error) return json({ error: "Could not verify the selected head. Please try again." }, 500);
       if (!selected.data) return json({ error: "That head is no longer active. Select an active head from the list." }, 400);
       reportingHead = selected.data;
@@ -184,7 +184,7 @@ Deno.serve(async (req: Request) => {
     const created = await db.auth.admin.createUser({
       email, password, email_confirm: true,
       user_metadata: { full_name: fullName, phone, gender },
-      app_metadata: { wm_role: "eb_member", wm_team: team, wm_section: section, wm_eb_role: ebRole, ...(reportingHead ? { wm_reporting_head_id: reportingHead.id } : {}) },
+      app_metadata: { wm_role: "eb_member", wm_team: team, wm_section: section, wm_eb_role: ebRole, ...(reportingHead ? { wm_reporting_head_id: reportingHead.user_id } : {}) },
     });
     if (created.error || !created.data.user) {
       const message = created.error?.message || "";
@@ -203,7 +203,7 @@ Deno.serve(async (req: Request) => {
       section,
       phone,
       gender,
-      reporting_head_id: reportingHead?.id ?? null,
+      reporting_head_id: reportingHead?.user_id ?? null,
       active: true,
       inside: false,
     }).select("user_id").maybeSingle();
