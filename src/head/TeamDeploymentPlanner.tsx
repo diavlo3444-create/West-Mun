@@ -27,7 +27,6 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [reportingTo, setReportingTo] = useState('');
-  const [assignmentSection, setAssignmentSection] = useState<SectionKey | 'general'>(section || 'male');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -55,8 +54,6 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
       setApplicants(approved);
       setAssignments((assignmentResult.data || []) as Assignment[]);
       setRegistrationId(current => approved.some(a => a.id === current) ? current : (approved[0]?.id || ''));
-      if (section) setAssignmentSection(section);
-      else setAssignmentSection(current => current === 'general' || current === 'male' || current === 'female' ? current : 'male');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load approved applicants and deployment assignments.');
     } finally { setBusy(false); }
@@ -73,7 +70,7 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
     }
     const start = new Date(startsAt), end = new Date(endsAt);
     if (!(end > start)) { setError('The end time must be after the start time.'); return; }
-    const chosenSection = section || (selectedApplicant.section === 'male' || selectedApplicant.section === 'female' ? selectedApplicant.section : assignmentSection);
+    const chosenSection = section || (selectedApplicant.section === 'male' || selectedApplicant.section === 'female' ? selectedApplicant.section : 'general');
     if (!chosenSection) { setError('Choose the applicant’s section.'); return; }
     setBusy(true); setError(''); setNotice('');
     try {
@@ -120,9 +117,8 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
       <form className={panel+' space-y-3'} onSubmit={submit}>
         <h3 className="flex items-center gap-2 font-semibold"><Plus size={15} className="text-[#d4af37]"/> Create deployment assignment</h3>
         <div><label className={label}>Approved team member</label><select className={field} value={registrationId} onChange={e=>setRegistrationId(e.target.value)} required><option value="">Choose applicant…</option>{applicants.map(a=><option key={a.id} value={a.id}>{a.full_name} · {a.section}</option>)}</select>{applicants.length===0&&<p className="mt-1 text-xs text-amber-200">No approved applicants are visible for this department/section yet.</p>}</div>
-        {!section && <div><label className={label}>Section</label><select className={field} value={assignmentSection} onChange={e=>setAssignmentSection(e.target.value as SectionKey|'general')}><option value="male">Male</option><option value="female">Female</option><option value="general">General / shared area</option></select></div>}
         <div><label className={label}>Duty / role</label><input className={field} placeholder={department==='volunteers'?'e.g. Dais runner / delegate support':department==='security'?'e.g. Entrance checkpoint / floor patrol':'e.g. Plenary photographer / committee reporter'} value={assignmentTitle} onChange={e=>setAssignmentTitle(e.target.value)} required/></div>
-        <div><label className={label}>Station / location</label><input className={field} placeholder="e.g. Main entrance, A-201, Press desk" className={field} value={station} onChange={e=>setStation(e.target.value)} required/></div>
+        <div><label className={label}>Station / location</label><input className={field} placeholder="e.g. Main entrance, A-201, Press desk" value={station} onChange={e=>setStation(e.target.value)} required/></div>
         <div><label className={label}>Shift starts</label><input type="datetime-local" className={field} value={startsAt} onChange={e=>setStartsAt(e.target.value)} required/></div>
         <div><label className={label}>Shift ends</label><input type="datetime-local" className={field} value={endsAt} onChange={e=>setEndsAt(e.target.value)} required/></div>
         <div><label className={label}>Reports to</label><input className={field} placeholder="Supervisor / team lead" value={reportingTo} onChange={e=>setReportingTo(e.target.value)} required/></div>
