@@ -34,7 +34,15 @@ export default function PassPage() {
         return;
       }
       const { data, error: invokeError } = await supabase.functions.invoke("wm-qr-access", { body: { action: "pass", fullName: providedName.trim() } });
-      if (invokeError || !data?.success || !data?.pass) throw new Error(data?.error || invokeError?.message || "Could not load your QR pass.");
+      if (invokeError) {
+        let detail = "";
+        const context = (invokeError as unknown as { context?: Response }).context;
+        if (context && typeof context.clone === "function") {
+          try { const payload = await context.clone().json(); detail = typeof payload?.error === "string" ? payload.error : ""; } catch {}
+        }
+        throw new Error(detail || data?.error || invokeError.message || "Could not load your QR pass.");
+      }
+      if (!data?.success || !data?.pass) throw new Error(data?.error || "Could not load your QR pass.");
       const current = data.pass as PassData;
       const image = await QRCode.toDataURL(current.qr_token, {
         width: 360,
