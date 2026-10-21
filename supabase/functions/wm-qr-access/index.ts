@@ -103,6 +103,17 @@ Deno.serve(async (req: Request) => {
     return json({ success: true, pass: pass.data }, 201);
   }
 
+  if (body.action === "checked_in") {
+    if (!canScan) return json({ error: "This account cannot view venue attendance." }, 403);
+    const checkedIn = await db.from("wm_qr_passes")
+      .select("user_id,full_name,account_role,team,section,last_scanned_at")
+      .eq("active", true)
+      .eq("inside", true)
+      .order("last_scanned_at", { ascending: false });
+    if (checkedIn.error) return json({ error: "Could not load the current check-in list." }, 500);
+    return json({ success: true, people: checkedIn.data ?? [], count: checkedIn.data?.length ?? 0 });
+  }
+
   if (body.action === "scan") {
     if (!canScan) return json({ error: "Scanner access is restricted to authorized Security members and WEST MUN admins." }, 403);
     const qrToken = clean(body.qrToken);
