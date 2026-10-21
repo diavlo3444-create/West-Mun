@@ -70,16 +70,40 @@ export default function ScannerPage() {
   useEffect(() => {
     if (!scanning || !allowed) return;
     let live = true;
+    let started = false;
     let instance: Html5Qrcode | null = null;
+    const config = { fps: 12, qrbox: { width: 250, height: 250 }, aspectRatio: 1 };
+    const onDecoded = (text: string) => { if (live) void handleDecoded(text); };
     const start = async () => {
       try {
-        instance = new Html5Qrcode("westmun-qr-reader");
+        instance = new Html5Qrcode("westmun-qr-reader", { verbose: false });
         scannerRef.current = instance;
-        await instance.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 }, (text) => { if (live) void handleDecoded(text); }, () => {});
-      } catch {
+        // Prefer a real camera device ID; some browsers fail to resolve facingMode="environment".
+        const cameras = await Html5Qrcode.getCameras();
+        if (!live) return;
+        if (!cameras.length) throw new Error("No camera was found. Connect a camera or open this page on a phone with camera access.");
+        const preferred = cameras.find((camera) => /back|rear|environment|world/i.test(camera.label)) ?? cameras[cameras.length - 1];
+        try {
+          await instance.start(preferred.id, config, onDecoded, () => {});
+        } catch (deviceError) {
+          if (!live) return;
+          // Fall back to the browser's environment-camera selector.
+          try {
+            await instance.start({ facingMode: "environment" }, config, onDecoded, () => {});
+          } catch {
+            throw deviceError;
+          }
+        }
+        started = true;
+        if (!live) {
+          await instance.stop().catch(() => {});
+          started = false;
+        }
+      } catch (e) {
         if (live) {
           setScanning(false);
-          setMessage({ success: false, outcome: "denied", error: "Camera could not start. Allow camera access and use HTTPS, or try another device." });
+          const detail = e instanceof Error ? e.message : String(e);
+          setMessage({ success: false, outcome: "denied", error: `Camera could not start: ${detail}. Check browser camera permission and use the HTTPS WEST MUN website.` });
         }
       }
     };
@@ -87,10 +111,13 @@ export default function ScannerPage() {
     return () => {
       live = false;
       const active = instance;
-      if (active) {
+      if (active && started) {
         void active.stop().catch(() => {}).finally(() => { try { active.clear(); } catch {} });
+      } else if (active) {
+        // If startup is still pending, its continuation will stop the camera once it resolves.
+        try { active.clear(); } catch {}
       }
-      scannerRef.current = null;
+      if (scannerRef.current === active) scannerRef.current = null;
     };
   }, [scanning, allowed, handleDecoded]);
 
@@ -118,6 +145,7 @@ export default function ScannerPage() {
                 <button onClick={startCamera} disabled={scanning || busy} className="flex flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-[#e5c158] to-[#aa8232] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"><Camera className="h-4 w-4" /> {scanning ? "Camera active…" : "Start camera"}</button>
                 <button onClick={() => setScanning(false)} disabled={!scanning} className="flex items-center justify-center gap-2 rounded-md border border-white/15 px-4 py-3 text-sm text-neutral-300 disabled:opacity-40"><CameraOff className="h-4 w-4" /> Stop</button>
               </div>
+              <p className="mt-3 text-xs leading-relaxed text-neutral-500">If the camera does not open, check the browser's camera permission for west-mun.vercel.app and reload the page. Camera access requires HTTPS.</p>
               {busy && <p className="mt-4 flex items-center gap-2 text-sm text-neutral-400"><Loader2 className="h-4 w-4 animate-spin" /> Verifying pass…</p>}
               {message && <div role="status" className={`mt-4 rounded-lg border p-4 ${statusClass}`}>
                 <p className="font-semibold">{message.success ? (direction === "entry" ? "Entry approved" : "Exit recorded") : "Scan denied"}</p>
