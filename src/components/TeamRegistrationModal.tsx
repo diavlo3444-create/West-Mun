@@ -199,7 +199,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
           '',
           '5. Photography, videography, or design portfolio:',
           form.media_portfolio.trim(),
-        ].join('\\n')
+        ].join('\n')
       : team === 'security'
       ? formatSecurityAnswers({
           security_emergency_steps: form.security_emergency_steps,
