@@ -614,6 +614,7 @@ export default function AdminApp() {
     >
       <div className="mb-4 flex flex-wrap justify-end gap-2">
         <a href="/pass" className="rounded-md border border-[#d4af37]/35 px-3 py-2 text-xs font-medium text-[#bfa04a] hover:bg-[#d4af37]/10">My QR Pass</a>
+        <a href="/admin/eb-invites" className="rounded-md border border-[#d4af37]/35 px-3 py-2 text-xs font-medium text-[#bfa04a] hover:bg-[#d4af37]/10">EB Signup Links</a>
         <a href="/scanner" className="rounded-md bg-[#d4af37] px-3 py-2 text-xs font-semibold text-black hover:brightness-110">Venue Scanner</a>
       </div>
       <div key={page} className="wm-page-in">
