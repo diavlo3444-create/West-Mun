@@ -8,16 +8,19 @@ import {
   ShieldAlert,
   LogOut,
   Globe,
+  Network,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { WebsiteEditor } from '../admin/WebsiteEditor';
 import {
   DEPARTMENTS,
   canManageRegistrations,
+  canManageRoles,
   isGenderSeparated,
   type DepartmentKey,
   type SectionKey,
 } from './departments';
+import { RolesDashboard } from './roles/RolesDashboard';
 import { DashboardShell, type NavGroup, type NavItem } from '../dashboard/DashboardShell';
 import { Notice } from '../dashboard/ui';
 import {
@@ -103,6 +106,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const isPr = department === 'pr';
   const isHr = department === 'hr';
   const registrationAccess = canManageRegistrations(department);
+  const rolesAccess = canManageRoles(department) || Boolean(testMode?.isActive);
   // Operations Studio is restricted to the three operational department heads.
   // Super IT test sessions are separately authenticated and audit-logged.
   const operationsAccess = Boolean(testMode?.isActive) || ['media_press', 'security', 'volunteers'].includes(department);
@@ -116,6 +120,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const [view, setView] = useState<HeadView>(() => {
     if (initialView === 'sponsors' && isPr) return 'sponsors';
     if (initialView === 'inquiries' && isHr) return 'inquiries';
+    if (initialView === 'roles' && rolesAccess) return 'roles';
     if (initialView === 'department') return 'department';
     if (initialView === 'registrations' && registrationAccess) return 'registrations';
     if (initialView && workspaceModules.some((module) => module.id === initialView)) return initialView;
@@ -491,6 +496,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const navigate = (id: string) => {
     if (id === 'operations' && !operationsAccess) return;
     if (id === 'registrations' && !registrationAccess) return;
+    if (id === 'roles' && !rolesAccess) return;
     if (id === 'sponsors' && !isPr) return;
     if (id === 'inquiries' && !isHr) return;
     setView(id);
@@ -512,6 +518,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(registrationAccess
       ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
       : []),
+    ...(rolesAccess ? [{ id: 'roles', label: 'Roles', icon: Network }] : []),
     ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
     ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
@@ -533,13 +540,15 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         ? 'Website CMS'
         : view === 'registrations'
           ? 'Applications'
-          : view === 'sponsors'
-            ? 'Sponsors & Partners'
-            : view === 'inquiries'
-              ? 'Inquiries & Messages'
-              : view === 'department'
-                ? 'Assignment'
-                : activeModule?.label || 'Workspace';
+          : view === 'roles'
+            ? 'Roles & Hierarchy'
+            : view === 'sponsors'
+              ? 'Sponsors & Partners'
+              : view === 'inquiries'
+                ? 'Inquiries & Messages'
+                : view === 'department'
+                  ? 'Assignment'
+                  : activeModule?.label || 'Workspace';
 
   const displayName = (headName && headName.trim()) || headEmail.split('@')[0] || 'Department head';
 
@@ -640,6 +649,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
               onReplayUnlock={handleReplayUnlock}
               onOpenSponsors={isPr ? () => setView('sponsors') : undefined}
               onOpenInquiries={isHr ? () => setView('inquiries') : undefined}
+              onOpenRoles={rolesAccess ? () => setView('roles') : undefined}
             />
             <section aria-labelledby="registration-workspace-heading" className="space-y-3">
               <div>
@@ -690,6 +700,15 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
             onSave={saveRegistration}
             initialRecord={focusRecord}
             onConsumeInitial={() => setFocusRecord(null)}
+          />
+        )}
+
+        {view === 'roles' && rolesAccess && (
+          <RolesDashboard
+            department={department}
+            section={section}
+            departmentLabel={meta.label}
+            testToken={testMode?.token || null}
           />
         )}
 

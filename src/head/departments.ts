@@ -66,6 +66,20 @@ export function canManageRegistrations(dept: DepartmentKey | null | undefined): 
   return Boolean(dept && REGISTRATION_DEPARTMENTS.includes(dept));
 }
 
+/**
+ * Roles & Organizational Hierarchy management is restricted to Media, Volunteer,
+ * and Security departments.
+ */
+export const ROLES_MANAGEMENT_DEPARTMENTS: readonly DepartmentKey[] = [
+  'media_press',
+  'security',
+  'volunteers',
+] as const;
+
+export function canManageRoles(dept: DepartmentKey | null | undefined): boolean {
+  return Boolean(dept && ROLES_MANAGEMENT_DEPARTMENTS.includes(dept));
+}
+
 export const DEPARTMENTS: Record<DepartmentKey, DepartmentMeta> = {
   design: {
     key: 'design',

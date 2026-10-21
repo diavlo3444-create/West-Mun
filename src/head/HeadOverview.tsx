@@ -15,6 +15,7 @@ import {
   Key,
   Award,
   Mail,
+  Network,
 } from 'lucide-react';
 import {
   EmptyState,
@@ -94,6 +95,7 @@ interface HeadOverviewProps {
   onReplayUnlock?: () => void;
   onOpenSponsors?: () => void;
   onOpenInquiries?: () => void;
+  onOpenRoles?: () => void;
 }
 
 function initials(name?: string): string {
@@ -125,6 +127,7 @@ export const HeadOverview: React.FC<HeadOverviewProps> = ({
   onReplayUnlock,
   onOpenSponsors,
   onOpenInquiries,
+  onOpenRoles,
 }) => {
   const Icon = meta.icon;
   const recent = registrations.slice(0, 6);
@@ -263,6 +266,32 @@ export const HeadOverview: React.FC<HeadOverviewProps> = ({
             className={btnSecondary}
           >
             <span>Open Inquiries Management</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {onOpenRoles && ['media_press', 'security', 'volunteers'].includes(meta.key) && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-[10px] border border-[#d4af37]/40 bg-gradient-to-r from-[#17150e] via-[#12110c] to-[#0c0c0f] shadow-lg">
+          <div className="flex items-center gap-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#d4af37]/40 bg-[#d4af37]/20 text-[#d4af37]">
+              <Network className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-white tracking-wide">
+                Roles & Organizational Hierarchy
+              </h3>
+              <p className="text-xs text-neutral-300 mt-0.5">
+                Assign roles, delegate operational responsibilities, and structure your approved team members into an organizational hierarchy.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenRoles}
+            className={btnPrimary}
+          >
+            <span>Open Roles & Hierarchy</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>

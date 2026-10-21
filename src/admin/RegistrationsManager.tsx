@@ -152,6 +152,85 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   const [bulkSignupLinks, setBulkSignupLinks] = useState<Array<{ signupUrl: string; message: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>>([]);
   const [bulkSignupNotice, setBulkSignupNotice] = useState<string | null>(null);
 
+  // Shared Gmail Connection State
+  const [gmailStatus, setGmailStatus] = useState<'checking' | 'connected' | 'not_connected' | 'error'>('checking');
+  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
+  const [gmailBusy, setGmailBusy] = useState(false);
+  const [gmailNotice, setGmailNotice] = useState<string | null>(null);
+
+  const loadGmailStatus = async () => {
+    if (!supabase) return;
+    setGmailBusy(true);
+    setGmailNotice(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('gmail-oauth-status');
+      if (error || !data) {
+        setGmailStatus('error');
+        setGmailNotice('Connection Status Unavailable');
+        return;
+      }
+      if (data.connected && data.email) {
+        setGmailStatus('connected');
+        setGmailEmail(data.email);
+      } else {
+        setGmailStatus('not_connected');
+        setGmailEmail(null);
+      }
+    } catch {
+      setGmailStatus('error');
+      setGmailNotice('Connection Status Unavailable');
+    } finally {
+      setGmailBusy(false);
+    }
+  };
+
+  React.useEffect(() => {
+    loadGmailStatus();
+  }, []);
+
+  const handleConnectGmail = async () => {
+    if (!supabase || gmailBusy) return;
+    setGmailBusy(true);
+    setGmailNotice(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('gmail-oauth-start');
+      if (error) {
+        if ((error as any)?.status === 409 || /conflict|already exists/i.test((error as any)?.message || '')) {
+          setGmailNotice('A shared Gmail connection already exists. Only the IT Super Admin can replace it.');
+          return;
+        }
+        setGmailNotice('Could not initiate Gmail connection.');
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch {
+      setGmailNotice('Connection Status Unavailable');
+    } finally {
+      setGmailBusy(false);
+    }
+  };
+
+  const handleDisconnectGmail = async () => {
+    if (!supabase || gmailBusy) return;
+    if (!window.confirm('Disconnect the shared Gmail account?')) return;
+    setGmailBusy(true);
+    setGmailNotice(null);
+    try {
+      const { error } = await supabase.functions.invoke('gmail-oauth-disconnect');
+      if (error) {
+        setGmailNotice('Could not disconnect Gmail.');
+        return;
+      }
+      await loadGmailStatus();
+    } catch {
+      setGmailNotice('Could not disconnect Gmail.');
+    } finally {
+      setGmailBusy(false);
+    }
+  };
+
   React.useEffect(() => {
     let current = true;
     setHeadRecommendation(null);
@@ -636,6 +715,76 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
               No emails are sent by this website. After an application is accepted, the authorized section head or admin can generate a one-time signup link and share it manually by WhatsApp, phone, or their own email account. The link expires in seven days and only works with the email on the application.
             </p>
           </div>
+        </div>
+      </Panel>
+
+      <Panel className="border-[#d4af37]/20 bg-[#101013]">
+        <PanelHeader
+          title="Shared Gmail Connection"
+          description="Manage the shared Gmail account used for official communications and dispatch."
+          action={
+            <button
+              type="button"
+              onClick={loadGmailStatus}
+              disabled={gmailBusy}
+              className={btnSecondary}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${gmailBusy ? 'animate-spin' : ''}`} aria-hidden="true" />
+              Refresh Status
+            </button>
+          }
+        />
+        <div className="p-4 space-y-3">
+          {gmailStatus === 'checking' && (
+            <div className="flex items-center gap-2 text-xs text-neutral-400">
+              <Loader2 className="h-4 w-4 animate-spin text-[#d4af37]" />
+              <span>Checking Connection</span>
+            </div>
+          )}
+          {gmailStatus === 'connected' && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-500/30 bg-emerald-950/20 p-3">
+              <div className="flex items-center gap-2 text-xs text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                <span>Gmail Connected</span>
+                {gmailEmail && <span className="font-mono text-white">({gmailEmail})</span>}
+              </div>
+              {isSuperAdmin && gmailStatus === 'connected' && (
+                <button
+                  type="button"
+                  onClick={handleDisconnectGmail}
+                  disabled={gmailBusy}
+                  className={btnDanger}
+                >
+                  Disconnect Shared Gmail
+                </button>
+              )}
+            </div>
+          )}
+          {gmailStatus === 'not_connected' && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-neutral-800 bg-neutral-900/40 p-3">
+              <div className="flex items-center gap-2 text-xs text-neutral-400">
+                <Mail className="h-4 w-4 text-neutral-500" />
+                <span>Gmail Not Connected</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleConnectGmail}
+                disabled={gmailBusy}
+                className={btnPrimary}
+              >
+                Connect Gmail
+              </button>
+            </div>
+          )}
+          {gmailStatus === 'error' && (
+            <div className="flex items-center gap-2 rounded border border-rose-500/30 bg-rose-950/20 p-3 text-xs text-rose-300">
+              <AlertTriangle className="h-4 w-4 text-rose-400" />
+              <span>Connection Status Unavailable</span>
+            </div>
+          )}
+          {gmailNotice && (
+            <p className="text-xs text-amber-400">{gmailNotice}</p>
+          )}
         </div>
       </Panel>
 
