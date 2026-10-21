@@ -156,7 +156,7 @@ Deno.serve(async (req: Request) => {
     });
     if (created.error || !created.data.user) {
       const message = created.error?.message || "";
-      if (/already\s+(?:been\\s+)?registered|already exists|duplicate key|email.*already/i.test(message)) return json({ error: "An account already exists for this email. Sign in with that account or ask an admin for help." }, 409);
+      if (/already\s+(?:been\s+)?registered|already exists|duplicate key|email.*already/i.test(message)) return json({ error: "An account already exists for this email. Sign in with that account or ask an admin for help." }, 409);
       console.error("[wm-eb-access] Public signup account creation failed", { error: message.slice(0, 160) });
       return json({ error: "Could not create your account. Check your details and try again." }, 500);
     }
