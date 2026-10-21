@@ -1516,7 +1516,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             </div>
 
             <p className="text-xs text-neutral-300 leading-relaxed font-light">
-              Are you sure you want to revoke department head authorization for{' '}
+              Are you sure you want to permanently delete the department head account for{' '}
               <strong className="text-white">{deletingHead.head_name || deletingHead.email}</strong>?
             </p>
 
@@ -1524,7 +1524,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
               <div>Department: <span className="text-white">{DEPARTMENTS[deletingHead.department]?.label}</span></div>
               {deletingHead.section && <div>Division: <span className="text-white">{deletingHead.section.toUpperCase()}</span></div>}
               <div className="text-[#e5c158] pt-1">
-                Note: Candidate applications and delegate records will NOT be deleted. Only this account's head portal access will be terminated.
+                This permanently deletes the Supabase login and removes its head, admin, and EB/pass assignments. Candidate applications and delegate records remain intact.
               </div>
             </div>
 
