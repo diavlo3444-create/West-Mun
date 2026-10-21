@@ -22,19 +22,12 @@ export const ExecutiveBoardManager: React.FC = () => {
     if (!supabase) { setNotice({ tone: 'error', message: 'Supabase is not configured.' }); setLoading(false); return; }
     setRefreshing(true);
     setNotice(null);
-    const [memberResult, headResult] = await Promise.all([
-      supabase.functions.invoke('wm-eb-access', { body: { action: 'list_members' } }),
-      supabase.from('department_heads').select('user_id,email,head_name,department,section,active,created_at').order('department').order('section'),
-    ]);
-    if (memberResult.error || !memberResult.data?.success) {
-      setNotice({ tone: 'error', message: memberResult.data?.error || memberResult.error?.message || 'Could not load EB members.' });
+    const { data, error } = await supabase.functions.invoke('wm-eb-access', { body: { action: 'list_members' } });
+    if (error || !data?.success) {
+      setNotice({ tone: 'error', message: data?.error || error?.message || 'Could not load the Executive Board directory.' });
     } else {
-      setMembers((memberResult.data.members || []) as Member[]);
-    }
-    if (headResult.error) {
-      setNotice({ tone: 'error', message: `Could not load department heads: ${headResult.error.message}` });
-    } else {
-      setHeads((headResult.data || []) as Head[]);
+      setMembers((data.members || []) as Member[]);
+      setHeads((data.heads || []) as Head[]);
     }
     setLoading(false);
     setRefreshing(false);
