@@ -1,5 +1,7 @@
 import {
   verifyAdminCaller,
+  verifySuperAdminCaller,
+  getSupabaseAdmin,
   handleCreateHeadAccount,
   handleAssignHead,
   handleListHeads,
@@ -91,6 +93,30 @@ export default async function handler(req: any, res: any) {
     const action = url.searchParams.get('action') || '';
     const scope = url.searchParams.get('scope') || url.searchParams.get('target') || '';
     const headId = url.searchParams.get('id') || '';
+
+    // Super Admin-only application deletion. Use the server-side service role
+    // because the browser's authenticated role is intentionally not in public.admins.
+    if (action === 'delete-application' && method === 'POST') {
+      const auth = await verifySuperAdminCaller(authHeader);
+      if (!auth.authorized) {
+        return res.status(auth.statusCode).json({ success: false, code: auth.code, error: auth.error });
+      }
+      const body = await parseJsonBody(req);
+      const id = String(body.id || '').trim();
+      const type = body.type === 'delegate' ? 'delegate' : body.type === 'team' ? 'team' : '';
+      if (!id || !type) return res.status(400).json({ success: false, error: 'Application id and type are required.' });
+      const db = getSupabaseAdmin();
+      if (!db) return res.status(503).json({ success: false, error: 'Server-side Supabase admin credentials are not configured.' });
+
+      if (type === 'team') {
+        const { error: decisionError } = await db.from('wm_staffing_decisions').delete().eq('registration_id', id);
+        if (decisionError) return res.status(400).json({ success: false, error: decisionError.message });
+      }
+      const table = type === 'delegate' ? 'delegates' : 'team_registrations';
+      const { error: deleteError } = await db.from(table).delete().eq('id', id);
+      if (deleteError) return res.status(400).json({ success: false, error: deleteError.message });
+      return res.status(200).json({ success: true });
+    }
 
     // 1. Session / identity verification (any organiser in public.admins).
     //    The bearer token is verified with Supabase Auth server-side; the
