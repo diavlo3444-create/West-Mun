@@ -135,6 +135,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   });
 
   const [registrations, setRegistrations] = useState<HeadRegistration[]>([]);
+  const [coHeads, setCoHeads] = useState<Array<{user_id:string;full_name:string;email:string;phone?:string|null;gender?:string|null}>>([]);
+  const [coHeadsError, setCoHeadsError] = useState("");
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [announcements, setAnnouncements] = useState<HeadAnnouncement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -298,6 +300,20 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   useEffect(() => {
     loadDepartmentData();
   }, [loadDepartmentData]);
+
+  useEffect(() => {
+    let active = true;
+    if (!supabase) return;
+    supabase.functions.invoke("wm-eb-access", { body: { action: "list_my_coheads" } })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error || !data?.success) { setCoHeadsError(data?.error || "Co-Head list unavailable."); return; }
+        setCoHeads(data.coHeads || []);
+        setCoHeadsError("");
+      })
+      .catch(() => { if (active) setCoHeadsError("Co-Head list unavailable."); });
+    return () => { active = false; };
+  }, [department, section]);
 
   useEffect(() => {
     document.title = `WEST MUN 2027 — ${meta.label} Dashboard`;
@@ -651,6 +667,24 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
         {view === 'overview' && registrationAccess && (
           <>
+            {coHeads.length > 0 && (
+              <section className="mb-5 rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/[0.06] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-[#f3e5ab]">Your Co-Head{coHeads.length === 1 ? "" : "s"}</h2>
+                  <span className="rounded-full border border-[#d4af37]/30 px-2 py-0.5 text-[10px] text-[#e5c158]">{coHeads.length}</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {coHeads.map((member) => (
+                    <div key={member.user_id} className="rounded-lg border border-white/[0.08] bg-black/20 p-3">
+                      <p className="text-sm font-medium text-white">{member.full_name}</p>
+                      <p className="mt-1 text-xs text-neutral-400">{member.email}</p>
+                      {member.phone && <p className="mt-1 text-xs text-neutral-500">{member.phone}</p>}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+            {coHeadsError && <p className="mb-4 text-xs text-neutral-500">{coHeadsError}</p>}
             <HeadOverview
               meta={meta}
               section={section}
