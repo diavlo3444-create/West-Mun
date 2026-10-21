@@ -75,7 +75,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     try {
       for (const file of Array.from(files)) {
         if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(file.type)) throw new Error(`${file.name}: use JPG, PNG, WEBP, or HEIC images.`);
-        if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name}: each photo must be 10 MB or smaller.`);
+        if (file.size > 200 * 1024 * 1024) throw new Error(`${file.name}: each photo must be 200 MB or smaller.`);
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100) || 'photo';
         const path = `registration-extra/${crypto.randomUUID()}/${Date.now()}-${safeName}`;
         const { error } = await supabase.storage.from('registration-extra').upload(path, file, { contentType: file.type, upsert: false });
@@ -605,7 +605,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
             <div>
               <div className="mt-5 border border-neutral-800 rounded-sm p-4 bg-black/20">
                 <label className={labelCls}>Extra — Photos of Past Experiences (Optional)</label>
-                <p className="text-xs text-neutral-500 mb-3">Upload photos from previous events, projects, volunteering, or relevant experience. JPG, PNG, WEBP, or HEIC; max 10 MB per photo. Only authorised WEST MUN admins and department heads can view them.</p>
+                <p className="text-xs text-neutral-500 mb-3">Upload photos from previous events, projects, volunteering, or relevant experience. JPG, PNG, WEBP, or HEIC; max 200 MB per photo. Only authorised WEST MUN admins and department heads can view them.</p>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/heic"
