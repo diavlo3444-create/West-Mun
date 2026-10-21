@@ -96,6 +96,49 @@ Deno.serve(async (req: Request) => {
   }
 
 
+  if (body.action === "delete_member") {
+    const bearer = (req.headers.get("authorization") ?? "").match(/^Bearer\\s+(.+)$/i);
+    if (!bearer) return json({ error: "Sign in as the primary Super Admin first." }, 401);
+    const auth = await db.auth.getUser(bearer[1]);
+    if (auth.error || !auth.data.user) return json({ error: "Your session is invalid or expired." }, 401);
+    if ((auth.data.user.email || "").toLowerCase() !== "diavlo3444@gmail.com") {
+      return json({ error: "Only the primary Super Admin can permanently delete an EB account." }, 403);
+    }
+
+    const targetId = clean(body.userId);
+    if (!/^[0-9a-f-]{36}$/i.test(targetId)) return json({ error: "Choose a valid EB account." }, 400);
+    if (targetId === auth.data.user.id) return json({ error: "You cannot delete your own account." }, 400);
+
+    const target = await db.auth.admin.getUserById(targetId);
+    if (target.error || !target.data.user) return json({ error: "The login account is already deleted or could not be found." }, 404);
+    if ((target.data.user.email || "").toLowerCase() === "diavlo3444@gmail.com") {
+      return json({ error: "The primary Super Admin account is protected." }, 403);
+    }
+
+    const [adminRecord, headRecord, passRecord] = await Promise.all([
+      db.from("admins").select("user_id").eq("user_id", targetId).maybeSingle(),
+      db.from("department_heads").select("user_id").eq("user_id", targetId).maybeSingle(),
+      db.from("wm_qr_passes").select("user_id,account_role").eq("user_id", targetId).maybeSingle(),
+    ]);
+    if (adminRecord.error || headRecord.error || passRecord.error) return json({ error: "Could not verify this account's role safely. Nothing was deleted." }, 500);
+    if (adminRecord.data || headRecord.data) return json({ error: "This account also has an Admin or Department Head assignment. Delete it through the matching Super Admin account manager." }, 409);
+    const appRole = String(target.data.user.app_metadata?.wm_role || "");
+    const ebRole = String(passRecord.data?.account_role || target.data.user.app_metadata?.wm_eb_role || "");
+    if (!["eb_member", "co_head", "designer", "marketing"].includes(appRole) &&
+        !["co_head", "designer", "marketing"].includes(ebRole)) {
+      return json({ error: "This login is not identified as an EB member, so it was not deleted." }, 409);
+    }
+
+    const passDelete = await db.from("wm_qr_passes").delete().eq("user_id", targetId);
+    if (passDelete.error) return json({ error: "Could not remove the EB record: " + passDelete.error.message }, 500);
+    const deleted = await db.auth.admin.deleteUser(targetId);
+    if (deleted.error) {
+      console.error("[wm-eb-access] EB Auth deletion failed", { code: deleted.error.name });
+      return json({ error: "The EB record was removed, but the login could not be deleted. Retry the deletion; no success was reported." }, 500);
+    }
+    return json({ success: true, message: "EB record and Supabase login permanently deleted." });
+  }
+
   if (body.action === "list_members") {
     const bearer = (req.headers.get("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
     if (!bearer) return json({ error: "Sign in as a WEST MUN admin first." }, 401);
