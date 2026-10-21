@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
+import { RegistrationExtraPhotos, stripExtraPhotoMarker } from '../components/RegistrationExtraPhotos';
 import { explainError, type Row } from './ui';
 import { downloadText, toCsv } from '../lib/safe';
 import { SECURITY_QUESTIONS, countWords, extractSecurityAnswers, getWordCountFeedback } from '../lib/securityQuestions';
@@ -1474,10 +1475,11 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                   Statement of motivation
                 </h3>
                 <div className="wm-scroll max-h-32 overflow-y-auto whitespace-pre-wrap rounded-md border border-white/[0.07] bg-[#101013] p-3 text-[11.5px] leading-relaxed text-neutral-300">
-                  {activeItem.statement}
+                  {stripExtraPhotoMarker(activeItem.statement)}
                 </div>
               </div>
             )}
+            <RegistrationExtraPhotos statement={activeItem.statement} />
 
             {/* Security Team Assessment Section (All 4 Questions & Answers) */}
             {(() => {
