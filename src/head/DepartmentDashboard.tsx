@@ -34,6 +34,7 @@ import { HeadDepartment } from './HeadDepartment';
 import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 import { HeadSponsorsManager } from './HeadSponsorsManager';
 import { HeadInquiriesManager } from './HeadInquiriesManager';
+import { DCCCommitteeManager } from './DCCCommitteeManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
 import { OperationsWorkspace } from './OperationsWorkspace';
 import { WorkspaceModuleGrid, WorkspaceOverview } from './WorkspaceOverview';
@@ -105,6 +106,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const isGenderDivision = isGenderSeparated(department);
   const isPr = department === 'pr';
   const isHr = department === 'hr';
+  const committeeAccess = department === 'dcc';
   const registrationAccess = canManageRegistrations(department);
   const rolesAccess = canManageRoles(department) || Boolean(testMode?.isActive);
   // Operations Studio is restricted to the three operational department heads.
@@ -499,6 +501,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (id === 'roles' && !rolesAccess) return;
     if (id === 'sponsors' && !isPr) return;
     if (id === 'inquiries' && !isHr) return;
+    if (id === 'dcc-committees' && !committeeAccess) return;
     setView(id);
   };
 
@@ -521,6 +524,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(rolesAccess ? [{ id: 'roles', label: 'Roles', icon: Network }] : []),
     ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
     ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
+    ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
     ...(operationsAccess ? [{ id: 'operations', label: 'Operations studio', icon: Users }] : []),
     { id: 'department', label: 'Assignment', icon: Building2 },
@@ -546,6 +550,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
               ? 'Sponsors & Partners'
               : view === 'inquiries'
                 ? 'Inquiries & Messages'
+                : view === 'dcc-committees'
+                  ? 'Committee Management'
                 : view === 'department'
                   ? 'Assignment'
                   : activeModule?.label || 'Workspace';
@@ -719,6 +725,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         {view === 'inquiries' && isHr && (
           <HeadInquiriesManager headName={headName} headEmail={headEmail} />
         )}
+
+        {view === 'dcc-committees' && committeeAccess && <DCCCommitteeManager />}
 
         {view === 'operations' && operationsAccess && (
           <OperationsWorkspace department={department} section={section} testToken={testMode?.token || null} />
