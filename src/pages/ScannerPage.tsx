@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "../lib/supabase";
+import { CheckedInPeople } from "../components/CheckedInPeople";
 import { ArrowLeft, Camera, CameraOff, Loader2, ShieldCheck } from "lucide-react";
 
 type ScanReply = { success?: boolean; outcome?: string; error?: string; direction?: string; person?: { fullName?: string; team?: string | null; section?: string | null; role?: string } };
@@ -208,6 +209,7 @@ export default function ScannerPage() {
                 {message.error && <p className="mt-2 text-sm">{message.error}</p>}
               </div>}
               <p className="mt-5 text-center text-[11px] leading-relaxed text-neutral-500">Only authorized Security accounts and WEST MUN admins can verify passes. Each entry and exit attempt is recorded.</p>
+              <div className="mt-7 border-t border-[#d4af37]/15 pt-6"><CheckedInPeople /></div>
             </>
           }
         </section>
