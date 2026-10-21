@@ -943,15 +943,28 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                         {formatDate(item.created_at)}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => openItem(item)}
-                          className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] px-2 py-1 text-[10.5px] font-medium text-neutral-400 transition-colors hover:border-[#d4af37]/35 hover:bg-[#d4af37]/[0.06] hover:text-[#e2c258]"
-                          aria-label={`Review ${item.full_name}`}
-                        >
-                          <Eye className="h-3 w-3" aria-hidden="true" />
-                          Review
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openItem(item)}
+                            className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] px-2 py-1 text-[10.5px] font-medium text-neutral-400 transition-colors hover:border-[#d4af37]/35 hover:bg-[#d4af37]/[0.06] hover:text-[#e2c258]"
+                            aria-label={`Review ${item.full_name}`}
+                          >
+                            <Eye className="h-3 w-3" aria-hidden="true" />
+                            Review
+                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => { setActiveItem(item); setPendingAction('delete'); setModalNotice(null); }}
+                              className="inline-flex items-center gap-1 rounded-md border border-rose-400/20 px-2 py-1 text-[10.5px] font-medium text-rose-300 transition-colors hover:border-rose-400/45 hover:bg-rose-400/[0.06]"
+                              aria-label={`Delete ${item.full_name}`}
+                            >
+                              <Trash2 className="h-3 w-3" aria-hidden="true" />
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
