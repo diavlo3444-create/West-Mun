@@ -14,6 +14,7 @@ export default function ScannerPage() {
   const [message, setMessage] = useState<ScanReply | null>(null);
   const [accessError, setAccessError] = useState("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scanBusyRef = useRef(false);
 
   const handleDecoded = useCallback(async (decodedText: string) => {
@@ -151,6 +152,23 @@ export default function ScannerPage() {
       setMessage({ success: false, outcome: "denied", error: `Camera permission could not be obtained: ${detail}` });
     }
   };
+  const scanQrImage = async (file?: File) => {
+    if (!file || busy) return;
+    setMessage(null);
+    setBusy(true);
+    try {
+      // Image scanning works even when browser camera permission is blocked.
+      const imageScanner = new Html5Qrcode("westmun-qr-reader", { verbose: false });
+      const decoded = await imageScanner.scanFile(file, true);
+      try { imageScanner.clear(); } catch {}
+      await handleDecoded(decoded);
+    } catch (e) {
+      setMessage({ success: false, outcome: "denied", error: e instanceof Error ? `Could not read a QR code from that image: ${e.message}` : "Could not read a QR code from that image. Try a clearer screenshot or photo." });
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
   const statusClass = message?.success ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-200" : "border-rose-500/30 bg-rose-950/20 text-rose-200";
 
   return (
@@ -174,7 +192,12 @@ export default function ScannerPage() {
                 <button onClick={startCamera} disabled={scanning || busy} className="flex flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-[#e5c158] to-[#aa8232] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"><Camera className="h-4 w-4" /> {scanning ? "Camera active…" : "Start camera"}</button>
                 <button onClick={() => setScanning(false)} disabled={!scanning} className="flex items-center justify-center gap-2 rounded-md border border-white/15 px-4 py-3 text-sm text-neutral-300 disabled:opacity-40"><CameraOff className="h-4 w-4" /> Stop</button>
               </div>
-              <p className="mt-3 text-xs leading-relaxed text-neutral-500">If the camera does not open, check the browser's camera permission for west-mun.vercel.app and reload the page. Camera access requires HTTPS.</p>
+              <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-sm font-medium text-neutral-200">Camera not available?</p>
+                <p className="mt-1 text-xs leading-relaxed text-neutral-400">Use a screenshot or photo of the person's WEST MUN QR pass. This fallback does not need camera permission.</p>
+                <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="mt-3 block w-full text-xs text-neutral-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#d4af37] file:px-3 file:py-2 file:font-semibold file:text-black" disabled={busy} onChange={(event) => void scanQrImage(event.target.files?.[0])} />
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-neutral-500">To restore live scanning after a previous denial, the browser's camera permission must be changed back to Allow. A website cannot override a browser denial.</p>
               {busy && <p className="mt-4 flex items-center gap-2 text-sm text-neutral-400"><Loader2 className="h-4 w-4 animate-spin" /> Verifying pass…</p>}
               {message && <div role="status" className={`mt-4 rounded-lg border p-4 ${statusClass}`}>
                 <p className="font-semibold">{message.success ? (direction === "entry" ? "Entry approved" : "Exit recorded") : "Scan denied"}</p>
