@@ -38,6 +38,28 @@ Deno.serve(async (req: Request) => {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Invalid request body." }, 400); }
 
+  if (body.action === "create_signup_link") {
+    const bearer = (req.headers.get("authorization") ?? "").match(/^Bearer\\s+(.+)$/i);
+    if (!bearer) return json({ error: "Sign in as a WEST MUN admin first." }, 401);
+    const auth = await db.auth.getUser(bearer[1]);
+    if (auth.error || !auth.data.user) return json({ error: "Your session is invalid or expired." }, 401);
+    const admin = await db.from("admins").select("user_id").eq("user_id", auth.data.user.id).maybeSingle();
+    if (admin.error) return json({ error: "Could not verify admin permissions." }, 500);
+    if (!admin.data) return json({ error: "Only a WEST MUN admin can create the EB signup link." }, 403);
+
+    const token = randomHex(32);
+    const revoked = await db.from("wm_eb_signup_links").update({ active: false }).eq("active", true);
+    if (revoked.error) return json({ error: "Could not refresh the existing signup link. No new link was created." }, 500);
+    const inserted = await db.from("wm_eb_signup_links").insert({
+      token_hash: await sha256(token),
+      active: true,
+      created_by: auth.data.user.id,
+      expires_at: null,
+    }).select("id,created_at").single();
+    if (inserted.error || !inserted.data) return json({ error: "Could not create the reusable EB signup link. Try again." }, 500);
+    return json({ success: true, signupUrl: `${SITE_URL}/eb-signup#token=${token}`, createdAt: inserted.data.created_at }, 201);
+  }
+
   if (body.action === "create_invite") {
     const bearer = (req.headers.get("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
     if (!bearer) return json({ error: "Sign in as a WEST MUN admin first." }, 401);
@@ -97,6 +119,68 @@ Deno.serve(async (req: Request) => {
     const ebEmails = new Set((inviteResult.data || []).map((row: { email: string }) => row.email.toLowerCase()));
     const members = (passResult.data || []).filter((row: { email: string }) => ebEmails.has(row.email.toLowerCase()));
     return json({ success: true, members, heads: headResult.data || [] });
+  }
+
+  if (body.action === "signup_public") {
+    const token = clean(body.token).toLowerCase();
+    const email = emailNorm(body.email);
+    const fullName = normalizeName(clean(body.fullName));
+    const password = typeof body.password === "string" ? body.password : "";
+    const phone = clean(body.phone).replace(/[^0-9]/g, "");
+    const gender = clean(body.gender).toLowerCase();
+    const ebRole = clean(body.ebRole).toLowerCase();
+    const requestedDepartment = clean(body.department);
+    if (!/^[a-f0-9]{64}$/.test(token)) return json({ error: "This EB signup link is invalid. Ask an admin for the current link." }, 400);
+    if (!validEmail(email)) return json({ error: "Enter a valid email address." }, 400);
+    if (fullName.length < 5 || fullName.length > 120 || fullName.split(" ").filter(Boolean).length < 2) return json({ error: "Enter your full real name, including first and last name." }, 400);
+    if (phone.length < 7 || phone.length > 15) return json({ error: "Enter a valid phone number with country code, using 7–15 digits." }, 400);
+    if (!["male", "female"].includes(gender)) return json({ error: "Choose your gender to continue." }, 400);
+    if (password.length < 12 || password.length > 128) return json({ error: "Use a password between 12 and 128 characters." }, 400);
+    if (!["co_head", "designer", "marketing"].includes(ebRole)) return json({ error: "Choose Co-Head, Designer, or Marketing Team." }, 400);
+    if (ebRole === "co_head" && (!requestedDepartment || requestedDepartment.length > 80)) return json({ error: "Enter the department you will co-head." }, 400);
+
+    const link = await db.from("wm_eb_signup_links").select("id").eq("token_hash", await sha256(token)).eq("active", true).maybeSingle();
+    if (link.error) return json({ error: "Could not verify the signup link. Please try again." }, 500);
+    if (!link.data) return json({ error: "This EB signup link is no longer active. Ask an admin for the current link." }, 403);
+
+    const existingPhone = await db.from("wm_qr_passes").select("user_id").eq("phone", phone).limit(1).maybeSingle();
+    if (existingPhone.error) return json({ error: "Could not check the phone number. Please try again." }, 500);
+    if (existingPhone.data) return json({ error: "This phone number is already registered. Each EB member must use a unique phone number." }, 409);
+
+    const team = ebRole === "co_head" ? requestedDepartment : ebRole === "designer" ? "Design" : "Marketing";
+    const section = ebRole === "co_head" ? "Co-Head" : ebRole === "designer" ? "Design Team" : "Marketing Team";
+    const created = await db.auth.admin.createUser({
+      email, password, email_confirm: true,
+      user_metadata: { full_name: fullName, phone, gender },
+      app_metadata: { wm_role: "eb_member", wm_team: team, wm_section: section, wm_eb_role: ebRole },
+    });
+    if (created.error || !created.data.user) {
+      const message = created.error?.message || "";
+      if (/already\\s+(?:been\\s+)?registered|already exists|duplicate key|email.*already/i.test(message)) return json({ error: "An account already exists for this email. Sign in with that account or ask an admin for help." }, 409);
+      console.error("[wm-eb-access] Public signup account creation failed", { error: message.slice(0, 160) });
+      return json({ error: "Could not create your account. Check your details and try again." }, 500);
+    }
+    const userId = created.data.user.id;
+    const passCreated = await db.from("wm_qr_passes").insert({
+      user_id: userId,
+      qr_token: randomHex(32),
+      full_name: fullName,
+      email,
+      account_role: ebRole,
+      team,
+      section,
+      phone,
+      gender,
+      active: true,
+      inside: false,
+    }).select("user_id").maybeSingle();
+    if (passCreated.error || !passCreated.data) {
+      await db.auth.admin.deleteUser(userId);
+      if (passCreated.error?.code === "23505") return json({ error: "This phone number is already registered. Each EB member must use a unique phone number." }, 409);
+      console.error("[wm-eb-access] Public signup QR pass creation failed", { code: passCreated.error?.code });
+      return json({ error: "Your account could not be completed because the QR pass could not be issued. Your account was rolled back; please try again." }, 500);
+    }
+    return json({ success: true, redirectTo: "/eb", department: team, section, ebRole }, 201);
   }
 
   if (body.action === "signup") {
