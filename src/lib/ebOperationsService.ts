@@ -1021,31 +1021,22 @@ export const ebOperationsService = {
    */
   async getHierarchy(department?: string): Promise<EbHierarchyNode[]> {
     if (!supabase) return [];
-
     try {
-      // Use the live Secretariat and department-head records. The custom
-      // hierarchy table is an optional override and may be empty.
-      const [{ data: secretariatRows, error: secretariatError }, { data: headRows, error: headsError }] =
-        await Promise.all([
-          supabase
-            .from('secretariat')
-            .select('id, role, name, department, bio, sort_order, published, confirmed')
-            .eq('published', true)
-            .eq('confirmed', true)
-            .order('sort_order', { ascending: true }),
-          supabase
-            .from('department_heads')
-            .select('id, user_id, department, section, head_name, email, active')
-            .eq('active', true)
-            .order('department', { ascending: true }),
-        ]);
-
-      // Respect a manually configured chart when one exists.
-      const { data: configuredRows, error: configuredError } = await supabase
-        .from('wm_eb_hierarchy_nodes')
-        .select('*')
-        .order('rank_level', { ascending: true })
-        .order('sort_order', { ascending: true });
+      const [
+        { data: secretariatRows, error: secretariatError },
+        { data: headRows, error: headsError },
+        { data: coHeadRows },
+        { data: configuredRows, error: configuredError },
+      ] = await Promise.all([
+        supabase.from('secretariat').select('id, role, name, department, bio, sort_order, published, confirmed')
+          .eq('published', true).eq('confirmed', true).order('sort_order', { ascending: true }),
+        supabase.from('department_heads').select('id, user_id, department, section, head_name, email, active')
+          .eq('active', true).order('department', { ascending: true }),
+        supabase.from('wm_people').select('id, display_name, email, department, section, role_title, status')
+          .eq('status', 'active').or('role_title.ilike.%co-head%,role_title.ilike.%co head%,role_title.ilike.%deputy head%'),
+        supabase.from('wm_eb_hierarchy_nodes').select('*')
+          .order('rank_level', { ascending: true }).order('sort_order', { ascending: true }),
+      ]);
 
       if (!configuredError && configuredRows?.length) {
         const nodes = configuredRows as EbHierarchyNode[];
@@ -1054,102 +1045,74 @@ export const ebOperationsService = {
         for (const node of nodes) map.set(node.id, { ...node, children: [] });
         for (const node of nodes) {
           const item = map.get(node.id)!;
-          if (node.parent_node_id && map.has(node.parent_node_id)) {
-            map.get(node.parent_node_id)!.children!.push(item);
-          } else {
-            roots.push(item);
-          }
+          if (node.parent_node_id && map.has(node.parent_node_id)) map.get(node.parent_node_id)!.children!.push(item);
+          else roots.push(item);
         }
         return roots;
       }
-
       if (secretariatError && headsError) {
         console.error('Unable to load the Secretariat hierarchy', { secretariatError, headsError });
         return [];
       }
 
-      type SecretariatRow = {
-        id: string; role: string; name: string; department: string | null;
-        bio: string | null; sort_order: number | null;
-      };
-      type HeadRow = {
-        id: string; user_id: string; department: string; section: string | null;
-        head_name: string; email: string | null;
-      };
+      type SecretariatRow = { id: string; role: string; name: string; department: string | null; bio: string | null; sort_order: number | null };
+      type HeadRow = { id: string; user_id: string; department: string; section: string | null; head_name: string; email: string | null };
+      type CoHeadRow = { id: string; display_name: string; email: string | null; department: string | null; section: string | null; role_title: string };
 
-      const secretariat = ((secretariatRows || []) as SecretariatRow[])
-        .filter((row) => row.name && row.role)
-        .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
+      const secretariat = ((secretariatRows || []) as SecretariatRow[]).filter((row) => row.name && row.role)
+        .sort((a,b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
       const heads = ((headRows || []) as HeadRow[]).filter((row) => row.head_name && row.department);
+      const coHeads = ((coHeadRows || []) as CoHeadRow[]).filter((row) => row.display_name && row.department);
 
-      const makeNode = (
-        id: string,
-        roleTitle: string,
-        name: string,
-        departmentName: string,
-        rank: number,
-        parentId: string | null,
-        responsibilities: string,
-        email = '',
-        section: string | null = null,
-      ): EbHierarchyNode => ({
-        id,
-        department: departmentName || 'Executive Leadership',
-        section,
-        role_title: roleTitle,
-        rank_level: rank,
-        parent_node_id: parentId,
-        assigned_name: name,
-        assigned_email: email,
-        responsibilities: responsibilities || 'WEST MUN 2027 conference leadership and operations.',
-        contact_email: email,
-        contact_phone: '',
-        children: [],
-      });
+      const makeNode = (id: string, roleTitle: string, name: string, departmentName: string, rank: number,
+        parentId: string | null, responsibilities: string, email = '', section: string | null = null): EbHierarchyNode => ({
+          id, department: departmentName || 'Executive Leadership', section, role_title: roleTitle,
+          rank_level: rank, parent_node_id: parentId, assigned_name: name, assigned_email: email,
+          responsibilities: responsibilities || 'WEST MUN 2027 conference leadership and operations.',
+          contact_email: email, contact_phone: '', children: [],
+        });
 
       const roots: EbHierarchyNode[] = [];
-      const leadershipNodes = secretariat.map((row, index) =>
-        makeNode(
-          `secretariat-${row.id}`,
-          row.role,
-          row.name,
-          row.department || 'Executive Leadership',
-          Math.min(index + 1, 3),
-          index === 0 ? null : `secretariat-${secretariat[index - 1].id}`,
-          row.bio || '',
-        )
-      );
-
+      const leadershipNodes = secretariat.map((row, index) => makeNode(
+        `secretariat-${row.id}`, row.role, row.name, row.department || 'Executive Leadership',
+        index + 1, index === 0 ? null : `secretariat-${secretariat[index - 1].id}`, row.bio || '',
+      ));
       for (const node of leadershipNodes) {
         if (!node.parent_node_id) roots.push(node);
         else {
           const parent = leadershipNodes.find((candidate) => candidate.id === node.parent_node_id);
-          if (parent) parent.children!.push(node);
-          else roots.push(node);
+          if (parent) parent.children!.push(node); else roots.push(node);
         }
       }
 
-      const parentLeadership = leadershipNodes.length
-        ? leadershipNodes[Math.min(leadershipNodes.length - 1, 2)]
-        : null;
-      const headNodes = heads.map((head) =>
-        makeNode(
-          `head-${head.id || head.user_id}`,
-          head.section ? `${head.section} Section Head` : 'Department Head',
-          head.head_name,
-          head.department,
-          4,
-          parentLeadership?.id || null,
-          `Leads the ${head.section ? `${head.section} section of ` : ''}${head.department.replace(/_/g, ' ')} team and coordinates its EB operations.`,
-          head.email || '',
-          head.section,
-        )
-      );
+      // The reporting order is Secretariat (including Senior Advisor) -> Head -> Co-Head.
+      const seniorAdvisor = [...leadershipNodes].reverse().find((node) => /senior advisor/i.test(node.role_title));
+      const lastLeadershipNode = leadershipNodes[leadershipNodes.length - 1];
+      const leadershipParent = seniorAdvisor || lastLeadershipNode || null;
+      const headNodes = heads.map((head) => makeNode(
+        `head-${head.id || head.user_id}`, head.section ? `${head.section} Section Head` : 'Department Head',
+        head.head_name, head.department, 5, leadershipParent?.id || null,
+        `Leads the ${head.section ? `${head.section} section of ` : ''}${head.department.replace(/_/g, ' ')} team and coordinates its EB operations.`,
+        head.email || '', head.section,
+      ));
+      if (leadershipParent) leadershipParent.children!.push(...headNodes); else roots.push(...headNodes);
 
-      if (parentLeadership) parentLeadership.children!.push(...headNodes);
-      else roots.push(...headNodes);
+      for (const coHead of coHeads) {
+        const matchingHead = headNodes.find((head) =>
+          head.department.toLowerCase() === (coHead.department || '').toLowerCase() &&
+          (head.section || '').toLowerCase() === (coHead.section || '').toLowerCase()
+        );
+        const parent = matchingHead || headNodes.find((head) => head.department.toLowerCase() === (coHead.department || '').toLowerCase());
+        const coHeadNode = makeNode(
+          `cohead-${coHead.id}`, coHead.role_title || 'Co-Head', coHead.display_name,
+          coHead.department || parent?.department || 'General', 6, parent?.id || null,
+          'Supports the section head and coordinates section operations with the team.',
+          coHead.email || '', coHead.section,
+        );
+        if (parent) parent.children!.push(coHeadNode); else roots.push(coHeadNode);
+      }
 
-      // This is the organisation-wide chart, visible to every EB member.
+      // Show the organisation-wide hierarchy to every EB member.
       void department;
       return roots;
     } catch (error) {
