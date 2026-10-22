@@ -208,16 +208,16 @@ export default function EbPortal() {
         meta.selected_head_email || userMeta.selected_head_email || ''
       ).trim().toLowerCase();
 
-      let reportingHead: { id: string; user_id: string | null; head_name: string; department: string; section: string | null; email: string | null } | null = null;
+      let reportingHead: { user_id: string; head_name: string; department: string; section: string | null } | null = null;
       if (!isHead && !isAdmin && (selectedHeadId || selectedHeadName || selectedHeadEmail)) {
         const { data: activeHeads } = await supabase
           .from('department_heads')
-          .select('id,user_id,head_name,department,section,email,active')
+          .select('user_id,head_name,department,section,active')
           .eq('active', true);
         reportingHead = (activeHeads || []).find((candidate: any) => {
-          const idMatch = Boolean(selectedHeadId && [candidate.id, candidate.user_id].some((v) => String(v || '') === selectedHeadId));
+          const idMatch = Boolean(selectedHeadId && String(candidate.user_id || '') === selectedHeadId);
           const nameMatch = Boolean(selectedHeadName && String(candidate.head_name || '').trim().toLowerCase() === selectedHeadName);
-          const emailMatch = Boolean(selectedHeadEmail && String(candidate.email || '').trim().toLowerCase() === selectedHeadEmail);
+          const emailMatch = false; // department_heads does not guarantee an email column
           return idMatch || nameMatch || emailMatch;
         }) || null;
       }
@@ -230,9 +230,9 @@ export default function EbPortal() {
         department,
         section,
         phone: (userMeta.phone as string) || null,
-        reportingHeadId: reportingHead?.id || selectedHeadId || null,
+        reportingHeadId: reportingHead?.user_id || selectedHeadId || null,
         reportingHeadName: reportingHead?.head_name || null,
-        reportingHeadEmail: reportingHead?.email || null,
+        reportingHeadEmail: null,
         reportingHeadDepartment: reportingHead?.department || null,
         reportingHeadSection: reportingHead?.section || null,
         isHead,
