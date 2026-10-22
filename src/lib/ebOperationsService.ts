@@ -1038,7 +1038,8 @@ export const ebOperationsService = {
           .order('rank_level', { ascending: true }).order('sort_order', { ascending: true }),
       ]);
 
-      // Live Secretariat and executive head records take precedence over the optional manual hierarchy.\n      if (secretariatError && headsError) {
+      // Live Secretariat and executive head records take precedence over the optional manual hierarchy.
+      if (secretariatError && headsError) {
         console.error('Unable to load the Secretariat hierarchy', { secretariatError, headsError });
         return [];
       }
