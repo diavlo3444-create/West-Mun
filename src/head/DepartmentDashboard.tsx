@@ -39,6 +39,7 @@ import { DCCCommitteeManager } from './DCCCommitteeManager';
 import { DCCApplicationsManager } from './DCCApplicationsManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
 import { OperationsWorkspace } from './OperationsWorkspace';
+import { HeadCoHeadManagement } from './HeadCoHeadManagement';
 import { WorkspaceModuleGrid, WorkspaceOverview } from './WorkspaceOverview';
 import {
   createDepartmentRecord,
@@ -76,6 +77,7 @@ type HeadView =
   | 'sponsors'
   | 'inquiries'
   | 'dcc-applications'
+  | 'cohead-management'
   | string;
 
 function explainAccessError(error: { code?: string; message?: string } | null | undefined): string {
@@ -551,6 +553,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
     ...(operationsAccess ? [{ id: 'operations', label: 'Operations studio', icon: Users }] : []),
+    { id: 'cohead-management', label: 'Co-Head Management', icon: Users },
     { id: 'department', label: 'Assignment', icon: Building2 },
     { id: 'security-website', label: 'Security Website', icon: QrCode },
   ];
@@ -579,6 +582,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
                   ? 'Committee Management'
                 : view === 'dcc-applications'
                   ? 'Chair & Delegate Applications'
+                : view === 'cohead-management'
+                  ? 'Co-Head Management'
                 : view === 'department'
                   ? 'Assignment'
                   : activeModule?.label || 'Workspace';
@@ -773,6 +778,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
         {view === 'dcc-committees' && committeeAccess && <DCCCommitteeManager />}
         {view === 'dcc-applications' && committeeAccess && <DCCApplicationsManager />}
+
+        {view === 'cohead-management' && (
+          <HeadCoHeadManagement department={department} section={section} headName={headName} />
+        )}
 
         {view === 'operations' && operationsAccess && (
           <OperationsWorkspace department={department} section={section} testToken={testMode?.token || null} />
