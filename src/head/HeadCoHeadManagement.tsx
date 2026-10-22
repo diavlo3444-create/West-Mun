@@ -29,7 +29,7 @@ export const HeadCoHeadManagement: React.FC<{ department: DepartmentKey; section
     setLoading(true); setError('');
     try {
       const [{ data: peopleData, error: peopleError }, { data: taskData, error: taskError }, { data: shiftData, error: shiftError }] = await Promise.all([
-        supabase.functions.invoke('wm-eb-access', { body: { action: 'list_my_coheads' } }),
+        supabase.functions.invoke('wm-eb-access', { body: { action: 'list_my_coheads', department, section: section || null } }),
         supabase.from('wm_eb_tasks').select('id,title,assigned_to_user_id,assigned_to_name,status,priority,deadline,created_at').eq('department', department).order('created_at', { ascending: false }).limit(100),
         supabase.from('wm_eb_shifts').select('id,station_name,location,starts_at,ends_at,status,is_published').eq('department', department).order('starts_at', { ascending: true }).limit(100),
       ]);
