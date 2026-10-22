@@ -442,8 +442,6 @@ export default function EbPortal() {
             setOperationalStatus(status);
             if (profile) localStorage.setItem(`wm-eb-operational-status-${profile.id}`, status);
           }}
-          isEventDayMode={isEventDayMode}
-          onToggleEventDayMode={() => setIsEventDayMode((prev) => !prev)}
           notifications={notifications}
           onMarkNotificationRead={handleMarkNotificationRead}
           onNavigateNotification={(tabId) => {
