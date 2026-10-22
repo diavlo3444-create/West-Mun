@@ -99,8 +99,25 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
 
   // Peer Triad array: SG | DSG | USG (strictly 3 peer roles on the same level)
   const triadNodes = useMemo(() => {
+    if (isScopedMember) return [];
     return [sgNode, dsgNode, usgNode].filter((n): n is EbHierarchyNode => Boolean(n));
-  }, [sgNode, dsgNode, usgNode]);
+  }, [sgNode, dsgNode, usgNode, isScopedMember]);
+
+  // Regular EB members see only the reporting head selected at sign-up.
+  // Admins and department heads retain the full organizational overview.
+  const isScopedMember = !profile.isAdmin && !profile.isHead;
+  const reportingHeadNode = useMemo(() => {
+    const selectedId = profile.reportingHeadId?.trim();
+    const selectedName = profile.reportingHeadName?.trim().toLowerCase();
+    if (!selectedId && !selectedName) return null;
+    return allHeads.find((head) => {
+      const identifiers = [head.id, head.id.replace(/^head-/, ''), head.source_head_id || '', head.source_user_id || ''];
+      const idMatches = Boolean(selectedId && identifiers.some((value) => value === selectedId));
+      const nameMatches = Boolean(selectedName && selectedName !== 'department head' &&
+        selectedName !== 'directorate secretariat' && head.assigned_name.trim().toLowerCase() === selectedName);
+      return idMatches || nameMatches;
+    }) || null;
+  }, [allHeads, profile.reportingHeadId, profile.reportingHeadName]);
 
   // Department filter options
   const departmentOptions = useMemo(() => {
@@ -111,6 +128,7 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
 
   // Filtered Heads based on selected department and search query
   const filteredHeads = useMemo(() => {
+    if (isScopedMember) return reportingHeadNode ? [{ ...reportingHeadNode, children: [] }] : [];
     return allHeads.filter((head) => {
       if (selectedDeptFilter !== 'all' && head.department !== selectedDeptFilter) {
         return false;
@@ -130,7 +148,7 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
       }
       return true;
     });
-  }, [allHeads, selectedDeptFilter, searchQuery]);
+  }, [allHeads, selectedDeptFilter, searchQuery, isScopedMember, reportingHeadNode]);
 
   const toggleHeadCollapse = (id: string) => {
     setCollapsedHeads((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -442,114 +460,82 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
       </div>
 
       {/* Main View Area */}
-      {viewMode === 'chart' ? (
-        /* Mind-Map Visual Org Chart */
-        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#09090b]/80 p-6 sm:p-10 shadow-inner">
-          <div className="flex min-w-max flex-col items-center">
-            {/* ============================================================ */}
-            {/* LEVEL 1: TOP ROW - SECRETARIAT TRIAD (PEER ROLES ON SAME LEVEL) */}
-            {/* ============================================================ */}
-            <div className="flex flex-col items-center">
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#d4af37]/40 bg-[#d4af37]/10 px-3 py-1 text-[11px] font-mono tracking-wider text-[#f5d47a]">
-                <Crown className="h-3.5 w-3.5 text-[#d4af37]" />
-                <span>EXECUTIVE SECRETARIAT TRIAD • EQUAL PEER LEVEL</span>
-              </div>
-
-              {/* Three Cards Side by Side on the SAME Horizontal Row */}
-              <div className="flex flex-row items-stretch justify-center gap-4 sm:gap-8 lg:gap-10">
-                {triadNodes.map((node) => (
-                  <div key={node.id} className="flex flex-col items-center">
-                    {renderPersonnelCard(node, 'triad')}
-                    {/* Stem down from each triad card */}
-                    <div className="h-6 w-0.5 bg-[#d4af37]/70" />
-                  </div>
-                ))}
-              </div>
-
-              {/* Peer Connector Bridge: Unites SG, DSG, and USG into a single horizontal bus */}
-              {triadNodes.length > 1 && (
-                <div className="relative w-full max-w-4xl flex justify-center">
-                  {/* Horizontal gold bridge spanning the three columns */}
-                  <div className="h-0.5 w-[75%] bg-gradient-to-r from-[#d4af37]/30 via-[#d4af37] to-[#d4af37]/30 shadow-[0_0_8px_rgba(212,175,55,0.4)]" />
-                </div>
-              )}
-
-              {/* Central drop stem down to Senior Advisor */}
-              <div className="h-8 w-0.5 bg-gradient-to-b from-[#d4af37] to-[#d4af37]/80" />
+      {isScopedMember ? (
+        <div className="mx-auto w-full max-w-3xl rounded-2xl border border-[#d4af37]/25 bg-gradient-to-b from-[#15130f] to-[#09090b] p-5 sm:p-8">
+          <div className="mb-6 flex items-center gap-3 border-b border-white/10 pb-5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#d4af37]/40 bg-[#d4af37]/10 text-[#f5d47a]">
+              <UserCheck className="h-5 w-5" />
             </div>
-
-            {/* ============================================================ */}
-            {/* LEVEL 2: SENIOR ADVISOR */}
-            {/* ============================================================ */}
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#d4af37]">Your reporting line</p>
+              <h3 className="mt-1 text-lg font-semibold text-white">Your Department Head</h3>
+              <p className="mt-1 text-xs text-neutral-400">Only the head you selected during EB sign-up is shown here.</p>
+            </div>
+          </div>
+          {reportingHeadNode ? (
+            <div className="flex flex-col items-center">
+              <div className="mb-3 h-6 w-px bg-[#d4af37]/60" />
+              {renderPersonnelCard(reportingHeadNode, 'head')}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5 text-center">
+              <Shield className="mx-auto h-6 w-6 text-amber-300" />
+              <p className="mt-3 text-sm font-medium text-white">Your reporting head could not be matched</p>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-neutral-400">
+                Your account's selected reporting-head ID does not match an active head record. No other heads are shown. Ask an admin to verify the head selection saved during sign-up.
+              </p>
+            </div>
+          )}
+        </div>
+      ) : viewMode === 'chart' ? (
+        <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-[#09090b]/80 p-4 shadow-inner sm:p-6 lg:p-8">
+          <div className="mx-auto flex w-full max-w-[1500px] flex-col items-center">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#d4af37]/30 bg-[#d4af37]/10 px-3 py-1 text-center font-mono text-[10px] uppercase tracking-wider text-[#f5d47a]">
+              <Crown className="h-3.5 w-3.5" />
+              Executive Secretariat · Equal Peer Level
+            </div>
+            <div className="grid w-full grid-cols-1 justify-items-center gap-4 md:grid-cols-3 md:items-stretch">
+              {triadNodes.map((node) => (
+                <div key={node.id} className="flex w-full flex-col items-center">
+                  {renderPersonnelCard(node, 'triad')}
+                </div>
+              ))}
+            </div>
+            <div className="my-4 h-6 w-px bg-gradient-to-b from-[#d4af37] to-amber-400/60" />
             {seniorAdvisorNode && (
-              <div className="flex flex-col items-center">
-                <div className="mb-1 text-[10px] font-mono tracking-widest text-amber-300 uppercase">
-                  Reporting to Secretariat Triad
-                </div>
+              <>
+                <div className="mb-2 text-center font-mono text-[10px] uppercase tracking-wider text-amber-300">Senior advisory</div>
                 {renderPersonnelCard(seniorAdvisorNode, 'advisor')}
-
-                {/* Vertical stem down to Department Heads */}
-                <div className="h-8 w-0.5 bg-gradient-to-b from-amber-400 to-[#d4af37]/70" />
-              </div>
+                <div className="my-4 h-6 w-px bg-gradient-to-b from-amber-400/70 to-[#d4af37]/50" />
+              </>
             )}
-
-            {/* ============================================================ */}
-            {/* LEVEL 3 & 4: DEPARTMENT & SECTION HEADS + CO-HEADS */}
-            {/* ============================================================ */}
-            {filteredHeads.length > 0 && (
-              <div className="flex flex-col items-center w-full">
-                <div className="mb-2 text-[10px] font-mono tracking-widest text-[#d4af37] uppercase">
-                  Directorate Chains of Command • Reporting to Senior Advisor
-                </div>
-
-                {/* Horizontal Distribution Bus Bar spanning across heads */}
-                {filteredHeads.length > 1 && (
-                  <div className="relative w-full flex justify-center">
-                    <div className="h-0.5 w-[92%] bg-gradient-to-r from-transparent via-[#d4af37]/60 to-transparent" />
-                  </div>
-                )}
-
-                {/* Grid / Flex row of Department Heads */}
-                <div className="flex flex-row flex-wrap items-start justify-center gap-x-6 gap-y-10 pt-4">
-                  {filteredHeads.map((head) => {
-                    const hasCoHeads = Boolean(head.children && head.children.length > 0);
-                    const isCollapsed = Boolean(collapsedHeads[head.id]);
-
-                    return (
-                      <div key={head.id} className="relative flex flex-col items-center">
-                        {/* Connecting line from bus bar to this head card */}
-                        <div className="h-4 w-0.5 bg-[#d4af37]/50" />
-
-                        {/* Head Card */}
-                        {renderPersonnelCard(
-                          head,
-                          'head',
-                          hasCoHeads,
-                          isCollapsed,
-                          hasCoHeads ? () => toggleHeadCollapse(head.id) : undefined
-                        )}
-
-                        {/* Co-Heads layer beneath this head */}
-                        {hasCoHeads && !isCollapsed && (
-                          <div className="flex flex-col items-center">
-                            {/* Stem from head to co-head */}
-                            <div className="h-6 w-0.5 bg-gradient-to-b from-[#d4af37]/60 to-white/20" />
-
-                            {/* Co-heads container */}
-                            <div className="flex flex-col gap-3">
-                              {head.children!.map((cohead) => (
-                                <div key={cohead.id} className="flex flex-col items-center">
-                                  {renderPersonnelCard(cohead, 'cohead')}
-                                </div>
-                              ))}
-                            </div>
+            <div className="mb-4 text-center font-mono text-[10px] uppercase tracking-wider text-[#d4af37]">Department & section heads</div>
+            {filteredHeads.length ? (
+              <div className="grid w-full grid-cols-1 items-start justify-items-center gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {filteredHeads.map((head) => {
+                  const hasCoHeads = Boolean(head.children?.length);
+                  const isCollapsed = Boolean(collapsedHeads[head.id]);
+                  return (
+                    <div key={head.id} className="flex w-full flex-col items-center rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 sm:p-4">
+                      {renderPersonnelCard(head, 'head', hasCoHeads, isCollapsed, hasCoHeads ? () => toggleHeadCollapse(head.id) : undefined)}
+                      {hasCoHeads && !isCollapsed && (
+                        <>
+                          <div className="my-3 h-5 w-px bg-[#d4af37]/50" />
+                          <div className="flex w-full flex-col items-center gap-3">
+                            {head.children!.map((cohead) => (
+                              <div key={cohead.id} className="flex w-full justify-center">
+                                {renderPersonnelCard(cohead, 'cohead')}
+                              </div>
+                            ))}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+            ) : (
+              <p className="py-8 text-center text-sm text-neutral-500">No active department heads match the current filters.</p>
             )}
           </div>
         </div>
