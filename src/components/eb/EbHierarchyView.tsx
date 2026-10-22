@@ -111,8 +111,8 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
     const selectedName = profile.reportingHeadName?.trim().toLowerCase();
     if (!selectedId && !selectedName) return null;
     return allHeads.find((head) => {
-      const identifiers = [head.id, head.id.replace(/^head-/, ''), head.source_head_id || '', head.source_user_id || ''];
-      const idMatches = Boolean(selectedId && identifiers.some((value) => value === selectedId));
+      const identifiers = [head.id, head.id.replace(/^head-/, ''), head.source_head_id || '', head.source_user_id || '', head.assigned_email || ''].map((value) => value.toLowerCase());
+      const idMatches = Boolean(selectedId && identifiers.some((value) => value === selectedId.toLowerCase()));
       const nameMatches = Boolean(selectedName && selectedName !== 'department head' &&
         selectedName !== 'directorate secretariat' && head.assigned_name.trim().toLowerCase() === selectedName);
       return idMatches || nameMatches;
@@ -496,7 +496,7 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
               <Crown className="h-3.5 w-3.5" />
               Executive Secretariat · Equal Peer Level
             </div>
-            <div className="grid w-full grid-cols-1 justify-items-center gap-4 md:grid-cols-3 md:items-stretch">
+            <div className="grid w-full grid-cols-1 justify-items-center gap-4 lg:grid-cols-3 lg:items-stretch">
               {triadNodes.map((node) => (
                 <div key={node.id} className="flex w-full flex-col items-center">
                   {renderPersonnelCard(node, 'triad')}
