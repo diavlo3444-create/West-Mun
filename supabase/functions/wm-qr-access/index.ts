@@ -15,7 +15,13 @@ const randomHex = (length = 32) => {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 const clean = (v: unknown) => typeof v === "string" ? v.trim() : "";
-const normalized = (v: unknown) => clean(v).toLowerCase().replace(/\s+/g, " ");
+const normalized = (v: unknown) => clean(v).toLowerCase().replace(/\\s+/g, " ");
+const normalizedRole = (v: unknown) => normalized(v).replace(/[ -]+/g, "_");
+const isSecurityDepartment = (v: unknown) => {
+  const value = normalized(v);
+  return ["security", "security & protocol", "security and protocol"].includes(value);
+};
+const isCoHeadRole = (v: unknown) => ["co_head", "cohead", "co-head"].includes(normalizedRole(v));
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("origin") ?? "";
@@ -58,11 +64,18 @@ Deno.serve(async (req: Request) => {
   const requestedFullName = clean(body.fullName);
   const fullName = clean(userMeta.full_name) || clean(head?.head_name) || clean(pass?.full_name) || requestedFullName;
   const accountRole = isAdmin ? "admin" : head ? "head" : (clean(pass?.account_role) || (typeof meta.wm_eb_role === "string" ? meta.wm_eb_role : "") || (typeof meta.wm_role === "string" ? meta.wm_role : "team_member"));
-  const isSecurity = normalized(department) === "security" || normalized(department) === "security & protocol";
+  // Co-head permissions can be represented in auth metadata OR the official QR-pass row.
+  // Do not let a department_heads row (which labels the role as "head") hide the EB co-head role.
+  const isSecurity = isSecurityDepartment(department) ||
+    isSecurityDepartment(pass?.team) ||
+    isSecurityDepartment(meta.wm_team);
   const isSecurityCoHead = isSecurity && (
-    normalized(accountRole) === "co_head" ||
-    normalized(meta.wm_eb_role) === "co_head" ||
-    normalized(meta.wm_role) === "co_head"
+    isCoHeadRole(accountRole) ||
+    isCoHeadRole(pass?.account_role) ||
+    isCoHeadRole(meta.wm_eb_role) ||
+    isCoHeadRole(meta.wm_role) ||
+    isCoHeadRole(userMeta.wm_eb_role) ||
+    isCoHeadRole(userMeta.wm_role)
   );
   const canScan = isAdmin || (isTeamMember && isSecurity) || (Boolean(head) && isSecurity) || isSecurityCoHead;
 
