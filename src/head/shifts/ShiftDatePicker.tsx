@@ -168,7 +168,7 @@ export const ShiftDatePicker: React.FC<ShiftDatePickerProps> = ({
         type="button"
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen(!isOpen)
+        onClick={() => setIsOpen(!isOpen)}
         className={`flex w-full items-center justify-between rounded-lg border px-3.5 py-2.5 text-left text-sm transition-all ${
           error
             ? 'border-red-500/50 bg-red-950/10 text-white'
