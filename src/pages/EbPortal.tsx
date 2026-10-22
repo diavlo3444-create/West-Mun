@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Crown,
   LayoutDashboard,
-  FileCheck2,
   Calendar,
   Building2,
   Users,
@@ -124,7 +123,7 @@ export default function EbPortal() {
           type: 'alert',
           timestamp: new Date().toISOString(),
           read: false,
-          linkTab: 'tasks',
+          linkTab: 'overview',
         });
       }
 
@@ -398,7 +397,6 @@ export default function EbPortal() {
 
   const TABS: { id: TabKey; label: string; icon: any; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'tasks', label: canSeeOversight ? 'Department Tasks' : 'My Tasks', icon: FileCheck2, badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'schedule', label: canSeeOversight ? 'Department Schedule' : 'My Schedule', icon: Calendar },
     { id: 'station', label: canSeeOversight ? 'Department Stations' : 'My Station', icon: Building2 },
     { id: 'hierarchy', label: 'Hierarchy', icon: Users },
@@ -449,7 +447,7 @@ export default function EbPortal() {
           notifications={notifications}
           onMarkNotificationRead={handleMarkNotificationRead}
           onNavigateNotification={(tabId) => {
-            if (['overview', 'tasks', 'schedule', 'station', 'hierarchy', 'announcements', 'oversight'].includes(tabId)) {
+            if (['overview', 'schedule', 'station', 'hierarchy', 'announcements', 'oversight'].includes(tabId)) {
               setActiveTab(tabId as TabKey);
               setIsEventDayMode(false);
             }
