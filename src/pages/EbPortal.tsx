@@ -448,6 +448,12 @@ export default function EbPortal() {
           onToggleEventDayMode={() => setIsEventDayMode((prev) => !prev)}
           notifications={notifications}
           onMarkNotificationRead={handleMarkNotificationRead}
+          onNavigateNotification={(tabId) => {
+            if (['overview', 'tasks', 'schedule', 'station', 'hierarchy', 'announcements', 'oversight'].includes(tabId)) {
+              setActiveTab(tabId as TabKey);
+              setIsEventDayMode(false);
+            }
+          }}
           onClearAllNotifications={handleClearAllNotifications}
           pendingTasksCount={pendingCount}
           overdueTasksCount={overdueCount}
