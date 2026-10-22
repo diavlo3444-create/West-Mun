@@ -26,69 +26,64 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
 }) => {
   const [selectedPerson, setSelectedPerson] = useState<EbHierarchyNode | null>(null);
 
-  // Render a node and its children recursively in a clean tree structure
-  const renderNode = (node: EbHierarchyNode, level = 1) => {
-    const hasChildren = node.children && node.children.length > 0;
-    const isHead = node.rank_level === 1 || node.rank_level === 2;
+  // Vertical mind-map layout: each reporting level flows downward,
+  // with peers branching horizontally beneath their manager.
+  const renderNode = (node: EbHierarchyNode, level = 1): React.ReactNode => {
+    const hasChildren = Boolean(node.children?.length);
+    const isLeadership = level <= 4 || /secretary-general|under-secretary|senior advisor/i.test(node.role_title);
     const isMe = node.assigned_name.toLowerCase() === profile.name.toLowerCase();
 
     return (
-      <div key={node.id} className="relative space-y-4">
-        {/* Node Card */}
-        <div
+      <div key={node.id} className="flex min-w-0 flex-col items-center">
+        <button
+          type="button"
           onClick={() => setSelectedPerson(node)}
-          className={`group cursor-pointer rounded-2xl border p-4 sm:p-5 transition-all max-w-xl ${
+          className={`group relative z-10 w-[250px] max-w-[calc(100vw-5rem)] rounded-2xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d4af37]/80 hover:shadow-[0_8px_30px_rgba(212,175,55,0.10)] sm:w-[280px] ${
             isMe
-              ? 'border-[#d4af37] bg-gradient-to-r from-[#d4af37]/25 to-[#d4af37]/5 shadow-[0_0_20px_rgba(212,175,55,0.2)]'
-              : isHead
-              ? 'border-[#d4af37]/40 bg-gradient-to-b from-[#18150f] to-[#0c0c0e] hover:border-[#d4af37]'
-              : 'border-white/10 bg-black/40 hover:border-white/25 hover:bg-white/[0.02]'
+              ? 'border-[#d4af37] bg-gradient-to-br from-[#d4af37]/25 to-[#0b0b0d] shadow-[0_0_24px_rgba(212,175,55,0.16)]'
+              : isLeadership
+              ? 'border-[#d4af37]/45 bg-gradient-to-br from-[#211b0d] to-[#0c0c0e]'
+              : 'border-white/10 bg-gradient-to-br from-[#151518] to-[#09090b]'
           }`}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
-                  isHead
-                    ? 'border-[#d4af37]/60 bg-[#d4af37]/20 text-[#f5d47a]'
-                    : 'border-white/10 bg-white/5 text-neutral-400'
-                }`}
-              >
-                {isHead ? <Crown className="h-5 w-5" /> : <UserCheck className="h-5 w-5" />}
+          <div className="flex items-start gap-3">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+              isLeadership ? 'border-[#d4af37]/60 bg-[#d4af37]/15 text-[#f5d47a]' : 'border-white/10 bg-white/5 text-neutral-400'
+            }`}>
+              {isLeadership ? <Crown className="h-5 w-5" /> : <UserCheck className="h-5 w-5" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-[#d4af37]">
+                  {node.department.replace(/_/g, ' ')}
+                </span>
+                {isMe && <span className="rounded bg-[#d4af37] px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase text-black">You</span>}
               </div>
+              <h4 className="text-sm font-semibold text-white transition group-hover:text-[#f5d47a]">{node.assigned_name}</h4>
+              <p className="mt-0.5 text-xs font-medium text-[#d4af37]">{node.role_title}</p>
+              {node.section && <p className="mt-1 text-[10px] uppercase tracking-wider text-neutral-500">{node.section} section</p>}
+              {node.responsibilities && <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-neutral-400">{node.responsibilities}</p>}
+            </div>
+            <ChevronRight className="mt-1 h-4 w-4 shrink-0 rotate-90 text-neutral-500 transition group-hover:text-white" />
+          </div>
+        </button>
 
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[9px] uppercase tracking-wider text-[#d4af37]">
-                    Tier {node.rank_level} · {node.department.replace(/_/g, ' ')}
-                  </span>
-                  {isMe && (
-                    <span className="rounded bg-[#d4af37] px-1.5 py-0.2 font-mono text-[9px] font-bold uppercase text-black">
-                      You
-                    </span>
-                  )}
-                </div>
-
-                <h4 className="text-sm font-semibold text-white group-hover:text-[#f5d47a] transition">
-                  {node.assigned_name}
-                </h4>
-
-                <p className="mt-0.5 text-xs text-[#d4af37] font-medium">{node.role_title}</p>
-                <p className="mt-1 text-[11px] text-neutral-400 line-clamp-2 leading-relaxed">
-                  {node.responsibilities}
-                </p>
+        {hasChildren && (
+          <>
+            <div className="h-7 w-px bg-gradient-to-b from-[#d4af37]/70 to-white/15" />
+            <div className="relative flex w-full min-w-max justify-center pt-7 before:absolute before:left-1/2 before:top-0 before:h-3.5 before:w-px before:-translate-x-1/2 before:bg-white/20">
+              {node.children!.length > 1 && (
+                <div className="absolute left-[calc(50%_/_var(--unused,1))] right-0 top-0 hidden border-t border-white/20" />
+              )}
+              <div className="flex w-full flex-wrap items-start justify-center gap-x-6 gap-y-8">
+                {node.children!.map((child) => (
+                  <div key={child.id} className="relative flex min-w-0 flex-col items-center before:absolute before:-top-7 before:left-1/2 before:h-7 before:w-px before:-translate-x-1/2 before:bg-white/20">
+                    {renderNode(child, level + 1)}
+                  </div>
+                ))}
               </div>
             </div>
-
-            <ChevronRight className="h-4 w-4 text-neutral-500 group-hover:text-white shrink-0 mt-2" />
-          </div>
-        </div>
-
-        {/* Children reporting tree */}
-        {hasChildren && (
-          <div className="pl-6 sm:pl-10 border-l border-white/10 space-y-4 ml-4 sm:ml-5">
-            {node.children!.map((child) => renderNode(child, level + 1))}
-          </div>
+          </>
         )}
       </div>
     );
@@ -105,13 +100,13 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
       </div>
 
       {/* Tree Container */}
-      <div className="rounded-2xl border border-white/10 bg-black/40 p-6 sm:p-8 space-y-6 overflow-x-auto">
+      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-5 sm:p-8">
         {hierarchy.length === 0 ? (
           <div className="py-12 text-center text-xs text-neutral-400">
             Organizational hierarchy chart is being synchronized with the Secretariat database.
           </div>
         ) : (
-          hierarchy.map((rootNode) => renderNode(rootNode))
+          <div className="flex min-w-max flex-col items-center gap-8 py-4">{hierarchy.map((rootNode) => renderNode(rootNode))}</div>
         )}
       </div>
 
