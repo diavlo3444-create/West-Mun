@@ -761,6 +761,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
         {view === 'roles' && rolesAccess && (
           <RolesDashboard
+            coHeads={coHeads}
             department={department}
             section={section}
             departmentLabel={meta.label}
