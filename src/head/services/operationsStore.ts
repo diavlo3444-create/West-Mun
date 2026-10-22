@@ -1054,11 +1054,15 @@ export async function duplicateDepartmentShift(
     if (nErr || !newShift) throw nErr || new Error('Failed to clone shift.');
 
     if (input.copyAssignments) {
-      const { data: assignments } = await supabase
+      const { data: assignments, error: assignmentsError } = await supabase
         .from('wm_shift_assignments')
         .select('*')
         .eq('shift_id', shiftId)
         .neq('status', 'cancelled');
+      if (assignmentsError) {
+        await supabase.from('wm_shifts').delete().eq('id', newShift.id);
+        throw assignmentsError;
+      }
 
       if (assignments && assignments.length > 0) {
         const copyPayloads = assignments.map((a: any) => ({
@@ -1074,7 +1078,11 @@ export async function duplicateDepartmentShift(
           assignee_email: a.assignee_email || '',
           status: 'assigned' as ShiftAssignmentStatus,
         }));
-        await supabase.from('wm_shift_assignments').insert(copyPayloads);
+        const { error: copyError } = await supabase.from('wm_shift_assignments').insert(copyPayloads);
+        if (copyError) {
+          await supabase.from('wm_shifts').delete().eq('id', newShift.id);
+          throw copyError;
+        }
       }
     }
 
@@ -1515,9 +1523,11 @@ export async function createDepartmentGroup(
         .insert(memberPayloads)
         .select();
 
-      if (!mErr && mData) {
-        savedMembers = mData as WmTeamGroupMember[];
+      if (mErr) {
+        await supabase.from('wm_team_groups').delete().eq('id', grp.id);
+        throw mErr;
       }
+      savedMembers = (mData || []) as WmTeamGroupMember[];
     }
 
     return {
@@ -1636,8 +1646,9 @@ export async function syncGroupMembers(
   if (!supabase) return { ok: false, error: 'Database client not initialized.' };
 
   try {
-    // Delete existing members
-    await supabase.from('wm_team_group_members').delete().eq('group_id', groupId);
+    // Delete existing members and stop immediately if deletion fails.
+    const { error: deleteError } = await supabase.from('wm_team_group_members').delete().eq('group_id', groupId);
+    if (deleteError) throw deleteError;
 
     if (members.length === 0) {
       return { ok: true, data: [] };
