@@ -80,7 +80,7 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
                 WEST MUN
               </span>
               <span className="rounded bg-[#d4af37]/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[#d4af37]">
-                EB Operations
+                {profile.isAdmin ? 'Admin Operations' : profile.isHead ? 'Head Operations' : 'EB Operations'}
               </span>
             </div>
             <div className="flex items-center gap-2 text-xs text-neutral-400">
@@ -96,7 +96,7 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
         </div>
 
         {/* Status Selector & KPI Badges (Desktop) */}
-        <div className="hidden lg:flex items-center gap-4">
+        <div className="flex items-center gap-2 lg:gap-4">
           {/* Operational Status Dropdown */}
           <div className="relative">
             <button
@@ -245,11 +245,11 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
           {/* QR Pass Link */}
           <a
             href="/pass"
-            className="hidden sm:flex items-center gap-1.5 rounded-lg border border-[#d4af37]/35 bg-[#d4af37]/10 px-3 py-1.5 text-xs font-semibold text-[#f5d47a] hover:bg-[#d4af37]/20"
+            className="flex items-center gap-1.5 rounded-lg border border-[#d4af37]/35 bg-[#d4af37]/10 px-2.5 py-1.5 text-xs font-semibold text-[#f5d47a] hover:bg-[#d4af37]/20"
             title="Open digital conference accreditation badge"
           >
             <QrCode className="h-3.5 w-3.5" />
-            <span>My Pass</span>
+            <span className="hidden sm:inline">My Pass</span>
           </a>
 
           {/* Sign Out */}
