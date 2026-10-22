@@ -676,7 +676,7 @@ function initLocalStorage() {
     // Ignore storage issues
   }
 }
-initLocalStorage();
+// Intentionally disabled: operational data must come from Supabase.
 
 function persistTasks() {
   if (typeof window !== 'undefined') {
@@ -741,7 +741,7 @@ export const ebOperationsService = {
         // Fall back to memory
       }
     }
-    return [...cachedTasks];
+    return [];
   },
 
   /**
@@ -806,9 +806,7 @@ export const ebOperationsService = {
       } catch {}
     }
 
-    cachedTasks = [newTask, ...cachedTasks];
-    persistTasks();
-    return newTask;
+    throw new Error('Task was not saved. Check the database connection and your department permissions.');
   },
 
   /**
@@ -825,7 +823,7 @@ export const ebOperationsService = {
         if (!error && data) return data as EbTaskComment[];
       } catch {}
     }
-    return cachedComments[taskId] || [];
+    return [];
   },
 
   /**
@@ -849,9 +847,7 @@ export const ebOperationsService = {
       } catch {}
     }
 
-    if (!cachedComments[taskId]) cachedComments[taskId] = [];
-    cachedComments[taskId].push(newComment);
-    return newComment;
+    throw new Error('Comment was not saved. Check the database connection and task permissions.');
   },
 
   /**
@@ -868,7 +864,7 @@ export const ebOperationsService = {
         if (!error && data && data.length > 0) return data as EbStation[];
       } catch {}
     }
-    return [...cachedStations];
+    return [];
   },
 
   /**
@@ -907,7 +903,7 @@ export const ebOperationsService = {
         if (!error && data && data.length > 0) return data as EbShift[];
       } catch {}
     }
-    return [...cachedShifts];
+    return [];
   },
 
   /**
@@ -924,7 +920,7 @@ export const ebOperationsService = {
         if (!error && data) return data as EbShiftSwap[];
       } catch {}
     }
-    return [...cachedSwaps];
+    return [];
   },
 
   /**
@@ -949,8 +945,7 @@ export const ebOperationsService = {
       } catch {}
     }
 
-    cachedSwaps = [newSwap, ...cachedSwaps];
-    return newSwap;
+    throw new Error('Shift-swap request was not saved. Check the database connection.');
   },
 
   /**
@@ -991,7 +986,7 @@ export const ebOperationsService = {
         }
       } catch {}
     }
-    return [...cachedAnnouncements];
+    return [];
   },
 
   /**
@@ -1034,9 +1029,7 @@ export const ebOperationsService = {
       } catch {}
     }
 
-    cachedAnnouncements = [newAnn, ...cachedAnnouncements];
-    persistAnnouncements();
-    return newAnn;
+    throw new Error('Announcement was not published. Check the database connection and department permissions.');
   },
 
   /**
@@ -1070,7 +1063,7 @@ export const ebOperationsService = {
         }
       } catch {}
     }
-    return [...FALLBACK_HIERARCHY];
+    return [];
   },
 
   /**
@@ -1086,7 +1079,7 @@ export const ebOperationsService = {
         if (!error && data) return data as EbIncident[];
       } catch {}
     }
-    return [...cachedIncidents];
+    return [];
   },
 
   /**
@@ -1111,9 +1104,7 @@ export const ebOperationsService = {
       } catch {}
     }
 
-    cachedIncidents = [newInc, ...cachedIncidents];
-    persistIncidents();
-    return newInc;
+    throw new Error('Incident report was not saved. Check the database connection and department permissions.');
   },
 
   /**
