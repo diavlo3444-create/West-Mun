@@ -33,7 +33,15 @@ export const HeadCoHeadManagement: React.FC<{ department: DepartmentKey; section
         supabase.from('wm_eb_tasks').select('id,title,assigned_to_user_id,assigned_to_name,status,priority,deadline,created_at').eq('department', department).order('created_at', { ascending: false }).limit(100),
         supabase.from('wm_eb_shifts').select('id,station_name,location,starts_at,ends_at,status,is_published').eq('department', department).order('starts_at', { ascending: true }).limit(100),
       ]);
-      if (peopleError || !peopleData?.success) throw new Error(peopleData?.error || peopleError?.message || 'Could not load your Co-Heads.');
+      if (peopleError || !peopleData?.success) {
+        const status = (peopleError as any)?.context?.status;
+        const message = status === 403
+          ? 'This login is not assigned as an active Department Head. Sign out and sign in with the account assigned to lead this department, then reopen Co-Head Management.'
+          : status === 401
+            ? 'Your session is missing or expired. Sign in again with your Department Head account.'
+            : peopleData?.error || peopleError?.message || 'Could not load your Co-Heads.';
+        throw new Error(message);
+      }
       if (taskError) throw new Error(taskError.message);
       if (shiftError) throw new Error(shiftError.message);
       const list = (peopleData.coHeads || []) as CoHead[];
