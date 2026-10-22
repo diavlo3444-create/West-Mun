@@ -324,8 +324,8 @@ export const EbEventDayMode: React.FC<EbEventDayModeProps> = ({
             {incidentSuccess ? (
               <div className="py-8 text-center space-y-2">
                 <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-400 animate-in zoom-in-75 duration-200" />
-                <p className="text-sm font-semibold text-white">Incident Dispatched to Directorate</p>
-                <p className="text-xs text-neutral-400">Floor supervisors have been notified.</p>
+                <p className="text-sm font-semibold text-white">Incident report saved</p>
+                <p className="text-xs text-neutral-400">The report is available to authorized staff. Contact your supervisor directly for immediate emergencies.</p>
               </div>
             ) : (
               <form onSubmit={handleIncidentSubmit} className="space-y-3.5 text-xs">
