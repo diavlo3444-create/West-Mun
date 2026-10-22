@@ -1234,7 +1234,7 @@ export const ebOperationsService = {
   /**
    * Fetch Incidents
    */
-  async getIncidents(department?: string, canReviewAll = false): Promise<EbIncident[]> {
+  async getIncidents(department?: string): Promise<EbIncident[]> {
     if (!supabase) return [];
     let query = supabase.from('wm_eb_incidents').select('*').order('created_at', { ascending: false });
     if (department && department !== 'all') query = query.or(`department.eq.${department},department.eq.all`);
