@@ -4,7 +4,8 @@ import {
   Crown,
   Bell,
   LogOut,
-  Smartphone,
+  ScanLine,
+  QrCode,
   ChevronDown,
   Check,
   Clock,
@@ -21,8 +22,6 @@ interface EbNavbarProps {
   profile: EbMemberProfile;
   operationalStatus: 'on_duty' | 'standby' | 'break' | 'off_duty';
   onStatusChange: (status: 'on_duty' | 'standby' | 'break' | 'off_duty') => void;
-  isEventDayMode: boolean;
-  onToggleEventDayMode: () => void;
   notifications: EbNotification[];
   onMarkNotificationRead: (id: string) => void;
   onNavigateNotification: (tabId: string) => void;
@@ -44,8 +43,6 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
   profile,
   operationalStatus,
   onStatusChange,
-  isEventDayMode,
-  onToggleEventDayMode,
   notifications,
   onMarkNotificationRead,
   onNavigateNotification,
@@ -162,22 +159,23 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          {/* Event-Day Mode Button */}
-          <button
-            type="button"
-            onClick={onToggleEventDayMode}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-all ${
-              isEventDayMode
-                ? 'border-[#d4af37] bg-gradient-to-r from-[#d4af37] to-[#aa8232] text-black shadow-[0_0_16px_rgba(212,175,55,0.3)]'
-                : 'border-[#d4af37]/40 bg-[#d4af37]/10 text-[#f5d47a] hover:bg-[#d4af37]/20'
-            }`}
-            title="Switch to Mobile Event-Day Operations View"
+          {/* EB quick access: scanner and personal QR pass */}
+          <a
+            href="/scanner"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/[0.06] px-2.5 text-xs font-semibold text-[#f5d47a] transition hover:bg-[#d4af37]/15 sm:px-3"
+            title="Open QR scanner"
           >
-            <Smartphone className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">
-              {isEventDayMode ? 'Standard Portal' : 'Event-Day Mode'}
-            </span>
-          </button>
+            <ScanLine className="h-4 w-4" />
+            <span className="hidden md:inline">Scanner</span>
+          </a>
+          <a
+            href="/pass"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/[0.06] px-2.5 text-xs font-semibold text-[#f5d47a] transition hover:bg-[#d4af37]/15 sm:px-3"
+            title="Open your official QR pass"
+          >
+            <QrCode className="h-4 w-4" />
+            <span className="hidden md:inline">My QR Pass</span>
+          </a>
 
           {/* Notifications Trigger */}
           <div className="relative">
