@@ -3,7 +3,6 @@ import {
   ShieldCheck,
   Crown,
   Bell,
-  QrCode,
   LogOut,
   Smartphone,
   ChevronDown,
@@ -14,7 +13,6 @@ import {
   Coffee,
   CheckCircle2,
   X,
-  ExternalLink,
 } from 'lucide-react';
 import type { EbMemberProfile } from '../../pages/EbPortal';
 import type { EbNotification } from '../../lib/ebOperationsService';
@@ -257,16 +255,6 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
               </div>
             )}
           </div>
-
-          {/* QR Pass Link */}
-          <a
-            href="/pass"
-            className="flex items-center gap-1.5 rounded-lg border border-[#d4af37]/35 bg-[#d4af37]/10 px-2.5 py-1.5 text-xs font-semibold text-[#f5d47a] hover:bg-[#d4af37]/20"
-            title="Open digital conference accreditation badge"
-          >
-            <QrCode className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">My Pass</span>
-          </a>
 
           {/* Sign Out */}
           <button
