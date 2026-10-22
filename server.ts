@@ -651,6 +651,19 @@ app.all('/api/head-auth*', async (req: Request, res: Response) => {
 });
 
 /**
+ * Security QR Scanner & Attendee Accreditation Endpoint
+ */
+app.all('/api/qr-access*', async (req: Request, res: Response) => {
+  try {
+    const { default: handler } = await import('./serverless/qr-access.ts');
+    await handler(req, res);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Internal Server Error';
+    res.status(500).json({ error: msg });
+  }
+});
+
+/**
  * Organizer Admin Data Retrieval Endpoint (Requires valid Bearer token)
  */
 app.get('/api/admin/data', (req: Request, res: Response) => {

@@ -48,6 +48,8 @@ async function boot() {
   } else if (path === '/privacy') {
     const { LegalPage } = await import('./pages/LegalPage');
     Page = () => <LegalPage kind="privacy" />;
+  } else if (path === '/scanner' || path.startsWith('/scanner/')) {
+    Page = (await import('./pages/ScannerPage')).default;
   } else if (path === '/preview' || path.startsWith('/preview/')) {
     Page = (await import('./App')).default;
   } else {
