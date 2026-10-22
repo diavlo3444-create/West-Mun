@@ -78,14 +78,26 @@ export default function ScannerPage() {
           }
 
           const scannedAt = new Date().toISOString();
-          await supabase
+          const { data: updatedPass, error: updateError } = await supabase
             .from("wm_qr_passes")
             .update({ inside: direction === "entry", last_scanned_at: scannedAt, updated_at: scannedAt })
             .eq("user_id", pass.user_id)
-            .eq("active", true);
+            .eq("active", true)
+            .select("user_id")
+            .maybeSingle();
+
+          if (updateError || !updatedPass) {
+            setMessage({
+              success: false,
+              outcome: "denied",
+              error: "Check-in could not be saved. Verify your Security access and try again.",
+              person: { fullName: pass.full_name, team: pass.team, section: pass.section },
+            });
+            return;
+          }
 
           if (user) {
-            await supabase.from("wm_qr_scan_logs").insert({
+            const { error: logError } = await supabase.from("wm_qr_scan_logs").insert({
               scanner_user_id: user.id,
               pass_user_id: pass.user_id,
               pass_full_name: pass.full_name,
@@ -94,6 +106,16 @@ export default function ScannerPage() {
               direction,
               outcome: "allowed",
             });
+            if (logError) {
+              setMessage({
+                success: true,
+                outcome: "allowed",
+                direction,
+                error: "Check-in was saved, but the scan history could not be recorded. Notify an administrator.",
+                person: { fullName: pass.full_name, team: pass.team, section: pass.section },
+              });
+              return;
+            }
           }
 
           setMessage({
