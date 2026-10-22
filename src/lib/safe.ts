@@ -1,7 +1,7 @@
 /** Only https:// links or site-relative paths ("/file.pdf") are ever rendered. */
 export function safeUrl(value: unknown): string {
   if (typeof value !== 'string') return '';
-  const v = value.trim();
+  let v = value.trim();
   if (!v || v.length > 600) return '';
   if (v.startsWith('https://')) {
     try {
@@ -10,6 +10,10 @@ export function safeUrl(value: unknown): string {
     } catch {
       return '';
     }
+  }
+  // Allow bare relative filenames (e.g. "muaz.jpg", "zain-firas.jpg") by prepending leading slash
+  if (/^[a-zA-Z0-9_\-./]+$/.test(v) && !v.includes('://') && !v.startsWith('//')) {
+    if (!v.startsWith('/')) v = '/' + v;
   }
   if (/^\/[^/\\\s]/.test(v) && !/\s/.test(v)) return v;
   return '';

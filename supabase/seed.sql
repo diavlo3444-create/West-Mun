@@ -56,9 +56,9 @@ begin
       (2, 'Deputy Secretary-General', 'Yousef Saifi', 'Executive Secretariat',
        'Experienced debater with a deep passion for global diplomacy and constructive dialogue. Committed to youth empowerment, collaborative problem-solving, and delivering an unforgettable conference.',
        '/yousef.jpg', 'top', true),
-      (3, 'Under-Secretary-General', 'Fahad', 'Executive Secretariat',
+      (3, 'Under-Secretary-General', 'Zain Firas', 'Executive Secretariat',
        'Directing substantive committee operations, delegate services, and institutional logistics. Dedicated to fostering high-level multilateral debate and diplomatic excellence.',
-       '/fahad.jpg', 'center', true),
+       '/zain-firas.jpg', 'center', true),
       (4, 'Senior Advisor', 'Muaz Elamir', 'Advisory Board',
        'Hi im Muaz Elamir My job is to guide the team, share advice, and help make sure the conference runs smoothly so you all have a great MUN experience!',
        '/muaz.jpg', 'center', true);

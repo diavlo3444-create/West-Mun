@@ -11,26 +11,122 @@ interface TeamMember {
   department: string;
   bio: string;
   image?: string;
+  fallbackImage?: string;
   isConfirmed: boolean;
   appointmentNumber: string;
   imagePosition?: string;
 }
+
+const SecretariatAvatar: React.FC<{
+  src?: string;
+  fallbackSrc?: string;
+  name: string;
+  positionClass?: string;
+}> = ({ src, fallbackSrc, name, positionClass }) => {
+  const [currentSrc, setCurrentSrc] = React.useState<string | undefined>(src || fallbackSrc);
+  const [hasFailed, setHasFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setCurrentSrc(src || fallbackSrc);
+    setHasFailed(false);
+  }, [src, fallbackSrc]);
+
+  const handleError = () => {
+    if (fallbackSrc && currentSrc !== fallbackSrc) {
+      setCurrentSrc(fallbackSrc);
+    } else {
+      setHasFailed(true);
+    }
+  };
+
+  if (hasFailed || !currentSrc) {
+    return (
+      <div className="flex flex-col items-center justify-center text-neutral-400 group-hover:text-[#d4af37] transition-colors">
+        <User className="w-10 h-10 mb-1 opacity-50" />
+        <span className="text-[9px] sm:text-[10px] font-mono tracking-widest uppercase text-[#d4af37]/80">
+          PORTRAIT TBA
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={currentSrc}
+      alt={name}
+      onError={handleError}
+      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${positionClass || 'object-center'}`}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+    />
+  );
+};
 
 export const SecretariatSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
 
   const rows = usePublicTable<SecretariatRow>('secretariat', DEFAULT_SECRETARIAT);
   const positionClass = { center: 'object-center', top: 'object-top', bottom: 'object-bottom' } as const;
-  const secretariat: TeamMember[] = rows.map((r, i) => ({
-    role: r.role,
-    name: r.name,
-    department: r.department,
-    bio: r.bio,
-    image: safeUrl(r.image_url) || undefined,
-    imagePosition: positionClass[r.image_position] ?? 'object-center',
-    isConfirmed: r.confirmed,
-    appointmentNumber: String(i + 1).padStart(2, '0'),
-  }));
+
+  const secretariat: TeamMember[] = rows.map((r, i) => {
+    const isUsg =
+      r.id === 'd-sec-3' ||
+      /under[- ]?secretary[- ]?general/i.test(r.role) ||
+      /\bUSG\b/i.test(r.role);
+
+    const isAdvisor =
+      r.id === 'd-sec-4' ||
+      /advisor/i.test(r.role) ||
+      /muaz/i.test(r.name);
+
+    const isSecretaryGeneral =
+      r.id === 'd-sec-1' ||
+      (r.role === 'Secretary-General' && !isUsg && !/deputy/i.test(r.role));
+
+    const isDeputy =
+      r.id === 'd-sec-2' ||
+      /deputy/i.test(r.role);
+
+    let name = r.name;
+    let imageUrl = safeUrl(r.image_url) || undefined;
+    let fallbackImage: string | undefined;
+
+    if (isUsg) {
+      // Under-Secretary-General must always be Zain Firas
+      if (!name || name.trim().toLowerCase() === 'fahad' || name.trim().toLowerCase() === 'fahad al kendi') {
+        name = 'Zain Firas';
+      }
+      // Replace external/flaky links with reliable local high-res asset
+      if (!imageUrl || imageUrl.includes('i.ibb.co') || imageUrl.includes('fahad.jpg')) {
+        imageUrl = '/zain-firas.jpg';
+      }
+      fallbackImage = '/zain-firas.jpg';
+    } else if (isAdvisor) {
+      // Senior Advisor Muaz El Amir
+      if (!imageUrl || imageUrl.includes('i.ibb.co')) {
+        imageUrl = '/muaz.jpg';
+      }
+      fallbackImage = '/muaz.jpg';
+    } else if (isSecretaryGeneral) {
+      if (!imageUrl) imageUrl = '/rakan-almerbad.jpg';
+      fallbackImage = '/rakan-almerbad.jpg';
+    } else if (isDeputy) {
+      if (!imageUrl) imageUrl = '/yousef.jpg';
+      fallbackImage = '/yousef.jpg';
+    }
+
+    return {
+      role: r.role,
+      name,
+      department: r.department,
+      bio: r.bio,
+      image: imageUrl,
+      fallbackImage,
+      imagePosition: positionClass[r.image_position] ?? 'object-center',
+      isConfirmed: r.confirmed,
+      appointmentNumber: String(i + 1).padStart(2, '0'),
+    };
+  });
 
   return (
     <section id="secretariat" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
@@ -93,22 +189,12 @@ export const SecretariatSection: React.FC = React.memo(() => {
 
               {/* Portrait (Identical Dimensions & Circular Border Treatment) */}
               <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full mb-5 relative overflow-hidden flex items-center justify-center shrink-0 bg-gradient-to-b from-[#18181f] to-[#0c0c0e] border-2 border-[#d4af37]/40 group-hover:border-[#d4af37] transition-all shadow-xl">
-                {member.image ? (
-                  <img
-                    src={member.image}
-                    alt={member.name}
-                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${member.imagePosition || 'object-center'}`}
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-neutral-400 group-hover:text-[#d4af37] transition-colors">
-                    <User className="w-10 h-10 mb-1 opacity-50" />
-                    <span className="text-[9px] sm:text-[10px] font-mono tracking-widest uppercase text-[#d4af37]/80">
-                      PORTRAIT TBA
-                    </span>
-                  </div>
-                )}
+                <SecretariatAvatar
+                  src={member.image}
+                  fallbackSrc={member.fallbackImage}
+                  name={member.name}
+                  positionClass={member.imagePosition}
+                />
               </div>
 
               {/* Role Title (Fixed Min-Height to Guarantee Vertical Alignment Across All Rows) */}
