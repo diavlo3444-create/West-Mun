@@ -64,6 +64,8 @@ export default function EbPortal() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [isEventDayMode, setIsEventDayMode] = useState(false);
   const [operationalStatus, setOperationalStatus] = useState<'on_duty' | 'standby' | 'break' | 'off_duty'>('on_duty');
+  const [dataError, setDataError] = useState('');
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([]);
 
   // Operations Data State
   const [tasks, setTasks] = useState<EbTask[]>([]);
@@ -78,14 +80,16 @@ export default function EbPortal() {
   // Load initial data
   const loadData = useCallback(async (prof: EbMemberProfile) => {
     try {
+      setDataError('');
+      const canReview = Boolean(prof.isHead || prof.isAdmin || prof.role === 'co_head');
       const [t, s, st, a, h, inc, sw] = await Promise.all([
-        ebOperationsService.getTasks(prof.id, prof.department),
-        ebOperationsService.getShifts(prof.department),
+        ebOperationsService.getTasks(prof.id, prof.department, canReview),
+        ebOperationsService.getShifts(prof.department, prof.id, canReview),
         ebOperationsService.getStations(prof.department),
         ebOperationsService.getAnnouncements(prof.id, prof.department),
         ebOperationsService.getHierarchy(prof.department),
-        ebOperationsService.getIncidents(),
-        ebOperationsService.getShiftSwaps(prof.id),
+        ebOperationsService.getIncidents(prof.department, canReview),
+        ebOperationsService.getShiftSwaps(prof.id, prof.department, canReview),
       ]);
 
       setTasks(t);
@@ -138,9 +142,14 @@ export default function EbPortal() {
         });
       }
 
-      setNotifications(notifs);
+      let dismissed: string[] = [];
+      try { dismissed = JSON.parse(localStorage.getItem(`wm-eb-dismissed-notifications-${prof.id}`) || '[]'); } catch { dismissed = []; }
+      setDismissedNotificationIds(dismissed);
+      setNotifications(notifs.filter((n) => !dismissed.includes(n.id)).map((n) => ({
+        ...n, read: localStorage.getItem(`wm-eb-notification-read-${prof.id}-${n.id}`) === 'true' || n.read,
+      })));
     } catch (e) {
-      // In-memory fallback handles data automatically
+      setDataError(e instanceof Error ? e.message : 'EB information could not be loaded. Please retry.');
     }
   }, []);
 
@@ -239,8 +248,9 @@ export default function EbPortal() {
 
       if (!live) return;
       setProfile(builtProfile);
+      const savedStatus = localStorage.getItem(`wm-eb-operational-status-${user.id}`);
+      if (savedStatus === 'on_duty' || savedStatus === 'standby' || savedStatus === 'break' || savedStatus === 'off_duty') setOperationalStatus(savedStatus);
       setLoading(false);
-
       void loadData(builtProfile);
     };
 
@@ -352,12 +362,16 @@ export default function EbPortal() {
 
   // Notifications
   const handleMarkNotificationRead = (id: string) => {
-    setNotifications((current) =>
-      current.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    if (profile) localStorage.setItem(`wm-eb-notification-read-${profile.id}-${id}`, 'true');
+    setNotifications((current) => current.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
   const handleClearAllNotifications = () => {
+    if (profile) {
+      const allIds = Array.from(new Set([...dismissedNotificationIds, ...notifications.map((n) => n.id)]));
+      localStorage.setItem(`wm-eb-dismissed-notifications-${profile.id}`, JSON.stringify(allIds));
+      setDismissedNotificationIds(allIds);
+    }
     setNotifications([]);
   };
 
@@ -373,7 +387,7 @@ export default function EbPortal() {
 
   const TABS: { id: TabKey; label: string; icon: any; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'tasks', label: 'My Tasks', icon: FileCheck2, badge: pendingCount > 0 ? pendingCount : undefined },
+    { id: 'tasks', label: canSeeOversight ? 'Department Tasks' : 'My Tasks', icon: FileCheck2, badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'schedule', label: 'My Schedule', icon: Calendar },
     { id: 'station', label: 'My Station', icon: Building2 },
     { id: 'hierarchy', label: 'Hierarchy', icon: Users },
@@ -415,7 +429,10 @@ export default function EbPortal() {
         <EbNavbar
           profile={profile}
           operationalStatus={operationalStatus}
-          onStatusChange={setOperationalStatus}
+          onStatusChange={(status) => {
+            setOperationalStatus(status);
+            if (profile) localStorage.setItem(`wm-eb-operational-status-${profile.id}`, status);
+          }}
           isEventDayMode={isEventDayMode}
           onToggleEventDayMode={() => setIsEventDayMode((prev) => !prev)}
           notifications={notifications}
@@ -427,6 +444,14 @@ export default function EbPortal() {
           onSignOut={handleSignOut}
         />
 
+        {dataError && (
+          <div role="alert" className="mx-auto mb-4 max-w-7xl px-4 sm:px-6">
+            <div className="flex flex-col gap-2 rounded-xl border border-rose-500/40 bg-rose-950/20 p-3 text-sm text-rose-100 sm:flex-row sm:items-center sm:justify-between">
+              <span>{dataError}</span>
+              <button type="button" onClick={() => profile && void loadData(profile)} className="self-start rounded-lg border border-rose-300/30 px-3 py-1.5 text-xs font-semibold hover:bg-rose-500/10">Retry loading</button>
+            </div>
+          </div>
+        )}
         {/* Event Day Mode (Field Phone Mode) vs Standard Portal */}
         {isEventDayMode ? (
           <main className="px-4 py-6">
