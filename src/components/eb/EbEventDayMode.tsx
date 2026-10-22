@@ -185,13 +185,10 @@ export const EbEventDayMode: React.FC<EbEventDayModeProps> = ({
               <span>Call Supervisor</span>
             </a>
           ) : (
-            <a
-              href="tel:+966501123344"
-              className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 py-3 text-xs font-bold text-white shadow-lg active:scale-95"
-            >
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] py-3 text-center text-xs text-neutral-400">
               <Phone className="h-4 w-4" />
-              <span>Call Directorate</span>
-            </a>
+              <span>Supervisor contact not configured</span>
+            </div>
           )}
 
           <button
@@ -232,7 +229,7 @@ export const EbEventDayMode: React.FC<EbEventDayModeProps> = ({
         </div>
 
         <div className="space-y-2">
-          {tasks.slice(0, 4).map((task) =>
+          {tasks.slice(0, 4).flatMap((task) =>
             task.checklist.map((item) => (
               <div
                 key={item.id}
