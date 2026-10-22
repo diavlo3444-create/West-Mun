@@ -1,3 +1,40 @@
+-- Core tables are created first so this migration works on a clean project.
+-- Additive and idempotent: existing rows are preserved.
+create table if not exists public.wm_eb_tasks (
+ id text primary key, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+ department text not null, section text, assigned_to_user_id uuid references auth.users(id) on delete set null,
+ assigned_to_name text not null default '', assigned_by_name text not null default '', title text not null,
+ description text not null default '', priority text not null default 'normal' check(priority in ('low','normal','high','urgent')),
+ status text not null default 'not_started' check(status in ('not_started','in_progress','blocked','completed')),
+ deadline timestamptz, station_name text not null default '', checklist jsonb not null default '[]'::jsonb,
+ completion_note text not null default '', blocker_reason text not null default '', reference_links jsonb not null default '[]'::jsonb,
+ completed_at timestamptz
+);
+create index if not exists idx_wm_eb_tasks_assignee on public.wm_eb_tasks(assigned_to_user_id);
+create index if not exists idx_wm_eb_tasks_department_status on public.wm_eb_tasks(department,status);
+
+create table if not exists public.wm_eb_shifts (
+ id text primary key, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+ department text not null, section text, station_id text, station_name text not null default '', location text not null default '',
+ shift_date date not null, starts_at timestamptz not null, ends_at timestamptz not null,
+ supervisor_name text not null default '', supervisor_id uuid references auth.users(id) on delete set null,
+ responsibilities text not null default '', handover_notes text not null default '', break_schedule text not null default '',
+ checklist jsonb not null default '[]'::jsonb, capacity integer not null default 1 check(capacity>0),
+ status text not null default 'scheduled' check(status in ('scheduled','active','completed','modified','cancelled')),
+ is_published boolean not null default false, check(ends_at>starts_at)
+);
+create index if not exists idx_wm_eb_shifts_dept_starts on public.wm_eb_shifts(department,starts_at);
+
+create table if not exists public.wm_eb_shift_assignments (
+ id text primary key, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+ shift_id text not null references public.wm_eb_shifts(id) on delete cascade,
+ user_id uuid not null references auth.users(id) on delete cascade, member_name text not null default '',
+ member_email text not null default '', role_title text not null default '', department text not null, section text,
+ status text not null default 'confirmed' check(status in ('confirmed','checked_in','completed','swap_requested','absent')),
+ notes text not null default '', unique(shift_id,user_id)
+);
+create index if not exists idx_wm_eb_shift_assignments_user on public.wm_eb_shift_assignments(user_id);
+
 -- =====================================================================
 -- WEST MUN 2027 — EB Accounts, Scheduling, Tasks & Security QR Permissions
 -- Migration: Enhanced Scheduling, Task Checklists, and Co-Head Permissions
