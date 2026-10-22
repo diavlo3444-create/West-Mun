@@ -1162,12 +1162,12 @@ export const ebOperationsService = {
         const node = makeNode(
           `head-${head.user_id}`,
           secLabel,
-          (peopleCoHeads as any[]).find((p: any) => String(p.id || '') === String(head.user_id || ''))?.display_name || 'Department Head',
+          head.head_name || 'Department Head',
           head.department,
           3,
           advisorNode.id,
           `Leads the ${head.section ? `${head.section} section of ` : ''}${head.department.replace(/_/g, ' ')} team and coordinates its EB operations.`,
-          (peopleCoHeads as any[]).find((p: any) => String(p.id || '') === String(head.user_id || ''))?.email || '',
+          head.email || '',
           head.section
         );
         return {
