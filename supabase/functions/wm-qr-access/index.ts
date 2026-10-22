@@ -15,7 +15,7 @@ const randomHex = (length = 32) => {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 const clean = (v: unknown) => typeof v === "string" ? v.trim() : "";
-const normalized = (v: unknown) => clean(v).toLowerCase().replace(/\\s+/g, " ");
+const normalized = (v: unknown) => clean(v).toLowerCase().replace(/\s+/g, " ");
 const normalizedRole = (v: unknown) => normalized(v).replace(/[ -]+/g, "_");
 const isSecurityDepartment = (v: unknown) => {
   const value = normalized(v);
