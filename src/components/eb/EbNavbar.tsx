@@ -27,6 +27,7 @@ interface EbNavbarProps {
   onToggleEventDayMode: () => void;
   notifications: EbNotification[];
   onMarkNotificationRead: (id: string) => void;
+  onNavigateNotification: (tabId: string) => void;
   onClearAllNotifications: () => void;
   pendingTasksCount: number;
   overdueTasksCount: number;
@@ -49,6 +50,7 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
   onToggleEventDayMode,
   notifications,
   onMarkNotificationRead,
+  onNavigateNotification,
   onClearAllNotifications,
   pendingTasksCount,
   overdueTasksCount,
@@ -220,8 +222,22 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
                     notifications.map((n) => (
                       <div
                         key={n.id}
-                        onClick={() => onMarkNotificationRead(n.id)}
-                        className={`cursor-pointer rounded-lg border p-2.5 transition ${
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          onMarkNotificationRead(n.id);
+                          if (n.linkTab) onNavigateNotification(n.linkTab);
+                          setNotifOpen(false);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onMarkNotificationRead(n.id);
+                            if (n.linkTab) onNavigateNotification(n.linkTab);
+                            setNotifOpen(false);
+                          }
+                        }}
+                        className={`cursor-pointer rounded-lg border p-2.5 text-left transition ${
                           n.read
                             ? 'border-white/5 bg-black/20 text-neutral-400'
                             : 'border-[#d4af37]/30 bg-[#d4af37]/[0.06] text-white shadow-[0_0_8px_rgba(212,175,55,0.08)]'
