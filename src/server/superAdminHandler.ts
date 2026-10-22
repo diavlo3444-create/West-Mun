@@ -2196,6 +2196,7 @@ export async function handleConsumeLaunchTicket(
       headName: string;
       department: DepartmentKey;
       section: SectionKey | null;
+      demoRole?: 'co_head' | 'marketing' | 'design';
     };
     adminEmail?: string;
     error?: string;
@@ -2310,6 +2311,7 @@ export async function handleVerifyTestSession(
       headName: string;
       department: DepartmentKey;
       section: SectionKey | null;
+      demoRole?: 'co_head' | 'marketing' | 'design';
     };
     expiresAt?: string;
     error?: string;
