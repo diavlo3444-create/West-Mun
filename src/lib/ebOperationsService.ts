@@ -731,22 +731,14 @@ export const ebOperationsService = {
   /**
    * Fetch all tasks relevant to an EB member or department
    */
-  async getTasks(userId?: string, department?: string): Promise<EbTask[]> {
-    if (supabase) {
-      try {
-        let query = supabase.from('wm_eb_tasks').select('*').order('created_at', { ascending: false });
-        if (department && department !== 'all') {
-          query = query.or(`department.eq.${department},department.eq.all`);
-        }
-        const { data, error } = await query;
-        if (!error && data && data.length > 0) {
-          return data as EbTask[];
-        }
-      } catch (e) {
-        // Fall back to memory
-      }
-    }
-    return [];
+  async getTasks(userId?: string, department?: string, includeDepartmentTasks = false): Promise<EbTask[]> {
+    if (!supabase) return [];
+    let query = supabase.from('wm_eb_tasks').select('*').order('created_at', { ascending: false });
+    if (department && department !== 'all') query = query.or(`department.eq.${department},department.eq.all`);
+    if (userId && !includeDepartmentTasks) query = query.eq('assigned_to_user_id', userId);
+    const { data, error } = await query;
+    if (error) throw new Error('Could not load tasks: ' + error.message);
+    return (data || []) as EbTask[];
   },
 
   /**
@@ -859,17 +851,12 @@ export const ebOperationsService = {
    * Fetch all stations
    */
   async getStations(department?: string): Promise<EbStation[]> {
-    if (supabase) {
-      try {
-        let query = supabase.from('wm_eb_stations').select('*').order('name');
-        if (department && department !== 'all') {
-          query = query.or(`department.eq.${department},department.eq.all`);
-        }
-        const { data, error } = await query;
-        if (!error && data && data.length > 0) return data as EbStation[];
-      } catch {}
-    }
-    return [];
+    if (!supabase) return [];
+    let query = supabase.from('wm_eb_stations').select('*').order('name');
+    if (department && department !== 'all') query = query.or(`department.eq.${department},department.eq.all`);
+    const { data, error } = await query;
+    if (error) throw new Error('Could not load stations: ' + error.message);
+    return (data || []) as EbStation[];
   },
 
   /**
@@ -890,34 +877,26 @@ export const ebOperationsService = {
    * Fetch member shifts and schedule
    */
   async getShifts(department?: string): Promise<EbShift[]> {
-    if (supabase) {
-      try {
-        let query = supabase.from('wm_eb_shifts').select('*').order('starts_at', { ascending: true });
-        if (department && department !== 'all') {
-          query = query.or(`department.eq.${department},department.eq.all`);
-        }
-        const { data, error } = await query;
-        if (!error && data && data.length > 0) return data as EbShift[];
-      } catch {}
-    }
-    return [];
+    if (!supabase) return [];
+    let query = supabase.from('wm_eb_shifts').select('*').order('starts_at', { ascending: true });
+    if (department && department !== 'all') query = query.or(`department.eq.${department},department.eq.all`);
+    const { data, error } = await query;
+    if (error) throw new Error('Could not load shifts: ' + error.message);
+    return (data || []) as EbShift[];
   },
 
   /**
    * Fetch shift swap requests
    */
-  async getShiftSwaps(userId?: string): Promise<EbShiftSwap[]> {
-    if (supabase) {
-      try {
-        let query = supabase.from('wm_eb_shift_swaps').select('*, shift:wm_eb_shifts(*)').order('created_at', { ascending: false });
-        if (userId) {
-          query = query.eq('requester_user_id', userId);
-        }
-        const { data, error } = await query;
-        if (!error && data) return data as EbShiftSwap[];
-      } catch {}
-    }
-    return [];
+  async getShiftSwaps(userId?: string, department?: string, canReview = false): Promise<EbShiftSwap[]> {
+    if (!supabase) return [];
+    let query = supabase.from('wm_eb_shift_swaps').select('*, shift:wm_eb_shifts(*)').order('created_at', { ascending: false });
+    if (userId && !canReview) query = query.eq('requester_user_id', userId);
+    const { data, error } = await query;
+    if (error) throw new Error('Could not load shift-swap requests: ' + error.message);
+    const rows = (data || []) as EbShiftSwap[];
+    if (canReview && department && department !== 'all') return rows.filter((swap) => swap.shift?.department === department || swap.shift?.department === 'all');
+    return rows;
   },
 
   /**
@@ -963,26 +942,13 @@ export const ebOperationsService = {
    * Fetch announcements
    */
   async getAnnouncements(userId?: string, department?: string): Promise<EbAnnouncement[]> {
-    if (supabase) {
-      try {
-        let query = supabase
-          .from('wm_eb_announcements')
-          .select('*, acks:wm_eb_announcement_acks(user_id)')
-          .order('pinned', { ascending: false })
-          .order('created_at', { ascending: false });
-        if (department && department !== 'all') {
-          query = query.or(`department.eq.${department},department.eq.all`);
-        }
-        const { data, error } = await query;
-        if (!error && data && data.length > 0) {
-          return data.map((item: any) => ({
-            ...item,
-            is_acknowledged: userId ? (item.acks || []).some((a: any) => a.user_id === userId) : false,
-          })) as EbAnnouncement[];
-        }
-      } catch {}
-    }
-    return [];
+    if (!supabase) return [];
+    let query = supabase.from('wm_eb_announcements').select('*, acks:wm_eb_announcement_acks(user_id)')
+      .order('pinned', { ascending: false }).order('created_at', { ascending: false });
+    if (department && department !== 'all') query = query.or(`department.eq.${department},department.eq.all`);
+    const { data, error } = await query;
+    if (error) throw new Error('Could not load announcements: ' + error.message);
+    return ((data || []) as any[]).map((item) => ({ ...item, is_acknowledged: userId ? (item.acks || []).some((a: any) => a.user_id === userId) : false })) as EbAnnouncement[];
   },
 
   /**
@@ -1233,17 +1199,13 @@ export const ebOperationsService = {
   /**
    * Fetch Incidents
    */
-  async getIncidents(): Promise<EbIncident[]> {
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('wm_eb_incidents')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (!error && data) return data as EbIncident[];
-      } catch {}
-    }
-    return [];
+  async getIncidents(department?: string, canReviewAll = false): Promise<EbIncident[]> {
+    if (!supabase) return [];
+    let query = supabase.from('wm_eb_incidents').select('*').order('created_at', { ascending: false });
+    if (department && department !== 'all') query = query.or(`department.eq.${department},department.eq.all`);
+    const { data, error } = await query;
+    if (error) throw new Error('Could not load incidents: ' + error.message);
+    return (data || []) as EbIncident[];
   },
 
   /**
