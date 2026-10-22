@@ -204,17 +204,39 @@ Deno.serve(async (req: Request) => {
 
   if (body.action === "list_my_coheads") {
     const bearer = (req.headers.get("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
-    if (!bearer) return json({ error: "Sign in as a department head first." }, 401);
+    if (!bearer) return json({ error: "Sign in first." }, 401);
     const auth = await db.auth.getUser(bearer[1]);
     if (auth.error || !auth.data.user) return json({ error: "Your session is invalid or expired." }, 401);
+
+    // Department Heads see only Co-Heads reporting to their own account.
     const head = await db.from("department_heads").select("user_id,department,section,active")
       .eq("user_id", auth.data.user.id).eq("active", true).maybeSingle();
     if (head.error) return json({ error: "Could not verify your head assignment." }, 500);
-    if (!head.data) return json({ error: "Only an active department head can view their Co-Head list." }, 403);
-    const result = await db.from("wm_qr_passes").select("user_id,full_name,email,phone,gender,created_at,reporting_head_id")
-      .eq("reporting_head_id", head.data.user_id).eq("account_role", "co_head").eq("active", true).order("full_name");
-    if (result.error) return json({ error: "Could not load your Co-Heads." }, 500);
-    return json({ success: true, coHeads: result.data || [] });
+    if (head.data) {
+      const result = await db.from("wm_qr_passes").select("user_id,full_name,email,phone,gender,created_at,reporting_head_id,team,section")
+        .eq("reporting_head_id", head.data.user_id).eq("account_role", "co_head").eq("active", true).order("full_name");
+      if (result.error) return json({ error: "Could not load your Co-Heads." }, 500);
+      return json({ success: true, accessMode: "head", coHeads: result.data || [] });
+    }
+
+    // Admins may manage Co-Heads from the admin dashboard, scoped to the
+    // department/section currently selected in the dashboard.
+    const admin = await db.from("admins").select("user_id").eq("user_id", auth.data.user.id).maybeSingle();
+    if (admin.error) return json({ error: "Could not verify admin permissions." }, 500);
+    if (!admin.data) return json({ error: "Only an active Department Head or WEST MUN admin can view Co-Head management." }, 403);
+    const department = clean(body.department);
+    const section = clean(body.section);
+    if (!department) return json({ error: "Choose a department to manage." }, 400);
+    let headsQuery = db.from("department_heads").select("user_id,department,section").eq("active", true).eq("department", department);
+    if (section) headsQuery = headsQuery.eq("section", section);
+    const headsResult = await headsQuery;
+    if (headsResult.error) return json({ error: "Could not load heads for this department." }, 500);
+    const headIds = (headsResult.data || []).map((row: any) => row.user_id);
+    if (!headIds.length) return json({ success: true, accessMode: "admin", coHeads: [] });
+    const coHeadsResult = await db.from("wm_qr_passes").select("user_id,full_name,email,phone,gender,created_at,reporting_head_id,team,section")
+      .in("reporting_head_id", headIds).eq("account_role", "co_head").eq("active", true).order("full_name");
+    if (coHeadsResult.error) return json({ error: "Could not load Co-Heads for this department." }, 500);
+    return json({ success: true, accessMode: "admin", coHeads: coHeadsResult.data || [] });
   }
 
   if (body.action === "signup_public") {
