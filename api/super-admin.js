@@ -1281,24 +1281,33 @@ async function handleDeleteHead(authHeader, headId) {
   const supabaseAdmin = getSupabaseAdmin();
   if (supabaseAdmin) {
     try {
-      const { error: deleteErr } = await supabaseAdmin.from("department_heads").delete().eq("user_id", headId);
-      if (deleteErr) {
-        return {
-          statusCode: 400,
-          body: { success: false, code: deleteErr.code, error: explainAssignmentError(deleteErr).message }
-        };
+      const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(headId);
+      if (targetUser?.user?.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        return { statusCode: 400, body: { success: false, error: "Primary IT Super Admin account cannot be deleted." } };
       }
+      const links = await supabaseAdmin.from("wm_eb_signup_links").update({ created_by: auth.user.id, active: false }).eq("created_by", headId);
+      if (links.error) return { statusCode: 400, body: { success: false, error: `Could not safely transfer signup-link ownership: ${links.error.message}` } };
+      const passDelete = await supabaseAdmin.from("wm_qr_passes").delete().eq("user_id", headId);
+      if (passDelete.error) return { statusCode: 400, body: { success: false, error: `Could not remove the account's EB/pass record: ${passDelete.error.message}` } };
+      const adminDelete = await supabaseAdmin.from("admins").delete().eq("user_id", headId);
+      if (adminDelete.error) return { statusCode: 400, body: { success: false, error: `Could not remove the account's admin assignment: ${adminDelete.error.message}` } };
+      const headDelete = await supabaseAdmin.from("department_heads").delete().eq("user_id", headId);
+      if (headDelete.error) return { statusCode: 400, body: { success: false, code: headDelete.error.code, error: explainAssignmentError(headDelete.error).message } };
+      const unlinkCoHeads = await supabaseAdmin.from("wm_qr_passes").update({ reporting_head_id: null }).eq("reporting_head_id", headId);
+      if (unlinkCoHeads.error) return { statusCode: 400, body: { success: false, error: `Head assignment was removed, but Co-Head links could not be cleared: ${unlinkCoHeads.error.message}` } };
       try {
         HeadStore.delete(headId);
       } catch {
       }
-      return {
-        statusCode: 200,
-        body: {
-          success: true,
-          message: "Department-head assignment removed successfully. The underlying Auth account remains unchanged."
+      if (targetUser?.user) {
+        const authDelete = await supabaseAdmin.auth.admin.deleteUser(headId);
+        if (authDelete.error) {
+          console.error("[SuperAdmin] Auth deletion failed for department head", { code: authDelete.error.name });
+          await supabaseAdmin.auth.admin.updateUserById(headId, { ban_duration: "876000h", app_metadata: { wm_role: "deleted", wm_access_revoked: true } }).catch(() => null);
+          return { statusCode: 500, body: { success: false, error: "Role assignments were removed. Supabase could not fully delete the login, so access was revoked and the deletion must be retried." } };
         }
-      };
+      }
+      return { statusCode: 200, body: { success: true, message: "Department head account and Supabase login permanently deleted." } };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to delete head record in Supabase.";
       return { statusCode: 400, body: { success: false, error: msg } };
@@ -1609,15 +1618,27 @@ async function handleDeleteAdmin(authHeader, targetId) {
       if (targetAdmin && targetAdmin.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
         return { statusCode: 400, body: { success: false, error: "Primary IT Super Admin account cannot be deleted." } };
       }
-      const { error: deleteErr } = await supabaseAdmin.from("admins").delete().eq("user_id", targetId);
-      if (deleteErr) {
-        return { statusCode: 400, body: { success: false, error: deleteErr.message } };
+      const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(targetId);
+      if (targetUser?.user?.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        return { statusCode: 400, body: { success: false, error: "Primary IT Super Admin account cannot be deleted." } };
       }
-      await supabaseAdmin.auth.admin.deleteUser(targetId).catch(() => null);
-      return {
-        statusCode: 200,
-        body: { success: true, message: "Admin account removed successfully." }
-      };
+      const links = await supabaseAdmin.from("wm_eb_signup_links").update({ created_by: auth.user.id, active: false }).eq("created_by", targetId);
+      if (links.error) return { statusCode: 400, body: { success: false, error: `Could not safely transfer signup-link ownership: ${links.error.message}` } };
+      const passDelete = await supabaseAdmin.from("wm_qr_passes").delete().eq("user_id", targetId);
+      if (passDelete.error) return { statusCode: 400, body: { success: false, error: `Could not remove the account's EB/pass record: ${passDelete.error.message}` } };
+      const headDelete = await supabaseAdmin.from("department_heads").delete().eq("user_id", targetId);
+      if (headDelete.error) return { statusCode: 400, body: { success: false, error: `Could not remove the account's head assignment: ${headDelete.error.message}` } };
+      const { error: deleteErr } = await supabaseAdmin.from("admins").delete().eq("user_id", targetId);
+      if (deleteErr) return { statusCode: 400, body: { success: false, error: deleteErr.message } };
+      if (targetUser?.user) {
+        const authDelete = await supabaseAdmin.auth.admin.deleteUser(targetId);
+        if (authDelete.error) {
+          console.error("[SuperAdmin] Auth deletion failed for administrator", { code: authDelete.error.name });
+          await supabaseAdmin.auth.admin.updateUserById(targetId, { ban_duration: "876000h", app_metadata: { wm_role: "deleted", wm_access_revoked: true } }).catch(() => null);
+          return { statusCode: 500, body: { success: false, error: "Role assignments were removed. Supabase could not fully delete the login, so access was revoked and the deletion must be retried." } };
+        }
+      }
+      return { statusCode: 200, body: { success: true, message: "Administrator account and Supabase login permanently deleted." } };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to delete admin record.";
       return { statusCode: 400, body: { success: false, error: msg } };
