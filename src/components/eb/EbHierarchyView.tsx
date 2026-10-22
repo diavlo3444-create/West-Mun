@@ -334,14 +334,14 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
             </span>
           </div>
           <h2 className="mt-2 font-serif text-2xl sm:text-3xl font-normal text-white">
-            Secretariat & Directorate Hierarchy
+            {isScopedMember ? 'Your Reporting Head' : 'Secretariat & Directorate Hierarchy'}
           </h2>
           <p className="mt-1 text-xs text-neutral-400">
-            Secretary-General, Deputy Secretary-General, and Under-Secretary-General peer leadership, Senior Advisory counsel, and Directorate operational chains.
+            {isScopedMember ? 'Your EB view is limited to the department head selected during sign-up.' : 'Secretary-General, Deputy Secretary-General, and Under-Secretary-General peer leadership, Senior Advisory counsel, and Directorate operational chains.'}
           </p>
         </div>
 
-        {/* View Toggle & Department Filter */}
+        {!isScopedMember && (
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Search Input */}
           <div className="relative">
@@ -406,9 +406,10 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
             </button>
           </div>
         </div>
+        )}
       </div>
 
-      {/* Leadership Structure Overview Banner */}
+      {!isScopedMember && (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-[#d4af37]/30 bg-gradient-to-br from-[#d4af37]/10 to-black/40 p-3">
           <div className="flex items-center gap-2">
@@ -458,6 +459,7 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
           <p className="text-[10px] text-neutral-400">Subordinate Section Leadership</p>
         </div>
       </div>
+      )}
 
       {/* Main View Area */}
       {isScopedMember ? (
