@@ -1048,7 +1048,7 @@ export const ebOperationsService = {
         supabase
           ? supabase
               .from('department_heads')
-              .select('user_id, department, section, head_name, active')
+              .select('user_id, department, section, active')
               .order('department', { ascending: true })
           : Promise.resolve({ data: null }),
         supabase
@@ -1066,7 +1066,7 @@ export const ebOperationsService = {
         secretariatRows && secretariatRows.length > 0 ? (secretariatRows as any[]) : DEFAULT_SECRETARIAT;
 
       const rawHeads = headRows || [];
-      const heads = rawHeads.filter((h: any) => h.active === true && h.head_name && h.department);
+      const heads = rawHeads.filter((h: any) => h.active === true && h.user_id && h.department);
       // Co-heads are sourced from active wm_people records below; department_heads has no role_type/title columns.
       const peopleCoHeads = (coHeadRows || []).filter((p: any) => p.display_name && p.department);
 
@@ -1164,12 +1164,12 @@ export const ebOperationsService = {
         const node = makeNode(
           `head-${head.user_id}`,
           secLabel,
-          head.head_name,
+          (peopleCoHeads as any[]).find((p: any) => String(p.id || '') === String(head.user_id || ''))?.display_name || 'Department Head',
           head.department,
           3,
           advisorNode.id,
           `Leads the ${head.section ? `${head.section} section of ` : ''}${head.department.replace(/_/g, ' ')} team and coordinates its EB operations.`,
-          head.email || '',
+          (peopleCoHeads as any[]).find((p: any) => String(p.id || '') === String(head.user_id || ''))?.email || '',
           head.section
         );
         return {
