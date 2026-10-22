@@ -155,7 +155,7 @@ export const EbEventDayMode: React.FC<EbEventDayModeProps> = ({
           </h2>
           <div className="mt-1 flex items-center gap-2 text-xs text-[#d4af37]">
             <MapPin className="h-4 w-4 shrink-0" />
-            <span>{currentShift ? currentShift.location : station ? station.location : 'Auditorium Level 1'}</span>
+            <span>{currentShift ? currentShift.location : station ? station.location : 'Location not configured'}</span>
           </div>
         </div>
 
