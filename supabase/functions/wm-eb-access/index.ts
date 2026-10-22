@@ -161,7 +161,28 @@ Deno.serve(async (req: Request) => {
     }
     const ebEmails = new Set((inviteResult.data || []).map((row: { email: string }) => row.email.toLowerCase()));
     const members = (passResult.data || []).filter((row: { email: string; account_role: string }) => ebEmails.has(row.email.toLowerCase()) || ["co_head", "designer", "marketing"].includes(String(row.account_role || "").toLowerCase()));
-    return json({ success: true, members, heads: headResult.data || [] });
+
+    // department_heads intentionally stores assignment fields, not profile fields.
+    // Resolve each real account through Supabase Auth so the admin directory can
+    // show the head's name/email rather than rendering every assignment as unnamed.
+    const heads = await Promise.all((headResult.data || []).map(async (row: any) => {
+      const account = await db.auth.admin.getUserById(row.user_id);
+      const user = account.data.user;
+      const metadata = user?.user_metadata || {};
+      const headName = String(
+        metadata.full_name ||
+        metadata.fullName ||
+        metadata.name ||
+        user?.email?.split("@")[0] ||
+        "Department Head"
+      );
+      return {
+        ...row,
+        head_name: headName,
+        email: user?.email || "",
+      };
+    }));
+    return json({ success: true, members, heads });
   }
 
   if (body.action === "list_active_heads") {
