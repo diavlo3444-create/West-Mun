@@ -151,7 +151,7 @@ Deno.serve(async (req: Request) => {
     const [inviteResult, passResult, headResult] = await Promise.all([
       db.from("wm_eb_invites").select("email").not("redeemed_at", "is", null),
       db.from("wm_qr_passes").select("user_id,full_name,email,account_role,team,section,phone,gender,active,created_at").order("full_name"),
-      db.from("department_heads").select("user_id,email,head_name,department,section,active,created_at").order("department").order("section"),
+      db.from("department_heads").select("user_id,department,section,active,created_at").order("department").order("section"),
     ]);
     if (inviteResult.error || passResult.error || headResult.error) {
       console.error("[wm-eb-access] Directory query failed", {
@@ -165,8 +165,8 @@ Deno.serve(async (req: Request) => {
   }
 
   if (body.action === "list_active_heads") {
-    const result = await db.from("department_heads").select("user_id,head_name,department,section")
-      .eq("active", true).order("department").order("section").order("head_name");
+    const result = await db.from("department_heads").select("user_id,department,section,active")
+      .eq("active", true).order("department").order("section");
     if (result.error) return json({ error: "Could not load the active department heads. Please try again." }, 500);
     return json({ success: true, heads: result.data || [] });
   }
@@ -209,9 +209,9 @@ Deno.serve(async (req: Request) => {
     if (link.error) return json({ error: "Could not verify the signup link. Please try again." }, 500);
     if (!link.data) return json({ error: "This EB signup link is no longer active. Ask an admin for the current link." }, 403);
 
-    let reportingHead: { user_id: string; head_name: string | null; department: string; section: string | null } | null = null;
+    let reportingHead: { user_id: string; department: string; section: string | null } | null = null;
     if (ebRole === "co_head") {
-      const selected = await db.from("department_heads").select("user_id,head_name,department,section,active")
+      const selected = await db.from("department_heads").select("user_id,department,section,active")
         .eq("user_id", requestedHeadId).eq("active", true).maybeSingle();
       if (selected.error) return json({ error: "Could not verify the selected head. Please try again." }, 500);
       if (!selected.data) return json({ error: "That head is no longer active. Select an active head from the list." }, 400);
