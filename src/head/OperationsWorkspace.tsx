@@ -62,9 +62,13 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
       if (!p.ok) throw new Error(p.error || 'Could not load people.');
       if (!pr.ok) throw new Error(pr.error || 'Could not load projects.');
       if (!sh.ok) throw new Error(sh.error || 'Could not load shifts.');
-      if (!win.ok) throw new Error(win.error || 'Could not load registration windows.');
       setPeople(p.data || []); setProjects(pr.data || []); setShifts(sh.data || []);
-      setWindows(win.data || []);
+      if (win.ok) {
+        setWindows(win.data || []);
+      } else {
+        setWindows([]);
+        setError(`Could not load registration windows: ${win.error || 'Unknown database error'}`);
+      }
       setSelectedProject(current => (pr.data || []).some(x => x.id === current) ? current : (pr.data?.[0]?.id || ''));
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not load workspace data.';
