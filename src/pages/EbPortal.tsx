@@ -48,6 +48,9 @@ export interface EbMemberProfile {
   phone?: string | null;
   reportingHeadId?: string | null;
   reportingHeadName?: string | null;
+  reportingHeadEmail?: string | null;
+  reportingHeadDepartment?: string | null;
+  reportingHeadSection?: string | null;
   isHead?: boolean;
   isAdmin?: boolean;
 }
@@ -176,15 +179,48 @@ export default function EbPortal() {
         .maybeSingle();
       const isHead = Boolean(headData);
 
-      const department = String(headData?.department || meta.wm_team || 'general');
-      const section = headData?.section || (meta.wm_section as string | null) || null;
+      const department = String(headData?.department || meta.wm_team || userMeta.wm_team || 'general');
+      const section = headData?.section || (meta.wm_section as string | null) || (userMeta.wm_section as string | null) || null;
       const role = isHead
         ? 'Department Head'
         : isAdmin
         ? 'Super Admin'
-        : String(meta.wm_eb_role || 'Executive Board');
+        : String(meta.wm_eb_role || userMeta.wm_eb_role || 'Executive Board');
       const fullName =
         String(userMeta.full_name || headData?.head_name || user.email?.split('@')[0] || 'EB Officer');
+
+      // Resolve the exact head selected at sign-up from active database records.
+      // Never substitute a generic department contact or a made-up hotline/location.
+      const selectedHeadId = String(
+        meta.wm_reporting_head_id || userMeta.wm_reporting_head_id ||
+        meta.reporting_head_id || userMeta.reporting_head_id ||
+        meta.wm_department_head_id || userMeta.wm_department_head_id ||
+        meta.selected_head_id || userMeta.selected_head_id || ''
+      ).trim();
+      const selectedHeadName = String(
+        meta.wm_reporting_head_name || userMeta.wm_reporting_head_name ||
+        meta.reporting_head_name || userMeta.reporting_head_name ||
+        meta.selected_head_name || userMeta.selected_head_name || ''
+      ).trim().toLowerCase();
+      const selectedHeadEmail = String(
+        meta.wm_reporting_head_email || userMeta.wm_reporting_head_email ||
+        meta.reporting_head_email || userMeta.reporting_head_email ||
+        meta.selected_head_email || userMeta.selected_head_email || ''
+      ).trim().toLowerCase();
+
+      let reportingHead: { id: string; user_id: string | null; head_name: string; department: string; section: string | null; email: string | null } | null = null;
+      if (!isHead && !isAdmin && (selectedHeadId || selectedHeadName || selectedHeadEmail)) {
+        const { data: activeHeads } = await supabase
+          .from('department_heads')
+          .select('id,user_id,head_name,department,section,email,active')
+          .eq('active', true);
+        reportingHead = (activeHeads || []).find((candidate: any) => {
+          const idMatch = Boolean(selectedHeadId && [candidate.id, candidate.user_id].some((v) => String(v || '') === selectedHeadId));
+          const nameMatch = Boolean(selectedHeadName && String(candidate.head_name || '').trim().toLowerCase() === selectedHeadName);
+          const emailMatch = Boolean(selectedHeadEmail && String(candidate.email || '').trim().toLowerCase() === selectedHeadEmail);
+          return idMatch || nameMatch || emailMatch;
+        }) || null;
+      }
 
       const builtProfile: EbMemberProfile = {
         id: user.id,
@@ -194,15 +230,11 @@ export default function EbPortal() {
         department,
         section,
         phone: (userMeta.phone as string) || null,
-        reportingHeadId: String(
-          meta.wm_reporting_head_id || userMeta.wm_reporting_head_id ||
-          meta.reporting_head_id || userMeta.reporting_head_id || ''
-        ) || null,
-        reportingHeadName: String(
-          meta.wm_reporting_head_name || userMeta.wm_reporting_head_name ||
-          meta.reporting_head_name || userMeta.reporting_head_name ||
-          (isHead ? 'Directorate Secretariat' : '')
-        ) || null,
+        reportingHeadId: reportingHead?.id || selectedHeadId || null,
+        reportingHeadName: reportingHead?.head_name || null,
+        reportingHeadEmail: reportingHead?.email || null,
+        reportingHeadDepartment: reportingHead?.department || null,
+        reportingHeadSection: reportingHead?.section || null,
         isHead,
         isAdmin,
       };
