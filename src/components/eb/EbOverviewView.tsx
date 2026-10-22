@@ -168,14 +168,7 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => onNavigateTab('schedule')}
-                className="flex items-center gap-1 text-xs text-[#d4af37] hover:underline"
-              >
-                <span>Full Roster</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
+
             </div>
 
             {nextShift ? (
@@ -257,14 +250,7 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => onNavigateTab('tasks')}
-                className="flex items-center gap-1 text-xs text-[#d4af37] hover:underline"
-              >
-                <span>View All ({tasks.length})</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
+
             </div>
 
             <div className="mt-4 space-y-3">
@@ -329,13 +315,7 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => onNavigateTab('tasks')}
-                      className="text-neutral-500 hover:text-white shrink-0 p-1"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
+
                   </div>
                 );
               })}
