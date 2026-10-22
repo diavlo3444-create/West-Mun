@@ -875,18 +875,10 @@ export const ebOperationsService = {
     type: 'opening' | 'closing',
     checklist: StationChecklistItem[]
   ): Promise<void> {
+    if (!supabase) throw new Error('Database connection is unavailable.');
     const key = type === 'opening' ? 'opening_checklist' : 'closing_checklist';
-    if (supabase) {
-      try {
-        await supabase.from('wm_eb_stations').update({ [key]: checklist }).eq('id', stationId);
-      } catch {}
-    }
-    cachedStations = cachedStations.map((s) => (s.id === stationId ? { ...s, [key]: checklist } : s));
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('wm_eb_stations_store', JSON.stringify(cachedStations));
-      } catch {}
-    }
+    const { error } = await supabase.from('wm_eb_stations').update({ [key]: checklist }).eq('id', stationId);
+    if (error) throw new Error('Station checklist was not saved: ' + error.message);
   },
 
   /**
@@ -952,15 +944,14 @@ export const ebOperationsService = {
    * Approve or reject shift swap
    */
   async reviewShiftSwap(swapId: string, status: 'approved' | 'rejected', reviewNotes: string): Promise<void> {
-    if (supabase) {
-      try {
-        await supabase
-          .from('wm_eb_shift_swaps')
-          .update({ status, review_notes: reviewNotes, updated_at: new Date().toISOString() })
-          .eq('id', swapId);
-      } catch {}
-    }
-    cachedSwaps = cachedSwaps.map((s) => (s.id === swapId ? { ...s, status, review_notes: reviewNotes } : s));
+    if (!supabase) throw new Error('Database connection is unavailable.');
+    const { data, error } = await supabase
+      .from('wm_eb_shift_swaps')
+      .update({ status, review_notes: reviewNotes, updated_at: new Date().toISOString() })
+      .eq('id', swapId)
+      .select('id')
+      .maybeSingle();
+    if (error || !data) throw new Error('Shift-swap review was not saved' + (error ? ': ' + error.message : '. Check your permissions.'));
   },
 
   /**
@@ -993,18 +984,11 @@ export const ebOperationsService = {
    * Acknowledge critical announcement
    */
   async acknowledgeAnnouncement(announcementId: string, userId: string): Promise<void> {
-    if (supabase) {
-      try {
-        await supabase
-          .from('wm_eb_announcement_acks')
-          .insert({ announcement_id: announcementId, user_id: userId })
-          .select();
-      } catch {}
-    }
-    cachedAnnouncements = cachedAnnouncements.map((a) =>
-      a.id === announcementId ? { ...a, is_acknowledged: true } : a
-    );
-    persistAnnouncements();
+    if (!supabase) throw new Error('Database connection is unavailable.');
+    const { error } = await supabase
+      .from('wm_eb_announcement_acks')
+      .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: 'announcement_id,user_id' });
+    if (error) throw new Error('Announcement acknowledgement was not saved: ' + error.message);
   },
 
   /**
@@ -1111,17 +1095,13 @@ export const ebOperationsService = {
    * Resolve an incident
    */
   async resolveIncident(incidentId: string, resolutionNotes: string): Promise<void> {
-    if (supabase) {
-      try {
-        await supabase
-          .from('wm_eb_incidents')
-          .update({ status: 'resolved', resolution_notes: resolutionNotes, updated_at: new Date().toISOString() })
-          .eq('id', incidentId);
-      } catch {}
-    }
-    cachedIncidents = cachedIncidents.map((inc) =>
-      inc.id === incidentId ? { ...inc, status: 'resolved', resolution_notes: resolutionNotes } : inc
-    );
-    persistIncidents();
+    if (!supabase) throw new Error('Database connection is unavailable.');
+    const { data, error } = await supabase
+      .from('wm_eb_incidents')
+      .update({ status: 'resolved', resolution_notes: resolutionNotes, updated_at: new Date().toISOString() })
+      .eq('id', incidentId)
+      .select('id')
+      .maybeSingle();
+    if (error || !data) throw new Error('Incident was not resolved' + (error ? ': ' + error.message : '. Check your permissions.'));
   },
 };
