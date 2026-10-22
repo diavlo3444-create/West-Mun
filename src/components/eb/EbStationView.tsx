@@ -57,7 +57,7 @@ export const EbStationView: React.FC<EbStationViewProps> = ({
       <div className="border-b border-white/[0.08] pb-4">
         <h2 className="font-serif text-2xl font-normal text-white">Station Operating Manuals</h2>
         <p className="mt-1 text-xs text-neutral-400">
-          Standard operating procedures, equipment custody, opening/closing verification, and escalation contacts.
+          Department station manuals. Opening and closing checklist changes are shared with everyone who can access this station.
         </p>
       </div>
 
