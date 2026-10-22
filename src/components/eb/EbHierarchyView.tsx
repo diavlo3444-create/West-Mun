@@ -72,9 +72,6 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
           <>
             <div className="h-7 w-px bg-gradient-to-b from-[#d4af37]/70 to-white/15" />
             <div className="relative flex w-full min-w-max justify-center pt-7 before:absolute before:left-1/2 before:top-0 before:h-3.5 before:w-px before:-translate-x-1/2 before:bg-white/20">
-              {node.children!.length > 1 && (
-                <div className="absolute left-[calc(50%_/_var(--unused,1))] right-0 top-0 hidden border-t border-white/20" />
-              )}
               <div className="flex w-full flex-wrap items-start justify-center gap-x-6 gap-y-8">
                 {node.children!.map((child) => (
                   <div key={child.id} className="relative flex min-w-0 flex-col items-center before:absolute before:-top-7 before:left-1/2 before:h-7 before:w-px before:-translate-x-1/2 before:bg-white/20">
