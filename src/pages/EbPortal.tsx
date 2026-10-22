@@ -481,7 +481,7 @@ export default function EbPortal() {
   return (
     <div className="min-h-screen bg-[#070707] text-[#f5f5f5] selection:bg-[#d4af37]/30 selection:text-white flex flex-col justify-between">
       <div>
-        {demoSessionToken && <div className="border-b border-[#d4af37]/40 bg-[#d4af37]/10 px-4 py-2 text-center text-xs text-[#f5d47a]"><span className="font-semibold">SUPER IT DEMO SESSION</span> · Temporary role preview · Expires automatically after 15 minutes</div>}
+        {demoSessionToken && <div className="border-b border-[#d4af37]/40 bg-[#d4af37]/10 px-4 py-2 text-center text-xs text-[#f5d47a]"><span className="font-semibold">SUPER IT DEMO SESSION</span> · Temporary role preview · Live operational data · Expires automatically after 15 minutes</div>}
         {/* Sticky Operations Topbar */}
         <EbNavbar
           profile={profile}
