@@ -59,6 +59,7 @@ type TabKey = 'overview' | 'tasks' | 'schedule' | 'station' | 'hierarchy' | 'ann
 export default function EbPortal() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<EbMemberProfile | null>(null);
+  const [demoSessionToken, setDemoSessionToken] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [isEventDayMode, setIsEventDayMode] = useState(false);
@@ -166,6 +167,47 @@ export default function EbPortal() {
   useEffect(() => {
     let live = true;
     const verifyUser = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const launchToken = params.get('test_token') || params.get('test_ticket');
+      const storedDemo = (() => { try { return JSON.parse(sessionStorage.getItem('westmun_super_it_test_session') || 'null'); } catch { return null; } })();
+      const candidateToken = launchToken || storedDemo?.token;
+      if (candidateToken) {
+        try {
+          let verify = await fetch(`/api/super-admin?action=verify-test-session&token=${encodeURIComponent(candidateToken)}`);
+          let result: any = await verify.json().catch(() => ({}));
+          if ((!verify.ok || !result?.authorized) && params.has('test_ticket')) {
+            verify = await fetch(`/api/super-admin?action=consume-ticket&ticket=${encodeURIComponent(params.get('test_ticket') || '')}`);
+            result = await verify.json().catch(() => ({}));
+          }
+          const demoRole = result?.head?.demoRole;
+          if (verify.ok && (result?.authorized || result?.success) && result?.head && ['co_head', 'marketing', 'design'].includes(demoRole)) {
+            const token = result.sessionToken || candidateToken;
+            setDemoSessionToken(token);
+            sessionStorage.setItem('westmun_super_it_test_session', JSON.stringify({ token, adminEmail: result.adminEmail || 'diavlo3444@gmail.com', expiresAt: result.expiresAt }));
+            params.delete('test_token'); params.delete('test_ticket');
+            window.history.replaceState({}, document.title, `${window.location.pathname}${params.toString() ? `?${params}` : ''}`);
+            const head = result.head;
+            const demoProfile: EbMemberProfile = {
+              id: head.id,
+              name: head.headName || `Demo ${demoRole}`,
+              email: head.email || `demo-${demoRole}@westmun.local`,
+              role: demoRole === 'co_head' ? 'co_head' : demoRole === 'marketing' ? 'Marketing' : 'Design',
+              department: head.department || (demoRole === 'co_head' ? 'security' : demoRole),
+              section: head.section || null,
+              isHead: false,
+              isAdmin: false,
+            };
+            if (!live) return;
+            setProfile(demoProfile);
+            setLoading(false);
+            void loadData(demoProfile);
+            return;
+          }
+        } catch (demoError) {
+          console.warn('[EB Demo Session] Verification failed:', demoError);
+        }
+      }
+
       if (!supabase) {
         if (live) {
           setError('The WEST MUN sign-in service is unavailable.');
@@ -268,6 +310,14 @@ export default function EbPortal() {
   }, [loadData]);
 
   const handleSignOut = async () => {
+    if (demoSessionToken) {
+      try {
+        await fetch('/api/super-admin?action=terminate-test-session', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${demoSessionToken}` }, body: JSON.stringify({ token: demoSessionToken }) });
+      } catch {}
+      sessionStorage.removeItem('westmun_super_it_test_session');
+      window.location.replace('/admin');
+      return;
+    }
     await supabase?.auth.signOut();
     window.location.replace('/login');
   };
@@ -431,6 +481,7 @@ export default function EbPortal() {
   return (
     <div className="min-h-screen bg-[#070707] text-[#f5f5f5] selection:bg-[#d4af37]/30 selection:text-white flex flex-col justify-between">
       <div>
+        {demoSessionToken && <div className="border-b border-[#d4af37]/40 bg-[#d4af37]/10 px-4 py-2 text-center text-xs text-[#f5d47a]"><span className="font-semibold">SUPER IT DEMO SESSION</span> · Temporary role preview · Expires automatically after 15 minutes</div>}
         {/* Sticky Operations Topbar */}
         <EbNavbar
           profile={profile}
