@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import {
   Shield,
   ShieldCheck,
+  Megaphone,
   ShieldAlert,
   UserPlus,
   KeyRound,
@@ -130,6 +131,7 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
 
   // Super IT Test Mode State
   const [launchingHeadId, setLaunchingHeadId] = useState<string | null>(null);
+  const [launchingDemoRole, setLaunchingDemoRole] = useState<string | null>(null);
   const [testLaunchError, setTestLaunchError] = useState<string | null>(null);
 
   const currentUserEmail = session?.user?.email?.toLowerCase().trim() || '';
@@ -456,6 +458,27 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
       setResetError(msg);
     } finally {
       setResettingPassword(false);
+    }
+  };
+
+  // Launch a temporary EB demo profile in a separate tab. This does not create a real Auth account.
+  const handleLaunchDemoRole = async (role: 'co_head' | 'marketing' | 'design') => {
+    if (!isAuthorizedCaller || !session) return;
+    setTestLaunchError(null);
+    setLaunchingDemoRole(role);
+    try {
+      const { ok, data } = await safeJsonFetch('/api/super-admin?action=launch-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ demoRole: role }),
+      });
+      if (!ok || !data?.launchUrl) throw new Error(data?.error || 'Could not create the demo session.');
+      const opened = window.open(data.launchUrl, '_blank', 'noopener,noreferrer');
+      if (!opened) window.location.href = data.launchUrl;
+    } catch (err: unknown) {
+      setTestLaunchError(err instanceof Error ? err.message : 'Could not launch the demo session.');
+    } finally {
+      setLaunchingDemoRole(null);
     }
   };
 
@@ -1044,6 +1067,20 @@ export const SuperAdminManager: React.FC<SuperAdminManagerProps> = ({
             </button>
           </div>
         </form>
+      </Panel>
+
+      {/* Temporary EB role demo sessions */}
+      <Panel className="space-y-4 p-5 sm:p-6">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/10 text-[#e2c258]"><Eye className="h-5 w-5" /></div>
+          <div><h2 className="text-[14px] font-semibold text-white">EB Role Demo Accounts</h2><p className="mt-1 text-xs leading-relaxed text-neutral-400">Open a temporary preview of a role in a separate tab, similar to Administrator Session. These are signed demo sessions, not real accounts, and expire after 15 minutes.</p></div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {([{ role: 'co_head' as const, title: 'Co-Head', detail: 'Co-Head operations preview', icon: UserCheck }, { role: 'marketing' as const, title: 'Marketing', detail: 'Marketing EB dashboard preview', icon: Megaphone }, { role: 'design' as const, title: 'Design', detail: 'Design EB dashboard preview', icon: Sparkles }]).map((item) => {
+            const Icon = item.icon;
+            return <button key={item.role} type="button" onClick={() => handleLaunchDemoRole(item.role)} disabled={Boolean(launchingDemoRole)} className="group flex items-center gap-3 rounded-xl border border-white/[0.09] bg-black/30 p-4 text-left transition hover:border-[#d4af37]/50 hover:bg-[#d4af37]/[0.06] disabled:cursor-wait disabled:opacity-60"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#d4af37]/20 bg-[#d4af37]/[0.08] text-[#d4af37]">{launchingDemoRole === item.role ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}</span><span className="min-w-0"><span className="block text-sm font-medium text-white">{item.title}</span><span className="mt-1 block text-[11px] leading-relaxed text-neutral-400">{item.detail}</span></span><ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 text-neutral-500 group-hover:text-[#d4af37]" /></button>;
+          })}
+        </div>
       </Panel>
 
       {/* 4. Department Heads Directory */}
