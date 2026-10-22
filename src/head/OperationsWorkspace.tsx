@@ -51,9 +51,9 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
   const effectiveTestToken = testToken || null;
 
   const load = useCallback(async () => {
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError('');
     try {
-      const [p, pr, sh, win] = await Promise.all([
+      const [p, pr, sh, win = await Promise.all([
         listDepartmentPeople(department, section, effectiveTestToken),
         listDepartmentProjects(department, section, effectiveTestToken),
         listDepartmentShifts(department, section, effectiveTestToken),
@@ -62,8 +62,9 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
       if (!p.ok) throw new Error(p.error || 'Could not load people.');
       if (!pr.ok) throw new Error(pr.error || 'Could not load projects.');
       if (!sh.ok) throw new Error(sh.error || 'Could not load shifts.');
+      if (!win.ok) throw new Error(win.error || 'Could not load registration windows.');
       setPeople(p.data || []); setProjects(pr.data || []); setShifts(sh.data || []);
-      if (win.ok) setWindows(win.data || []);
+      setWindows(win.data || []);
       setSelectedProject(current => (pr.data || []).some(x => x.id === current) ? current : (pr.data?.[0]?.id || ''));
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not load workspace data.';
@@ -88,27 +89,37 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { void loadProject(selectedProject); }, [selectedProject, loadProject]);
 
-  const run = async (action: () => Promise<{ ok: boolean; error?: string }>, success: string) => {
+  const run = async (action: () => Promise<{ ok: boolean; error?: string }>, success: string): Promise<boolean> => {
     setBusy(true); setError(''); setNotice('');
-    try { const result = await action(); if (!result.ok) throw new Error(result.error || 'The change was not saved.'); setNotice(success); await load(); await loadProject(selectedProject); }
-    catch (e) { setError(e instanceof Error ? e.message : 'The change was not saved.'); }
-    finally { setBusy(false); }
+    try {
+      const result = await action();
+      if (!result.ok) throw new Error(result.error || 'The change was not saved.');
+      await load();
+      await loadProject(selectedProject);
+      setNotice(success);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The change was not saved.');
+      return false;
+    } finally { setBusy(false); }
   };
 
-  const createRole = () => {
+  const createRole = async () => {
     if (!roleForm.display_name.trim() || !roleForm.role_title.trim()) { setError('Enter a person/position name and a custom role title.'); return; }
-    void run(async () => { const r = await createDepartmentPerson({ ...roleForm, department, section, status: 'active' }, effectiveTestToken); return r; }, 'Custom role/person saved to Supabase.');
-    setRoleForm({ display_name: '', email: '', role_title: '', private_notes: '' });
+    const saved = await run(async () => createDepartmentPerson({ ...roleForm, department, section, status: 'active' }, effectiveTestToken), 'Custom role/person saved to Supabase.');
+    if (saved) setRoleForm({ display_name: '', email: '', role_title: '', private_notes: '' });
   };
-  const createProject = () => {
+  const createProject = async () => {
     if (!projectForm.title.trim()) { setError('Enter a project title.'); return; }
-    void run(async () => createDepartmentProject({ department, section, title: projectForm.title, brief: projectForm.brief, due_at: projectForm.due_at ? new Date(projectForm.due_at).toISOString() : null }, effectiveTestToken), 'Project created.');
-    setProjectForm({ title: '', brief: '', due_at: '' });
+    const saved = await run(async () => createDepartmentProject({ department, section, title: projectForm.title, brief: projectForm.brief, due_at: projectForm.due_at ? new Date(projectForm.due_at).toISOString() : null }, effectiveTestToken), 'Project created.');
+    if (saved) setProjectForm({ title: '', brief: '', due_at: '' });
   };
-  const createShift = () => {
+  const createShift = async () => {
     if (!shiftForm.title.trim() || !shiftForm.location.trim() || !shiftForm.starts_at || !shiftForm.ends_at) { setError('Complete the shift title, location, start and end times.'); return; }
-    void run(async () => createDepartmentShift({ department, section, title: shiftForm.title, location: shiftForm.location, starts_at: new Date(shiftForm.starts_at).toISOString(), ends_at: new Date(shiftForm.ends_at).toISOString(), capacity: shiftForm.capacity }, effectiveTestToken), 'Shift created.');
-    setShiftForm({ title: '', location: '', starts_at: '', ends_at: '', capacity: 4 });
+    const start = new Date(shiftForm.starts_at), end = new Date(shiftForm.ends_at);
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) { setError('The shift end must be after its start.'); return; }
+    const saved = await run(async () => createDepartmentShift({ department, section, title: shiftForm.title, location: shiftForm.location, starts_at: start.toISOString(), ends_at: end.toISOString(), capacity: shiftForm.capacity }, effectiveTestToken), 'Shift created.');
+    if (saved) setShiftForm({ title: '', location: '', starts_at: '', ends_at: '', capacity: 4 });
   };
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -181,14 +192,14 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
         <div className="space-y-4">{selectedProject ? <>
           {projects.filter(p=>p.id===selectedProject).map(p=><div key={p.id} className={panel}><div className="flex flex-wrap justify-between gap-3"><div><h3 className="text-lg font-semibold">{p.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-neutral-300">{p.brief||'No brief yet.'}</p></div><div className="flex gap-2"><select className={field+' w-auto'} value={p.status} onChange={e=>void run(()=>updateDepartmentProject(p.id,{status:e.target.value as WmProject['status']},effectiveTestToken),'Project status updated.')}><option value="planning">Planning</option><option value="active">Active</option><option value="completed">Completed</option><option value="archived">Archived</option></select><button className="rounded-md border border-red-400/20 p-2 text-red-300" onClick={()=>{if(window.confirm('Delete this project and its linked tasks/stages?')) void run(()=>deleteDepartmentProject(p.id,effectiveTestToken),'Project deleted.');}}><Trash2 size={14}/></button></div></div></div>)}
           <div className="grid gap-4 xl:grid-cols-2">
-            <div className={panel+' space-y-3'}><h3 className="font-semibold">Production stages</h3><form className="flex gap-2" onSubmit={e=>{e.preventDefault();if(!stageTitle.trim())return;void run(()=>createProjectStage({project_id:selectedProject,title:stageTitle,sort_order:stages.length},effectiveTestToken),'Stage added.');setStageTitle('');}}><input className={field} placeholder="e.g. Filming / Editing / Review" value={stageTitle} onChange={e=>setStageTitle(e.target.value)}/><button className={button}><Plus size={14}/></button></form>
+            <div className={panel+' space-y-3'}><h3 className="font-semibold">Production stages</h3><form className="flex gap-2" onSubmit={e=>{e.preventDefault();if(!stageTitle.trim())return;void (async()=>{if(await run(()=>createProjectStage({project_id:selectedProject,title:stageTitle,sort_order:stages.length},effectiveTestToken),'Stage added.'))setStageTitle('');})();}}><input className={field} placeholder="e.g. Filming / Editing / Review" value={stageTitle} onChange={e=>setStageTitle(e.target.value)}/><button className={button}><Plus size={14}/></button></form>
               {stages.map(s=><div key={s.id} className="flex items-center gap-2 rounded border border-white/5 p-2"><span className="min-w-0 flex-1 text-sm">{s.title}</span><select aria-label="Stage status" className={field+' w-auto'} value={s.status} onChange={e=>void run(()=>updateProjectStage(s.id,{status:e.target.value as WmProjectStage['status']},effectiveTestToken),'Stage updated.')}><option value="todo">To do</option><option value="in_progress">In progress</option><option value="done">Done</option></select></div>)}
             </div>
-            <div className={panel+' space-y-3'}><h3 className="font-semibold">Project team roles</h3><form className="space-y-2" onSubmit={e=>{e.preventDefault();if(!memberForm.person_id||!memberForm.project_role.trim())return;void run(()=>addProjectMember({project_id:selectedProject,person_id:memberForm.person_id,project_role:memberForm.project_role},effectiveTestToken),'Team member assigned.');setMemberForm({person_id:'',project_role:''});}}><select className={field} value={memberForm.person_id} onChange={e=>setMemberForm({...memberForm,person_id:e.target.value})}><option value="">Choose a person</option>{people.map(p=><option key={p.id} value={p.id}>{p.display_name} — {p.role_title}</option>)}</select><input className={field} placeholder="Project-specific role, e.g. Director" value={memberForm.project_role} onChange={e=>setMemberForm({...memberForm,project_role:e.target.value})}/><button className={button}><Plus size={14}/> Assign to project</button></form>
+            <div className={panel+' space-y-3'}><h3 className="font-semibold">Project team roles</h3><form className="space-y-2" onSubmit={e=>{e.preventDefault();if(!memberForm.person_id||!memberForm.project_role.trim())return;void (async()=>{if(await run(()=>addProjectMember({project_id:selectedProject,person_id:memberForm.person_id,project_role:memberForm.project_role},effectiveTestToken),'Team member assigned.'))setMemberForm({person_id:'',project_role:''});})();}}><select className={field} value={memberForm.person_id} onChange={e=>setMemberForm({...memberForm,person_id:e.target.value})}><option value="">Choose a person</option>{people.map(p=><option key={p.id} value={p.id}>{p.display_name} — {p.role_title}</option>)}</select><input className={field} placeholder="Project-specific role, e.g. Director" value={memberForm.project_role} onChange={e=>setMemberForm({...memberForm,project_role:e.target.value})}/><button className={button}><Plus size={14}/> Assign to project</button></form>
               {(members||[]).map((m:any)=><div key={m.person_id} className="flex items-center justify-between gap-2 rounded border border-white/5 p-2"><div className="text-sm">{m.person?.display_name||'Team member'} <span className="text-xs text-[#d4af37]">· {m.project_role}</span></div><button className="text-xs text-red-300" onClick={()=>void run(()=>removeProjectMember(selectedProject,m.person_id,effectiveTestToken),'Member removed.')}>Remove</button></div>)}
             </div>
           </div>
-          <div className={panel+' space-y-3'}><h3 className="font-semibold">Tasks & deliverables</h3><form className="grid gap-2 md:grid-cols-2" onSubmit={e=>{e.preventDefault();if(!taskForm.title.trim())return;void run(()=>createProjectTask({project_id:selectedProject,title:taskForm.title,description:taskForm.description,priority:taskForm.priority,assigned_person_id:taskForm.assigned_person_id||null},effectiveTestToken),'Task created.');setTaskForm({title:'',description:'',priority:'medium',assigned_person_id:''});}}><input className={field} placeholder="Task title" value={taskForm.title} onChange={e=>setTaskForm({...taskForm,title:e.target.value})}/><select className={field} value={taskForm.priority} onChange={e=>setTaskForm({...taskForm,priority:e.target.value as WmProjectTask['priority']})}><option value="low">Low priority</option><option value="medium">Medium priority</option><option value="high">High priority</option><option value="urgent">Urgent</option></select><textarea className={field} rows={2} placeholder="Instructions, shot list, feedback, reference URL…" value={taskForm.description} onChange={e=>setTaskForm({...taskForm,description:e.target.value})}/><select className={field} value={taskForm.assigned_person_id} onChange={e=>setTaskForm({...taskForm,assigned_person_id:e.target.value})}><option value="">Unassigned</option>{people.map(p=><option key={p.id} value={p.id}>{p.display_name} — {p.role_title}</option>)}</select><button className={button+' md:col-span-2'}><Plus size={14}/> Add task</button></form>
+          <div className={panel+' space-y-3'}><h3 className="font-semibold">Tasks & deliverables</h3><form className="grid gap-2 md:grid-cols-2" onSubmit={e=>{e.preventDefault();if(!taskForm.title.trim())return;void (async()=>{if(await run(()=>createProjectTask({project_id:selectedProject,title:taskForm.title,description:taskForm.description,priority:taskForm.priority,assigned_person_id:taskForm.assigned_person_id||null},effectiveTestToken),'Task created.'))setTaskForm({title:'',description:'',priority:'medium',assigned_person_id:''});})();}}><input className={field} placeholder="Task title" value={taskForm.title} onChange={e=>setTaskForm({...taskForm,title:e.target.value})}/><select className={field} value={taskForm.priority} onChange={e=>setTaskForm({...taskForm,priority:e.target.value as WmProjectTask['priority']})}><option value="low">Low priority</option><option value="medium">Medium priority</option><option value="high">High priority</option><option value="urgent">Urgent</option></select><textarea className={field} rows={2} placeholder="Instructions, shot list, feedback, reference URL…" value={taskForm.description} onChange={e=>setTaskForm({...taskForm,description:e.target.value})}/><select className={field} value={taskForm.assigned_person_id} onChange={e=>setTaskForm({...taskForm,assigned_person_id:e.target.value})}><option value="">Unassigned</option>{people.map(p=><option key={p.id} value={p.id}>{p.display_name} — {p.role_title}</option>)}</select><button className={button+' md:col-span-2'}><Plus size={14}/> Add task</button></form>
             {tasks.map(t=><article key={t.id} className="rounded-md border border-white/5 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-medium">{t.title}</div><p className="mt-1 whitespace-pre-wrap text-xs text-neutral-400">{t.description}</p><p className="mt-1 text-[11px] text-neutral-500">{t.assigned_person?.display_name||'Unassigned'} · {t.priority}</p></div><div className="flex gap-2"><select aria-label="Task status" className={field+' w-auto'} value={t.status} onChange={e=>void run(()=>updateProjectTask(t.id,{status:e.target.value as WmProjectTask['status']},effectiveTestToken),'Task updated.')}><option value="todo">To do</option><option value="in_progress">In progress</option><option value="review">Review</option><option value="blocked">Blocked</option><option value="done">Done</option></select><button aria-label="Delete task" className="text-red-300" onClick={()=>void run(()=>deleteProjectTask(t.id,effectiveTestToken),'Task deleted.')}><Trash2 size={14}/></button></div></div></article>)}
           </div></>:<div className={panel+' text-sm text-neutral-400'}>Select a project to manage its stages, team and tasks.</div>}</div>
       </div>
@@ -215,7 +226,7 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
       />
     )}
 
-    {tab === 'deployment' && ['media_press', 'security', 'volunteers'].includes(department) && <TeamDeploymentPlanner department={department} section={section}/>}
+    {tab === 'deployment' && ['media_press', 'security', 'volunteers'].includes(department) && <TeamDeploymentPlanner department={department} section={section} testToken={effectiveTestToken}/>}
 
     {tab === 'registrations' && <div className="space-y-3"><div className={panel}><h2 className="font-semibold">Registration windows</h2><p className="mt-1 text-xs text-neutral-400">These controls use the database-backed windows. The database trigger remains the final enforcement layer.</p></div>{windows.length===0&&<div className={panel+' text-sm text-neutral-400'}>No windows returned for this account. This may be an RLS restriction; no changes were made.</div>}{windows.map(w=><div key={w.team} className={panel+' flex flex-wrap items-center justify-between gap-3'}><div><div className="font-medium">{w.team}</div><div className="text-xs text-neutral-500">Updated {new Date(w.updated_at).toLocaleString()}</div></div><button className={button} disabled={busy} onClick={()=>void run(()=>setRegistrationWindowStatus(w.team,!w.is_open,effectiveTestToken), 'Registration window updated.')}>{w.is_open?'Close registration':'Open registration'}</button></div>)}</div>}
     <div className="flex items-center gap-2 text-[11px] text-neutral-500"><LoaderCircle size={12} className={busy?'animate-spin':'hidden'}/> Live database operations · access is still restricted by Supabase RLS.</div>
