@@ -7,7 +7,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 // module importable under plain Node (tests, scripts) where import.meta.env is
 // undefined, without changing browser behaviour.
 const env =
-  (import.meta as unknown as { env?: Record<string, string | undefined> }).env || {};
+  (import.meta as unknown as { env?: Record<string, string | undefined> }).env ||
+  (typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : {}) ||
+  {};
 let rawUrl = (env.VITE_SUPABASE_URL as string | undefined)?.trim();
 const rawKey = (env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
 

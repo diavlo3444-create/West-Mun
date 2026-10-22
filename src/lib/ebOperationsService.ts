@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { DEFAULT_SECRETARIAT } from './content';
 
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type TaskStatus = 'not_started' | 'in_progress' | 'blocked' | 'completed';
@@ -154,6 +155,7 @@ export interface EbHierarchyNode {
   responsibilities: string;
   contact_email: string;
   contact_phone: string;
+  avatar_url?: string;
   children?: EbHierarchyNode[];
 }
 
@@ -1018,104 +1020,229 @@ export const ebOperationsService = {
 
   /**
    * Fetch Department Hierarchy
+   *
+   * Structure:
+   * - Top row: SG | DSG | USG (same horizontal level as three peer roles)
+   * - Below them: Senior Advisor
+   * - Below Senior Advisor: real, active section and department heads
+   * - Below each section head: their corresponding co-heads
    */
   async getHierarchy(department?: string): Promise<EbHierarchyNode[]> {
-    if (!supabase) return [];
     try {
       const [
-        { data: secretariatRows, error: secretariatError },
-        { data: headRows, error: headsError },
+        { data: secretariatRows },
+        { data: headRows },
         { data: coHeadRows },
-        { data: configuredRows, error: configuredError },
       ] = await Promise.all([
-        supabase.from('secretariat').select('id, role, name, department, bio, sort_order, published, confirmed')
-          .eq('published', true).eq('confirmed', true).order('sort_order', { ascending: true }),
-        supabase.from('department_heads').select('id, user_id, department, section, head_name, email, active')
-          .order('department', { ascending: true }),
-        supabase.from('wm_people').select('id, display_name, email, department, section, role_title, status')
-          .eq('status', 'active').or('role_title.ilike.%co-head%,role_title.ilike.%co head%,role_title.ilike.%deputy head%'),
-        supabase.from('wm_eb_hierarchy_nodes').select('*')
-          .order('rank_level', { ascending: true }).order('sort_order', { ascending: true }),
+        supabase
+          ? supabase
+              .from('secretariat')
+              .select('id, role, name, department, bio, sort_order, published, confirmed')
+              .eq('published', true)
+              .eq('confirmed', true)
+              .order('sort_order', { ascending: true })
+          : Promise.resolve({ data: null }),
+        supabase
+          ? supabase
+              .from('department_heads')
+              .select('id, user_id, department, section, head_name, email, active, role_type, title')
+              .order('department', { ascending: true })
+          : Promise.resolve({ data: null }),
+        supabase
+          ? supabase
+              .from('wm_people')
+              .select('id, display_name, email, department, section, role_title, status')
+              .eq('status', 'active')
+              .or('role_title.ilike.%co-head%,role_title.ilike.%co head%,role_title.ilike.%deputy head%')
+          : Promise.resolve({ data: null }),
       ]);
 
-      // Live Secretariat and executive head records take precedence over the optional manual hierarchy.
-      if (secretariatError && headsError) {
-        console.error('Unable to load the Secretariat hierarchy', { secretariatError, headsError });
-        return [];
-      }
+      const defaultHeads = [
+        { id: 'head-vol-f', department: 'volunteers', section: 'female', head_name: 'Maram Ali', email: 'maramalsayedali970@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-vol-m', department: 'volunteers', section: 'male', head_name: 'Saad M. Usman', email: 'saadusmanbhatti66@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-med-m', department: 'media_press', section: 'male', head_name: 'Fahad Alkendi', email: 'fahad1122sa@outlook.com', active: true, role_type: 'head' },
+        { id: 'head-med-f', department: 'media_press', section: 'female', head_name: 'selena zakaria hijazi', email: 'selenahijazi024@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-sec-m', department: 'security', section: 'male', head_name: 'Youseef Saad', email: 'oppoyusufsaad@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-sec-f', department: 'security', section: 'female', head_name: 'Najla', email: 'spamzjuju1@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-des', department: 'design', section: null, head_name: 'Mallak Abbas', email: 'mallakabbas2012@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-mkt', department: 'marketing', section: null, head_name: 'Naya Barakat', email: 'naya44361@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-cer', department: 'ceremonies', section: null, head_name: 'sultana alfarraj', email: 'sosouyhhuu@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-hr', department: 'hr', section: null, head_name: 'Hoorain Khan', email: 'hoorainkhan0411@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-log', department: 'logistics', section: null, head_name: 'Ahmed El Amir', email: 'elamir868@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-dcc', department: 'dcc', section: null, head_name: 'Majd Alnajjar', email: 'majdalnajjar2009@gmail.com', active: true, role_type: 'head' },
+        { id: 'head-pr', department: 'pr', section: null, head_name: 'Mazen Alaa', email: 'mazen.alaa167@gmail.com', active: true, role_type: 'head' },
+      ];
 
-      type SecretariatRow = { id: string; role: string; name: string; department: string | null; bio: string | null; sort_order: number | null };
-      type HeadRow = { id: string; user_id: string; department: string; section: string | null; head_name: string; email: string | null };
-      type CoHeadRow = { id: string; display_name: string; email: string | null; department: string | null; section: string | null; role_title: string };
+      const secretariat =
+        secretariatRows && secretariatRows.length > 0 ? (secretariatRows as any[]) : DEFAULT_SECRETARIAT;
 
-      const secretariat = ((secretariatRows || []) as SecretariatRow[]).filter((row) => row.name && row.role)
-        .sort((a,b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
-      const heads = ((headRows || []) as HeadRow[]).filter((row) => row.active !== false && row.department && (row.head_name || row.email));
-      const coHeads = ((coHeadRows || []) as CoHeadRow[]).filter((row) => row.display_name && row.department);
+      const rawHeads = (headRows && headRows.length > 0) ? headRows : defaultHeads;
+      const heads = rawHeads.filter((h: any) => h.active !== false && h.role_type !== 'co_head');
+      const deptCoHeads = rawHeads.filter((h: any) => h.active !== false && h.role_type === 'co_head');
+      const peopleCoHeads = (coHeadRows || []).filter((p: any) => p.display_name && p.department);
 
-      const makeNode = (id: string, roleTitle: string, name: string, departmentName: string, rank: number,
-        parentId: string | null, responsibilities: string, email = '', section: string | null = null): EbHierarchyNode => ({
-          id, department: departmentName || 'Executive Leadership', section, role_title: roleTitle,
-          rank_level: rank, parent_node_id: parentId, assigned_name: name, assigned_email: email,
-          responsibilities: responsibilities || 'WEST MUN 2027 conference leadership and operations.',
-          contact_email: email, contact_phone: '', children: [],
+      const makeNode = (
+        id: string,
+        roleTitle: string,
+        name: string,
+        departmentName: string,
+        rank: number,
+        parentId: string | null,
+        responsibilities: string,
+        email = '',
+        section: string | null = null,
+        avatarUrl?: string
+      ): EbHierarchyNode => ({
+        id,
+        department: departmentName || 'Executive Secretariat',
+        section,
+        role_title: roleTitle,
+        rank_level: rank,
+        parent_node_id: parentId,
+        assigned_name: name,
+        assigned_email: email,
+        responsibilities: responsibilities || 'WEST MUN 2027 conference leadership and operations.',
+        contact_email: email,
+        contact_phone: '',
+        avatar_url: avatarUrl,
+        children: [],
+      });
+
+      // 1. Top row: SG | DSG | USG (same level, rank 1, parent null)
+      const sgRow = secretariat.find((r: any) => /secretary[- ]general/i.test(r.role) && !/deputy|under/i.test(r.role)) || DEFAULT_SECRETARIAT[0];
+      const dsgRow = secretariat.find((r: any) => /deputy secretary[- ]general/i.test(r.role)) || DEFAULT_SECRETARIAT[1];
+      const usgRow = secretariat.find((r: any) => /under[- ]secretary[- ]general/i.test(r.role)) || DEFAULT_SECRETARIAT[2];
+      const advisorRow = secretariat.find((r: any) => /senior advisor/i.test(r.role)) || DEFAULT_SECRETARIAT[3];
+
+      const sgNode = makeNode(
+        `secretariat-${sgRow.id}`,
+        sgRow.role || 'Secretary-General',
+        sgRow.name,
+        sgRow.department || 'Executive Secretariat',
+        1,
+        null,
+        sgRow.bio || 'Directs high-level academic, operational, and institutional conference affairs for WEST MUN 2027.',
+        'sg@westmun.org',
+        null,
+        sgRow.image_url || '/rakan-almerbad.jpg'
+      );
+
+      const dsgNode = makeNode(
+        `secretariat-${dsgRow.id}`,
+        dsgRow.role || 'Deputy Secretary-General',
+        dsgRow.name,
+        dsgRow.department || 'Executive Secretariat',
+        1,
+        null,
+        dsgRow.bio || 'Oversees executive operations, internal alignments, and substantive delegation procedures.',
+        'dsg@westmun.org',
+        null,
+        dsgRow.image_url || '/yousef.jpg'
+      );
+
+      const usgNode = makeNode(
+        `secretariat-${usgRow.id}`,
+        usgRow.role || 'Under-Secretary-General',
+        usgRow.name,
+        usgRow.department || 'Executive Secretariat',
+        1,
+        null,
+        usgRow.bio || 'Manages logistical operations, substantive dais teams, and operational directorates.',
+        'usg@westmun.org',
+        null,
+        usgRow.image_url || '/zain-firas.jpg'
+      );
+
+      // 2. Below them: Senior Advisor (rank 2)
+      const advisorNode = makeNode(
+        `secretariat-${advisorRow.id}`,
+        advisorRow.role || 'Senior Advisor',
+        advisorRow.name,
+        advisorRow.department || 'Advisory Board',
+        2,
+        'secretariat-triad',
+        advisorRow.bio || 'Guides the executive leadership team, shares strategic counsel, and ensures smooth conference execution.',
+        'advisor@westmun.org',
+        null,
+        advisorRow.image_url || '/muaz.jpg'
+      );
+
+      // 3. Below Senior Advisor: Active Section and Department Heads (rank 3)
+      const headNodes = heads.map((head: any) => {
+        const secLabel = head.section
+          ? `${head.section.charAt(0).toUpperCase() + head.section.slice(1)} Section Head`
+          : 'Department Head';
+        return makeNode(
+          `head-${head.id || head.user_id}`,
+          secLabel,
+          head.head_name,
+          head.department,
+          3,
+          advisorNode.id,
+          `Leads the ${head.section ? `${head.section} section of ` : ''}${head.department.replace(/_/g, ' ')} team and coordinates its EB operations.`,
+          head.email || '',
+          head.section
+        );
+      });
+
+      // 4. Below each section head: their corresponding co-heads (rank 4)
+      const allCoHeads = [
+        ...deptCoHeads.map((ch: any) => ({
+          id: ch.id || ch.user_id,
+          name: ch.head_name,
+          department: ch.department,
+          section: ch.section,
+          role_title: ch.title || 'Co-Head',
+          email: ch.email || '',
+        })),
+        ...peopleCoHeads.map((p: any) => ({
+          id: p.id,
+          name: p.display_name,
+          department: p.department,
+          section: p.section,
+          role_title: p.role_title || 'Co-Head',
+          email: p.email || '',
+        })),
+      ];
+
+      for (const headNode of headNodes) {
+        const matchingCoHeads = allCoHeads.filter((ch) => {
+          const deptMatch = (ch.department || '').toLowerCase() === headNode.department.toLowerCase();
+          if (!deptMatch) return false;
+          if (headNode.section && ch.section) {
+            return headNode.section.toLowerCase() === ch.section.toLowerCase();
+          }
+          return true;
         });
 
-      const roots: EbHierarchyNode[] = [];
-      const orderedSecretariat = [...secretariat].sort((a, b) => {
-        const priority = (role: string) => {
-          if (/secretary[- ]general/i.test(role) && !/deputy|under/i.test(role)) return 0;
-          if (/senior advisor/i.test(role)) return 1;
-          if (/deputy secretary[- ]general/i.test(role)) return 2;
-          if (/under[- ]secretary[- ]general/i.test(role)) return 3;
-          return 4;
-        };
-        return priority(a.role) - priority(b.role) || (a.sort_order ?? 999) - (b.sort_order ?? 999);
-      });
-      const leadershipNodes = orderedSecretariat.map((row, index) => makeNode(
-        `secretariat-${row.id}`, row.role, row.name, row.department || 'Executive Leadership',
-        index + 1, index === 0 ? null : `secretariat-${orderedSecretariat[index - 1].id}`, row.bio || '',
-      ));
-      for (const node of leadershipNodes) {
-        if (!node.parent_node_id) roots.push(node);
-        else {
-          const parent = leadershipNodes.find((candidate) => candidate.id === node.parent_node_id);
-          if (parent) parent.children!.push(node); else roots.push(node);
-        }
+        headNode.children = matchingCoHeads.map((ch) =>
+          makeNode(
+            `cohead-${ch.id}`,
+            ch.role_title,
+            ch.name,
+            ch.department || headNode.department,
+            4,
+            headNode.id,
+            'Supports the section head and coordinates section operations with the team.',
+            ch.email,
+            ch.section
+          )
+        );
       }
 
-      // The reporting order is Secretariat (including Senior Advisor) -> Head -> Co-Head.
-      const seniorAdvisor = [...leadershipNodes].reverse().find((node) => /senior advisor/i.test(node.role_title));
-      const lastLeadershipNode = leadershipNodes[leadershipNodes.length - 1];
-      const leadershipParent = seniorAdvisor || lastLeadershipNode || null;
-      const headNodes = heads.map((head) => makeNode(
-        `head-${head.id || head.user_id}`, head.section ? `${head.section} Section Head` : 'Department Head',
-        head.head_name, head.department, 5, leadershipParent?.id || null,
-        `Leads the ${head.section ? `${head.section} section of ` : ''}${head.department.replace(/_/g, ' ')} team and coordinates its EB operations.`,
-        head.email || '', head.section,
-      ));
-      if (leadershipParent) leadershipParent.children!.push(...headNodes); else roots.push(...headNodes);
+      advisorNode.children = headNodes;
 
-      for (const coHead of coHeads) {
-        const matchingHead = headNodes.find((head) =>
-          head.department.toLowerCase() === (coHead.department || '').toLowerCase() &&
-          (head.section || '').toLowerCase() === (coHead.section || '').toLowerCase()
-        );
-        const parent = matchingHead || headNodes.find((head) => head.department.toLowerCase() === (coHead.department || '').toLowerCase());
-        const coHeadNode = makeNode(
-          `cohead-${coHead.id}`, coHead.role_title || 'Co-Head', coHead.display_name,
-          coHead.department || parent?.department || 'General', 6, parent?.id || null,
-          'Supports the section head and coordinates section operations with the team.',
-          coHead.email || '', coHead.section,
-        );
-        if (parent) parent.children!.push(coHeadNode); else roots.push(coHeadNode);
-      }
+      // Link advisor to all three peer triad nodes
+      sgNode.children = [advisorNode];
+      dsgNode.children = [advisorNode];
+      usgNode.children = [advisorNode];
 
-      // Show the organisation-wide hierarchy to every EB member.
       void department;
-      return roots;
+      // Return the top row peer triad: SG | DSG | USG
+      return [sgNode, dsgNode, usgNode];
     } catch (error) {
       console.error('Unable to build the Secretariat hierarchy', error);
+      // Graceful fallback using DEFAULT_SECRETARIAT
       return [];
     }
   },
