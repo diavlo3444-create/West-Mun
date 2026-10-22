@@ -53,7 +53,7 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
   const load = useCallback(async () => {
     setBusy(true); setError('');
     try {
-      const [p, pr, sh, win = await Promise.all([
+      const [p, pr, sh, win] = await Promise.all([
         listDepartmentPeople(department, section, effectiveTestToken),
         listDepartmentProjects(department, section, effectiveTestToken),
         listDepartmentShifts(department, section, effectiveTestToken),
