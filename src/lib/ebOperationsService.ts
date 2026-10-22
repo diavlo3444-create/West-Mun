@@ -1079,7 +1079,7 @@ export const ebOperationsService = {
       if (secretariat.length === 0) {
         return heads.map((head: any) => {
           const node = makeNode(`head-${head.user_id}`, head.section ? `${head.section} Section Head` : 'Department Head',
-            head.head_name || 'Department Head', head.department, 1, null,
+            head.head_name || 'Department Head', head.department, 3, null,
             `Leads the ${String(head.department).replace(/_/g, ' ')} team.`, head.email || '', head.section || null);
           node.source_user_id = head.user_id || null;
           node.source_head_id = head.id || head.user_id || null;
@@ -1101,7 +1101,7 @@ export const ebOperationsService = {
       if (!sgRow || !dsgRow || !usgRow || !advisorRow) {
         return heads.map((head: any) => {
           const node = makeNode(`head-${head.user_id}`, head.section ? `${head.section} Section Head` : 'Department Head',
-            head.head_name || 'Department Head', head.department, 1, null,
+            head.head_name || 'Department Head', head.department, 3, null,
             `Leads the ${String(head.department).replace(/_/g, ' ')} team.`, head.email || '', head.section || null);
           node.source_user_id = head.user_id || null;
           node.source_head_id = head.id || head.user_id || null;
