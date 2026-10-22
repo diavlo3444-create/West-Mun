@@ -108,7 +108,7 @@ export const EbScheduleView: React.FC<EbScheduleViewProps> = ({
         <div>
           <h2 className="font-serif text-2xl font-normal text-white">Conference Shift Schedule</h2>
           <p className="mt-1 text-xs text-neutral-400">
-            Official conference station rosters, shift hours, and supervisor handover directives.
+            {canReviewSwaps ? 'Department roster, shift hours, and swap requests awaiting your review.' : 'Your assigned roster, shift hours, and requests you have submitted.'}
           </p>
         </div>
 
@@ -153,6 +153,11 @@ export const EbScheduleView: React.FC<EbScheduleViewProps> = ({
         </div>
       )}
 
+      {canReviewSwaps && swaps.some((swap) => swap.status === 'pending') && (
+        <div className="rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/[0.06] p-3 text-xs text-[#f5d47a]">
+          {swaps.filter((swap) => swap.status === 'pending').length} shift-swap request{swaps.filter((swap) => swap.status === 'pending').length === 1 ? '' : 's'} awaiting review.
+        </div>
+      )}
       {/* Shifts List / Timeline View */}
       <div className="space-y-4">
         {shifts.length === 0 ? (
