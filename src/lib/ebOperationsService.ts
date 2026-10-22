@@ -1048,7 +1048,7 @@ export const ebOperationsService = {
         supabase
           ? supabase
               .from('department_heads')
-              .select('id, user_id, department, section, head_name, email, active')
+              .select('user_id, department, section, head_name, active')
               .order('department', { ascending: true })
           : Promise.resolve({ data: null }),
         supabase
@@ -1162,7 +1162,7 @@ export const ebOperationsService = {
           ? `${head.section.charAt(0).toUpperCase() + head.section.slice(1)} Section Head`
           : 'Department Head';
         const node = makeNode(
-          `head-${head.id || head.user_id}`,
+          `head-${head.user_id}`,
           secLabel,
           head.head_name,
           head.department,
@@ -1175,7 +1175,7 @@ export const ebOperationsService = {
         return {
           ...node,
           source_user_id: head.user_id || null,
-          source_head_id: head.id || null,
+          source_head_id: head.id || head.user_id || null,
         };
       });
 
