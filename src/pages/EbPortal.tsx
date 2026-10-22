@@ -400,7 +400,7 @@ export default function EbPortal() {
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'tasks', label: canSeeOversight ? 'Department Tasks' : 'My Tasks', icon: FileCheck2, badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'schedule', label: canSeeOversight ? 'Department Schedule' : 'My Schedule', icon: Calendar },
-    { id: 'station', label: 'My Station', icon: Building2 },
+    { id: 'station', label: canSeeOversight ? 'Department Stations' : 'My Station', icon: Building2 },
     { id: 'hierarchy', label: 'Hierarchy', icon: Users },
     { id: 'announcements', label: 'Announcements', icon: Radio, badge: unreadAnnouncementsCount > 0 ? unreadAnnouncementsCount : undefined },
     ...(canSeeOversight ? [{ id: 'oversight' as TabKey, label: 'Head Oversight', icon: TrendingUp }] : []),
