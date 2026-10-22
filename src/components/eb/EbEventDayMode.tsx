@@ -142,7 +142,7 @@ export const EbEventDayMode: React.FC<EbEventDayModeProps> = ({
       <div className="rounded-2xl border border-[#d4af37] bg-gradient-to-b from-[#1c180f] via-[#0d0c0e] to-black p-5 shadow-[0_0_24px_rgba(212,175,55,0.18)] space-y-4">
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-[#d4af37]/20 px-3 py-1 font-mono text-[10px] font-bold uppercase text-[#f5d47a]">
-            Active Duty Station
+            Assigned Duty Station
           </span>
           <span className="font-mono text-xs text-neutral-300">
             {currentShift ? currentShift.shift_date : 'Today'}
