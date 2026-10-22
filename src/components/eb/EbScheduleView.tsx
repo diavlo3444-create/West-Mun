@@ -75,7 +75,7 @@ export const EbScheduleView: React.FC<EbScheduleViewProps> = ({
     setBusy(true);
     try {
       await onRequestSwap({
-        assignment_id: selectedShiftForSwap.id,
+        assignment_id: selectedShiftForSwap.assignment_id || selectedShiftForSwap.id,
         requester_user_id: profile.id,
         requester_name: profile.name,
         target_shift_id: targetShiftId || null,
