@@ -230,7 +230,7 @@ export const EbTasksView: React.FC<EbTasksViewProps> = ({
         <div>
           <h2 className="font-serif text-2xl font-normal text-white">Operations Task Board</h2>
           <p className="mt-1 text-xs text-neutral-400">
-            Track deliverables, submit completion notes, and flag operational blockers in real-time.
+            {canManageTasks ? 'Manage department deliverables, assign work, and review blockers.' : 'Tasks assigned to your account by name or member ID appear here.'}
           </p>
         </div>
 
