@@ -62,7 +62,6 @@ export default function EbPortal() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [isEventDayMode, setIsEventDayMode] = useState(false);
-  const [operationalStatus, setOperationalStatus] = useState<'on_duty' | 'standby' | 'break' | 'off_duty'>('on_duty');
   const [dataError, setDataError] = useState('');
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([]);
 
@@ -258,8 +257,6 @@ export default function EbPortal() {
 
       if (!live) return;
       setProfile(builtProfile);
-      const savedStatus = localStorage.getItem(`wm-eb-operational-status-${user.id}`);
-      if (savedStatus === 'on_duty' || savedStatus === 'standby' || savedStatus === 'break' || savedStatus === 'off_duty') setOperationalStatus(savedStatus);
       setLoading(false);
       void loadData(builtProfile);
     };
@@ -437,11 +434,6 @@ export default function EbPortal() {
         {/* Sticky Operations Topbar */}
         <EbNavbar
           profile={profile}
-          operationalStatus={operationalStatus}
-          onStatusChange={(status) => {
-            setOperationalStatus(status);
-            if (profile) localStorage.setItem(`wm-eb-operational-status-${profile.id}`, status);
-          }}
           notifications={notifications}
           onMarkNotificationRead={handleMarkNotificationRead}
           onNavigateNotification={(tabId) => {
