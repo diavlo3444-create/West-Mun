@@ -210,14 +210,12 @@ export default function EbPortal() {
 
       let reportingHead: { user_id: string; department: string; section: string | null } | null = null;
       if (!isHead && !isAdmin && (selectedHeadId || selectedHeadName || selectedHeadEmail)) {
-        const { data: activeHeads } = await supabase
-          .from('department_heads')
-          .select('user_id,department,section,active')
-          .eq('active', true);
-        reportingHead = (activeHeads || []).find((candidate: any) => {
+        const { data: directory } = await supabase.functions.invoke('wm-eb-access', { body: { action: 'list_active_heads' } });
+        const activeHeads = directory?.heads || [];
+        reportingHead = activeHeads.find((candidate: any) => {
           const idMatch = Boolean(selectedHeadId && String(candidate.user_id || '') === selectedHeadId);
-          const nameMatch = false; // department_heads stores IDs and assignments, not display names.
-          const emailMatch = false; // department_heads does not guarantee an email column
+          const nameMatch = Boolean(selectedHeadName && String(candidate.head_name || '').trim().toLowerCase() === selectedHeadName);
+          const emailMatch = Boolean(selectedHeadEmail && String(candidate.email || '').trim().toLowerCase() === selectedHeadEmail);
           return idMatch || nameMatch || emailMatch;
         }) || null;
       }
@@ -231,8 +229,8 @@ export default function EbPortal() {
         section,
         phone: (userMeta.phone as string) || null,
         reportingHeadId: reportingHead?.user_id || selectedHeadId || null,
-        reportingHeadName: reportingHead ? (selectedHeadName || String(meta.wm_reporting_head_name || userMeta.wm_reporting_head_name || 'Department Head')) : null,
-        reportingHeadEmail: null,
+        reportingHeadName: reportingHead?.head_name || (reportingHead ? (selectedHeadName || String(meta.wm_reporting_head_name || userMeta.wm_reporting_head_name || 'Department Head')) : null),
+        reportingHeadEmail: reportingHead?.email || null,
         reportingHeadDepartment: reportingHead?.department || null,
         reportingHeadSection: reportingHead?.section || null,
         isHead,
