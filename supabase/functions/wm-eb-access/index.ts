@@ -168,7 +168,17 @@ Deno.serve(async (req: Request) => {
     const result = await db.from("department_heads").select("user_id,department,section,active")
       .eq("active", true).order("department").order("section");
     if (result.error) return json({ error: "Could not load the active department heads. Please try again." }, 500);
-    return json({ success: true, heads: result.data || [] });
+    const heads = await Promise.all((result.data || []).map(async (row: any) => {
+      const account = await db.auth.admin.getUserById(row.user_id);
+      const user = account.data.user;
+      const metadata = user?.user_metadata || {};
+      return {
+        ...row,
+        head_name: String(metadata.full_name || metadata.name || user?.email?.split("@")[0] || "Department Head"),
+        email: user?.email || null,
+      };
+    }));
+    return json({ success: true, heads });
   }
 
   if (body.action === "list_my_coheads") {
