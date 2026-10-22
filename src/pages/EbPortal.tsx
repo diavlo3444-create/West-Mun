@@ -173,7 +173,7 @@ export default function EbPortal() {
       // Check Department Head status
       const { data: headData } = await supabase
         .from('department_heads')
-        .select('user_id,head_name,department,section')
+        .select('user_id,department,section,active')
         .eq('user_id', user.id)
         .eq('active', true)
         .maybeSingle();
@@ -187,7 +187,7 @@ export default function EbPortal() {
         ? 'Super Admin'
         : String(meta.wm_eb_role || userMeta.wm_eb_role || 'Executive Board');
       const fullName =
-        String(userMeta.full_name || headData?.head_name || user.email?.split('@')[0] || 'EB Officer');
+        String(userMeta.full_name || user.email?.split('@')[0] || 'EB Officer');
 
       // Resolve the exact head selected at sign-up from active database records.
       // Never substitute a generic department contact or a made-up hotline/location.
@@ -208,15 +208,15 @@ export default function EbPortal() {
         meta.selected_head_email || userMeta.selected_head_email || ''
       ).trim().toLowerCase();
 
-      let reportingHead: { user_id: string; head_name: string; department: string; section: string | null } | null = null;
+      let reportingHead: { user_id: string; department: string; section: string | null } | null = null;
       if (!isHead && !isAdmin && (selectedHeadId || selectedHeadName || selectedHeadEmail)) {
         const { data: activeHeads } = await supabase
           .from('department_heads')
-          .select('user_id,head_name,department,section,active')
+          .select('user_id,department,section,active')
           .eq('active', true);
         reportingHead = (activeHeads || []).find((candidate: any) => {
           const idMatch = Boolean(selectedHeadId && String(candidate.user_id || '') === selectedHeadId);
-          const nameMatch = Boolean(selectedHeadName && String(candidate.head_name || '').trim().toLowerCase() === selectedHeadName);
+          const nameMatch = false; // department_heads stores IDs and assignments, not display names.
           const emailMatch = false; // department_heads does not guarantee an email column
           return idMatch || nameMatch || emailMatch;
         }) || null;
@@ -231,7 +231,7 @@ export default function EbPortal() {
         section,
         phone: (userMeta.phone as string) || null,
         reportingHeadId: reportingHead?.user_id || selectedHeadId || null,
-        reportingHeadName: reportingHead?.head_name || null,
+        reportingHeadName: reportingHead ? (selectedHeadName || null) : null,
         reportingHeadEmail: null,
         reportingHeadDepartment: reportingHead?.department || null,
         reportingHeadSection: reportingHead?.section || null,
