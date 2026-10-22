@@ -11,7 +11,7 @@ type Assignment = {
   reporting_to: string; status: 'assigned'|'in_progress'|'completed'|'no_show'|'cancelled'; notes: string;
   registration?: { full_name?: string; email?: string; section?: string } | null;
 };
-type Props = { department: DepartmentKey; section?: SectionKey | null };
+type Props = { department: DepartmentKey; section?: SectionKey | null; testToken?: string | null };
 const field = 'w-full rounded-md border border-white/10 bg-[#111115] px-3 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#d4af37] focus:outline-none';
 const button = 'inline-flex items-center justify-center gap-2 rounded-md border border-[#d4af37]/40 bg-[#d4af37]/10 px-3 py-2 text-xs font-semibold text-[#f1d98c] hover:bg-[#d4af37]/20 disabled:opacity-50';
 const panel = 'rounded-lg border border-white/10 bg-[#111115]/90 p-4';
@@ -19,7 +19,7 @@ const label = 'mb-1 block text-[10px] font-semibold uppercase tracking-wider tex
 const TEAM_NAMES: Record<string,string> = { media_press:'Media & Press', security:'Security & Protocol', volunteers:'Volunteers' };
 const normalizeTeam = (team: string) => team.toLowerCase().trim().replace(/\s+/g,'_');
 
-export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) => {
+export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section, testToken }) => {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [registrationId, setRegistrationId] = useState('');
@@ -33,6 +33,10 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
+  // This deployment table is not routed through the isolated Super IT operations API.
+  // Never read or mutate production deployment records from a test session.
+  const isIsolatedTestSession = Boolean(testToken);
+
   const applicantMatches = useCallback((a: Applicant) => {
     const team = normalizeTeam(a.team);
     const expected = department === 'media_press' ? ['media','media_press'].includes(team)
@@ -42,6 +46,7 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
   }, [department, section]);
 
   const load = useCallback(async () => {
+    if (isIsolatedTestSession) { setApplicants([]); setAssignments([]); setError('Team deployment is temporarily disabled in Super IT test mode to protect live deployment records. Test-mode support must be added to the server-side operations API first.'); return; }
     if (!supabase) { setError('Database client is not configured.'); return; }
     setBusy(true); setError('');
     try {
@@ -58,13 +63,14 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load approved applicants and deployment assignments.');
     } finally { setBusy(false); }
-  }, [applicantMatches, department, section]);
+  }, [applicantMatches, department, section, isIsolatedTestSession]);
 
   useEffect(() => { void load(); }, [load]);
 
   const selectedApplicant = useMemo(() => applicants.find(a => a.id === registrationId), [applicants, registrationId]);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isIsolatedTestSession) { setError('Deployment changes are disabled in Super IT test mode to protect production data.'); return; }
     if (!supabase || !selectedApplicant) { setError('Choose an approved applicant first.'); return; }
     if (!assignmentTitle.trim() || !station.trim() || !startsAt || !endsAt || !reportingTo.trim()) {
       setError('Complete the duty, station, start/end time, and reporting supervisor.'); return;
@@ -91,6 +97,7 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
   };
 
   const updateStatus = async (item: Assignment, status: Assignment['status']) => {
+    if (isIsolatedTestSession) { setError('Deployment changes are disabled in Super IT test mode to protect production data.'); return; }
     if (!supabase) return;
     setError(''); setNotice('');
     const { error: updateError } = await supabase.from('wm_team_assignments').update({ status, updated_at: new Date().toISOString() }).eq('id',item.id);
@@ -98,6 +105,7 @@ export const TeamDeploymentPlanner: React.FC<Props> = ({ department, section }) 
     else { setNotice('Assignment status updated.'); await load(); }
   };
   const remove = async (item: Assignment) => {
+    if (isIsolatedTestSession) { setError('Deployment changes are disabled in Super IT test mode to protect production data.'); return; }
     if (!supabase || !window.confirm('Remove this deployment assignment?')) return;
     const { error: deleteError } = await supabase.from('wm_team_assignments').delete().eq('id',item.id);
     if (deleteError) setError(deleteError.message); else { setNotice('Assignment removed.'); await load(); }
