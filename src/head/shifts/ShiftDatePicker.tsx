@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 interface ShiftDatePickerProps {
@@ -30,6 +31,9 @@ export const ShiftDatePicker: React.FC<ShiftDatePickerProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
 
   // Parse current selected date or fallback to today
   const selectedParts = value ? value.split('-').map(Number) : [];
@@ -50,16 +54,55 @@ export const ShiftDatePicker: React.FC<ShiftDatePickerProps> = ({
     }
   }, [value]);
 
+  useLayoutEffect(() => {
+    if (!isOpen || !triggerRef.current) return;
+    const updatePosition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const popupWidth = Math.min(380, window.innerWidth - 24);
+      const estimatedHeight = 360;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+      const left = Math.max(12, Math.min(rect.left, window.innerWidth - popupWidth - 12));
+      const top = openAbove
+        ? Math.max(12, rect.top - estimatedHeight - 8)
+        : Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - 12));
+      setPopupStyle({
+        position: 'fixed',
+        left,
+        top,
+        width: popupWidth,
+        maxHeight: 'min(80vh, 520px)',
+        overflowY: 'auto',
+        zIndex: 10000,
+      });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target) || popupRef.current?.contains(target)) return;
+      setIsOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
     };
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen]);
 
   const today = new Date();
@@ -121,8 +164,11 @@ export const ShiftDatePicker: React.FC<ShiftDatePickerProps> = ({
       )}
 
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen(!isOpen)
         className={`flex w-full items-center justify-between rounded-lg border px-3.5 py-2.5 text-left text-sm transition-all ${
           error
             ? 'border-red-500/50 bg-red-950/10 text-white'
@@ -142,8 +188,14 @@ export const ShiftDatePicker: React.FC<ShiftDatePickerProps> = ({
 
       {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
 
-      {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-[320px] max-w-[380px] rounded-xl border border-[#d4af37]/30 bg-[#0e0e14] p-4 shadow-2xl backdrop-blur-xl">
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popupRef}
+          role="dialog"
+          aria-label="Choose date"
+          style={popupStyle}
+          className="rounded-xl border border-[#d4af37]/40 bg-[#0e0e14] p-4 text-white shadow-[0_20px_70px_rgba(0,0,0,0.75)] backdrop-blur-xl"
+        >
           {/* Quick Shortcuts */}
           <div className="mb-3 flex flex-wrap gap-1.5 border-b border-white/5 pb-3">
             {summitPresets.map((preset) => {
@@ -259,7 +311,8 @@ export const ShiftDatePicker: React.FC<ShiftDatePickerProps> = ({
               Select Today
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
