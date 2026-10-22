@@ -156,6 +156,9 @@ export interface EbHierarchyNode {
   contact_email: string;
   contact_phone: string;
   avatar_url?: string;
+  /** Source identifiers used to match the EB member's selected reporting head. */
+  source_user_id?: string | null;
+  source_head_id?: string | null;
   children?: EbHierarchyNode[];
 }
 
@@ -1172,7 +1175,7 @@ export const ebOperationsService = {
         const secLabel = head.section
           ? `${head.section.charAt(0).toUpperCase() + head.section.slice(1)} Section Head`
           : 'Department Head';
-        return makeNode(
+        const node = makeNode(
           `head-${head.id || head.user_id}`,
           secLabel,
           head.head_name,
@@ -1183,6 +1186,11 @@ export const ebOperationsService = {
           head.email || '',
           head.section
         );
+        return {
+          ...node,
+          source_user_id: head.user_id || null,
+          source_head_id: head.id || null,
+        };
       });
 
       // 4. Below each section head: their corresponding co-heads (rank 4)
