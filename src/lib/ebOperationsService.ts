@@ -1060,27 +1060,13 @@ export const ebOperationsService = {
           : Promise.resolve({ data: null }),
       ]);
 
-      const defaultHeads = [
-        { id: 'head-vol-f', department: 'volunteers', section: 'female', head_name: 'Maram Ali', email: 'maramalsayedali970@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-vol-m', department: 'volunteers', section: 'male', head_name: 'Saad M. Usman', email: 'saadusmanbhatti66@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-med-m', department: 'media_press', section: 'male', head_name: 'Fahad Alkendi', email: 'fahad1122sa@outlook.com', active: true, role_type: 'head' },
-        { id: 'head-med-f', department: 'media_press', section: 'female', head_name: 'selena zakaria hijazi', email: 'selenahijazi024@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-sec-m', department: 'security', section: 'male', head_name: 'Youseef Saad', email: 'oppoyusufsaad@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-sec-f', department: 'security', section: 'female', head_name: 'Najla', email: 'spamzjuju1@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-des', department: 'design', section: null, head_name: 'Mallak Abbas', email: 'mallakabbas2012@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-mkt', department: 'marketing', section: null, head_name: 'Naya Barakat', email: 'naya44361@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-cer', department: 'ceremonies', section: null, head_name: 'sultana alfarraj', email: 'sosouyhhuu@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-hr', department: 'hr', section: null, head_name: 'Hoorain Khan', email: 'hoorainkhan0411@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-log', department: 'logistics', section: null, head_name: 'Ahmed El Amir', email: 'elamir868@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-dcc', department: 'dcc', section: null, head_name: 'Majd Alnajjar', email: 'majdalnajjar2009@gmail.com', active: true, role_type: 'head' },
-        { id: 'head-pr', department: 'pr', section: null, head_name: 'Mazen Alaa', email: 'mazen.alaa167@gmail.com', active: true, role_type: 'head' },
-      ];
+
 
       const secretariat =
         secretariatRows && secretariatRows.length > 0 ? (secretariatRows as any[]) : DEFAULT_SECRETARIAT;
 
-      const rawHeads = (headRows && headRows.length > 0) ? headRows : defaultHeads;
-      const heads = rawHeads.filter((h: any) => h.active !== false && h.head_name && h.department);
+      const rawHeads = headRows || [];
+      const heads = rawHeads.filter((h: any) => h.active === true && h.head_name && h.department);
       // Co-heads are sourced from active wm_people records below; department_heads has no role_type/title columns.
       const peopleCoHeads = (coHeadRows || []).filter((p: any) => p.display_name && p.department);
 
