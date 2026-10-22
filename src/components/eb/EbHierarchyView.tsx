@@ -97,15 +97,15 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
     };
   }, [hierarchy]);
 
+  // Regular EB members see only the reporting head selected at sign-up.
+  // Admins and department heads retain the full organizational overview.
+  const isScopedMember = !profile.isAdmin && !profile.isHead;
+
   // Peer Triad array: SG | DSG | USG (strictly 3 peer roles on the same level)
   const triadNodes = useMemo(() => {
     if (isScopedMember) return [];
     return [sgNode, dsgNode, usgNode].filter((n): n is EbHierarchyNode => Boolean(n));
   }, [sgNode, dsgNode, usgNode, isScopedMember]);
-
-  // Regular EB members see only the reporting head selected at sign-up.
-  // Admins and department heads retain the full organizational overview.
-  const isScopedMember = !profile.isAdmin && !profile.isHead;
   const reportingHeadNode = useMemo(() => {
     const selectedId = profile.reportingHeadId?.trim();
     const selectedName = profile.reportingHeadName?.trim().toLowerCase();
@@ -430,7 +430,7 @@ export const EbHierarchyView: React.FC<EbHierarchyViewProps> = ({
             </span>
           </div>
           <p className="mt-1 text-base font-semibold text-white">
-            {seniorAdvisorNode ? seniorAdvisorNode.assigned_name : 'Muaz Elamir'}
+            {seniorAdvisorNode ? seniorAdvisorNode.assigned_name : 'Senior Advisor'}
           </p>
           <p className="text-[10px] text-neutral-400">Advisory to Executive Secretariat</p>
         </div>
