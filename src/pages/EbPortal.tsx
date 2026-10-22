@@ -231,7 +231,7 @@ export default function EbPortal() {
         section,
         phone: (userMeta.phone as string) || null,
         reportingHeadId: reportingHead?.user_id || selectedHeadId || null,
-        reportingHeadName: reportingHead ? (selectedHeadName || null) : null,
+        reportingHeadName: reportingHead ? (selectedHeadName || String(meta.wm_reporting_head_name || userMeta.wm_reporting_head_name || 'Department Head')) : null,
         reportingHeadEmail: null,
         reportingHeadDepartment: reportingHead?.department || null,
         reportingHeadSection: reportingHead?.section || null,
