@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import type { DepartmentKey, SectionKey } from './departments';
 
 type CoHead = { user_id: string; full_name: string; email: string; phone?: string | null; gender?: string | null };
-type TaskRow = { id: string; title: string; assigned_to_name: string; status: string; priority: string; deadline: string | null; created_at: string };
+type TaskRow = { id: string; title: string; assigned_to_user_id: string | null; assigned_to_name: string; status: string; priority: string; deadline: string | null; created_at: string };
 type ShiftRow = { id: string; station_name: string; location: string; starts_at: string; ends_at: string; status: string; is_published: boolean };
 
 const field = 'w-full rounded-md border border-white/10 bg-[#111115] px-3 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#d4af37] focus:outline-none';
@@ -30,7 +30,7 @@ export const HeadCoHeadManagement: React.FC<{ department: DepartmentKey; section
     try {
       const [{ data: peopleData, error: peopleError }, { data: taskData, error: taskError }, { data: shiftData, error: shiftError }] = await Promise.all([
         supabase.functions.invoke('wm-eb-access', { body: { action: 'list_my_coheads' } }),
-        supabase.from('wm_eb_tasks').select('id,title,assigned_to_name,status,priority,deadline,created_at').eq('department', department).order('created_at', { ascending: false }).limit(100),
+        supabase.from('wm_eb_tasks').select('id,title,assigned_to_user_id,assigned_to_name,status,priority,deadline,created_at').eq('department', department).order('created_at', { ascending: false }).limit(100),
         supabase.from('wm_eb_shifts').select('id,station_name,location,starts_at,ends_at,status,is_published').eq('department', department).order('starts_at', { ascending: true }).limit(100),
       ]);
       if (peopleError || !peopleData?.success) throw new Error(peopleData?.error || peopleError?.message || 'Could not load your Co-Heads.');
@@ -50,7 +50,7 @@ export const HeadCoHeadManagement: React.FC<{ department: DepartmentKey; section
   useEffect(() => { void load(); }, [load]);
 
   const selectedCoHead = coHeads.find(p => p.user_id === selected) || null;
-  const scopedTasks = tasks.filter(t => !selectedCoHead || t.assigned_to_name === selectedCoHead.full_name);
+  const scopedTasks = tasks.filter(t => !selectedCoHead || t.assigned_to_user_id === selectedCoHead.user_id);
   const formatDate = (value: string) => new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 
   const createTask = async (e: React.FormEvent) => {
