@@ -365,31 +365,39 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
               </p>
 
               <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-white">
-                    {profile.reportingHeadName || 'Department Head'}
-                  </span>
-                  <span className="rounded bg-[#d4af37]/15 px-2 py-0.5 text-[9px] font-mono text-[#d4af37] uppercase">
-                    Active Head
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 text-xs text-neutral-300">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-3.5 w-3.5 text-[#d4af37] shrink-0" />
-                    <span className="font-mono text-[11px] text-neutral-300">
-                      {profile.department}@westmun.org
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-3.5 w-3.5 text-[#d4af37] shrink-0" />
-                    <span className="font-mono text-[11px] text-neutral-300">+966 50 112 3344 (Hotline)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-3.5 w-3.5 text-[#d4af37] shrink-0" />
-                    <span className="text-[11px] text-neutral-300">Room 204 Secretariat Directorate</span>
-                  </div>
-                </div>
+                {profile.reportingHeadName ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-white">{profile.reportingHeadName}</span>
+                      <span className="rounded bg-[#d4af37]/15 px-2 py-0.5 text-[9px] font-mono text-[#d4af37] uppercase">Assigned Head</span>
+                    </div>
+                    {profile.reportingHeadDepartment && (
+                      <p className="text-[10px] uppercase tracking-wider text-neutral-400">
+                        {profile.reportingHeadDepartment.replace(/_/g, ' ')}{profile.reportingHeadSection ? ` · ${profile.reportingHeadSection} section` : ''}
+                      </p>
+                    )}
+                    {profile.reportingHeadEmail ? (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-3.5 w-3.5 text-[#d4af37] shrink-0" />
+                        <a href={`mailto:${profile.reportingHeadEmail}`} className="break-all font-mono text-[11px] text-neutral-300 hover:text-[#f5d47a]">
+                          {profile.reportingHeadEmail}
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-neutral-400">Contact details have not been provided.</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-white">No reporting head linked</span>
+                      <span className="rounded bg-amber-400/10 px-2 py-0.5 text-[9px] font-mono text-amber-300 uppercase">Needs review</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-neutral-400">
+                      The head selected during sign-up could not be matched to an active department-head record. No contact information is shown rather than displaying incorrect details.
+                    </p>
+                  </>
+                )}
               </div>
 
               <button
