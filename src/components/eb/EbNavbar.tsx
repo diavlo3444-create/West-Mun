@@ -6,22 +6,12 @@ import {
   LogOut,
   ScanLine,
   QrCode,
-  ChevronDown,
-  Check,
-  Clock,
-  AlertTriangle,
-  User,
-  Coffee,
-  CheckCircle2,
-  X,
 } from 'lucide-react';
 import type { EbMemberProfile } from '../../pages/EbPortal';
 import type { EbNotification } from '../../lib/ebOperationsService';
 
 interface EbNavbarProps {
   profile: EbMemberProfile;
-  operationalStatus: 'on_duty' | 'standby' | 'break' | 'off_duty';
-  onStatusChange: (status: 'on_duty' | 'standby' | 'break' | 'off_duty') => void;
   notifications: EbNotification[];
   onMarkNotificationRead: (id: string) => void;
   onNavigateNotification: (tabId: string) => void;
@@ -32,17 +22,8 @@ interface EbNavbarProps {
   onSignOut: () => void;
 }
 
-const STATUS_CONFIG = {
-  on_duty: { label: 'On Duty', color: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-  standby: { label: 'Standby', color: 'bg-amber-500', text: 'text-amber-400', border: 'border-amber-500/30' },
-  break: { label: 'On Break', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
-  off_duty: { label: 'Off Duty', color: 'bg-neutral-500', text: 'text-neutral-400', border: 'border-neutral-700' },
-};
-
 export const EbNavbar: React.FC<EbNavbarProps> = ({
   profile,
-  operationalStatus,
-  onStatusChange,
   notifications,
   onMarkNotificationRead,
   onNavigateNotification,
@@ -52,11 +33,9 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
   unreadAnnouncementsCount,
   onSignOut,
 }) => {
-  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
   const unreadNotifs = notifications.filter((n) => !n.read);
-  const activeStatus = STATUS_CONFIG[operationalStatus];
 
   return (
     <header className="sticky top-0 z-40 border-b border-[#d4af37]/20 bg-[#070707]/90 backdrop-blur-md">
@@ -89,71 +68,6 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
                 {profile.role.replace(/_/g, ' ')}
               </span>
             </div>
-          </div>
-        </div>
-
-        {/* Status Selector & KPI Badges (Desktop) */}
-        <div className="flex items-center gap-2 lg:gap-4">
-          {/* Operational Status Dropdown */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setStatusMenuOpen((prev) => !prev)}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition hover:brightness-110 ${activeStatus.border} bg-black/50`}
-            >
-              <span className={`h-2 w-2 rounded-full ${activeStatus.color} animate-pulse`} />
-              <span className={activeStatus.text}>{activeStatus.label}</span>
-              <ChevronDown className="h-3 w-3 text-neutral-400" />
-            </button>
-
-            {statusMenuOpen && (
-              <div className="absolute left-0 mt-2 w-36 rounded-xl border border-[#d4af37]/30 bg-[#0e0e12] p-1.5 shadow-2xl backdrop-blur-xl z-50">
-                {(['on_duty', 'standby', 'break', 'off_duty'] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => {
-                      onStatusChange(s);
-                      setStatusMenuOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-left transition ${
-                      operationalStatus === s
-                        ? 'bg-[#d4af37]/20 font-semibold text-white'
-                        : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`h-1.5 w-1.5 rounded-full ${STATUS_CONFIG[s].color}`} />
-                      <span>{STATUS_CONFIG[s].label}</span>
-                    </div>
-                    {operationalStatus === s && <Check className="h-3 w-3 text-[#d4af37]" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Quick Metrics */}
-          <div className="flex items-center gap-3 border-l border-white/10 pl-4 text-xs font-mono">
-            <div className="flex items-center gap-1.5" title="Tasks pending completion">
-              <Clock className="h-3.5 w-3.5 text-neutral-400" />
-              <span className="text-neutral-400">Tasks:</span>
-              <span className="font-semibold text-white">{pendingTasksCount}</span>
-            </div>
-
-            {overdueTasksCount > 0 && (
-              <div className="flex items-center gap-1.5 text-rose-400" title="Overdue tasks requiring action">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                <span>{overdueTasksCount} overdue</span>
-              </div>
-            )}
-
-            {unreadAnnouncementsCount > 0 && (
-              <div className="flex items-center gap-1.5 text-amber-300" title="Unread urgent announcements">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
-                <span>{unreadAnnouncementsCount} unread</span>
-              </div>
-            )}
           </div>
         </div>
 
