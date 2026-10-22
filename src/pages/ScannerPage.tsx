@@ -40,9 +40,74 @@ export default function ScannerPage() {
         if (context && typeof context.clone === "function") {
           try { const payload = await context.clone().json(); detail = typeof payload?.error === "string" ? payload.error : ""; } catch {}
         }
-        if (!data) throw new Error(detail || error.message || "Could not verify this QR code.");
-        setMessage({ ...(data as ScanReply), error: detail || (data as ScanReply).error });
-        return;
+
+        // Direct DB fallback if edge function is unreachable/errors
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          const cleanToken = token.toLowerCase().trim();
+          const { data: pass, error: passErr } = await supabase
+            .from("wm_qr_passes")
+            .select("user_id,full_name,team,section,account_role,active,inside")
+            .eq("qr_token", cleanToken)
+            .eq("active", true)
+            .maybeSingle();
+
+          if (passErr || !pass) {
+            setMessage({ success: false, outcome: "denied", error: "Invalid or revoked WEST MUN QR pass." });
+            return;
+          }
+
+          if (direction === "entry" && pass.inside) {
+            setMessage({
+              success: false,
+              outcome: "denied",
+              error: "This person is already checked in.",
+              person: { fullName: pass.full_name, team: pass.team, section: pass.section },
+            });
+            return;
+          }
+
+          if (direction === "exit" && !pass.inside) {
+            setMessage({
+              success: false,
+              outcome: "denied",
+              error: "This person is not currently checked in.",
+              person: { fullName: pass.full_name, team: pass.team, section: pass.section },
+            });
+            return;
+          }
+
+          const scannedAt = new Date().toISOString();
+          await supabase
+            .from("wm_qr_passes")
+            .update({ inside: direction === "entry", last_scanned_at: scannedAt, updated_at: scannedAt })
+            .eq("user_id", pass.user_id)
+            .eq("active", true);
+
+          if (user) {
+            await supabase.from("wm_qr_scan_logs").insert({
+              scanner_user_id: user.id,
+              pass_user_id: pass.user_id,
+              pass_full_name: pass.full_name,
+              team: pass.team,
+              section: pass.section,
+              direction,
+              outcome: "allowed",
+            });
+          }
+
+          setMessage({
+            success: true,
+            outcome: "allowed",
+            direction,
+            person: { fullName: pass.full_name, team: pass.team, section: pass.section, role: pass.account_role },
+          });
+          return;
+        } catch {
+          if (!data) throw new Error(detail || error.message || "Could not verify this QR code.");
+          setMessage({ ...(data as ScanReply), error: detail || (data as ScanReply).error });
+          return;
+        }
       }
       setMessage((data ?? { success: false, outcome: "denied", error: "No response received from the scanner service." }) as ScanReply);
     } catch (e) {
@@ -61,25 +126,54 @@ export default function ScannerPage() {
       const user = sessionData.session?.user;
       if (!user) { window.location.replace("/login"); return; }
       // Route the Back link to the signed-in user's actual workspace.
-      const meta = user.app_metadata as Record<string, unknown>;
+      const meta = (user.app_metadata || {}) as Record<string, unknown>;
       if (meta?.wm_role === "team_member") {
         const team = meta.wm_team;
         if (team === "security") setBackDestination({ href: "/security", label: "Security dashboard" });
         else if (team === "media") setBackDestination({ href: "/media", label: "Media dashboard" });
         else if (team === "volunteers") setBackDestination({ href: "/volunteer", label: "Volunteer dashboard" });
+      } else if (meta?.wm_role === "eb_member" || meta?.wm_eb_role === "co_head") {
+        setBackDestination({ href: "/eb", label: "EB Operations Portal" });
       } else {
         const { data: admin } = await supabase.from("admins").select("user_id").eq("user_id", user.id).maybeSingle();
         if (admin) setBackDestination({ href: "/admin", label: "Admin dashboard" });
         else {
           const { data: head } = await supabase.from("department_heads").select("user_id").eq("user_id", user.id).eq("active", true).limit(1).maybeSingle();
           if (head) setBackDestination({ href: "/head", label: "Head dashboard" });
+          else setBackDestination({ href: "/eb", label: "EB Operations Portal" });
         }
       }
-      const { data, error } = await supabase.functions.invoke("wm-qr-access", { body: { action: "access" } });
+
+      let canScanAuthorized = false;
+      try {
+        const { data, error } = await supabase.functions.invoke("wm-qr-access", { body: { action: "access" } });
+        if (!error && data?.success && data.canScan) {
+          canScanAuthorized = true;
+        } else if (!data?.success && error) {
+          // If edge function returned an error, check database permissions directly
+          throw error;
+        }
+      } catch {
+        // Direct database permission check fallback
+        const [adminCheck, headCheck, passCheck] = await Promise.all([
+          supabase.from("admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+          supabase.from("department_heads").select("department").eq("user_id", user.id).eq("active", true).maybeSingle(),
+          supabase.from("wm_qr_passes").select("team,account_role,active").eq("user_id", user.id).maybeSingle(),
+        ]);
+        const isAdmin = Boolean(adminCheck.data);
+        const isSecurityHead = headCheck.data && ['security', 'security & protocol'].includes((headCheck.data.department || '').toLowerCase().trim());
+        const pass = passCheck.data;
+        const isSecurityCoHead = pass && pass.active && ['security', 'security & protocol'].includes((pass.team || '').toLowerCase().trim()) && ['co_head', 'security', 'head'].includes((pass.account_role || '').toLowerCase().trim());
+        const isSecurityMeta = ['security', 'security & protocol'].includes(String(meta.wm_team || '').toLowerCase().trim()) && (meta.wm_eb_role === 'co_head' || meta.wm_role === 'co_head');
+        canScanAuthorized = Boolean(isAdmin || isSecurityHead || isSecurityCoHead || isSecurityMeta);
+      }
+
       if (!live) return;
-      if (error || !data?.success) setAccessError(data?.error || error?.message || "Could not verify scanner permissions.");
-      else if (data.canScan) setAllowed(true);
-      else setAccessError("Scanner access is restricted to authorized Security members and WEST MUN admins.");
+      if (canScanAuthorized) {
+        setAllowed(true);
+      } else {
+        setAccessError("Scanner access is restricted to authorized Security staff, Security Co-Heads, and WEST MUN admins.");
+      }
       setLoading(false);
     };
     void check();

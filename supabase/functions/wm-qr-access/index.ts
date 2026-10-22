@@ -50,13 +50,21 @@ Deno.serve(async (req: Request) => {
   const isEbMember = meta.wm_role === "eb_member";
   if (!isAdmin && !head && !isTeamMember && !isEbMember) return json({ error: "This account has no active WEST MUN assignment." }, 403);
 
-  const department = head?.department ?? (typeof meta.wm_team === "string" ? meta.wm_team : null);
-  const section = head?.section ?? (typeof meta.wm_section === "string" ? meta.wm_section : null);
+  const passResult = await db.from("wm_qr_passes").select("full_name,team,section,account_role,active").eq("user_id", actor.id).maybeSingle();
+  const pass = passResult.data;
+
+  const department = head?.department ?? pass?.team ?? (typeof meta.wm_team === "string" ? meta.wm_team : null);
+  const section = head?.section ?? pass?.section ?? (typeof meta.wm_section === "string" ? meta.wm_section : null);
   const requestedFullName = clean(body.fullName);
-  const fullName = clean(userMeta.full_name) || clean(head?.head_name) || requestedFullName;
-  const accountRole = isAdmin ? "admin" : head ? "head" : isEbMember ? (typeof meta.wm_eb_role === "string" ? meta.wm_eb_role : "eb_member") : (typeof meta.wm_role === "string" ? meta.wm_role : "team_member");
+  const fullName = clean(userMeta.full_name) || clean(head?.head_name) || clean(pass?.full_name) || requestedFullName;
+  const accountRole = isAdmin ? "admin" : head ? "head" : (clean(pass?.account_role) || (typeof meta.wm_eb_role === "string" ? meta.wm_eb_role : "") || (typeof meta.wm_role === "string" ? meta.wm_role : "team_member"));
   const isSecurity = normalized(department) === "security" || normalized(department) === "security & protocol";
-  const canScan = isAdmin || (isTeamMember && normalized(meta.wm_team) === "security") || (Boolean(head) && isSecurity);
+  const isSecurityCoHead = isSecurity && (
+    normalized(accountRole) === "co_head" ||
+    normalized(meta.wm_eb_role) === "co_head" ||
+    normalized(meta.wm_role) === "co_head"
+  );
+  const canScan = isAdmin || (isTeamMember && isSecurity) || (Boolean(head) && isSecurity) || isSecurityCoHead;
 
   if (body.action === "access") {
     if (isEbMember) {

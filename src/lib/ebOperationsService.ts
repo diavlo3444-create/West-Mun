@@ -79,10 +79,25 @@ export interface EbShift {
   starts_at: string;
   ends_at: string;
   supervisor_name: string;
+  supervisor_id?: string | null;
   responsibilities: string;
   handover_notes: string;
+  break_schedule?: string;
+  checklist?: TaskChecklistItem[];
   capacity: number;
   status: 'scheduled' | 'active' | 'completed' | 'modified' | 'cancelled';
+  is_published?: boolean;
+  assigned_members?: { id: string; name: string; email: string }[];
+}
+
+export interface EbTemplate {
+  id: string;
+  department: string;
+  template_type: 'task' | 'shift_checklist' | 'station_checklist';
+  title: string;
+  description: string;
+  checklist: TaskChecklistItem[];
+  created_at?: string;
 }
 
 export interface EbShiftAssignment {
@@ -631,14 +646,15 @@ const FALLBACK_HIERARCHY: EbHierarchyNode[] = [
   },
 ];
 
-// In-Memory Storage Cache for Instant Offline / Pre-Migration Resilience
-let cachedTasks: EbTask[] = [...FALLBACK_TASKS];
-let cachedStations: EbStation[] = [...FALLBACK_STATIONS];
-let cachedShifts: EbShift[] = [...FALLBACK_SHIFTS];
-let cachedAnnouncements: EbAnnouncement[] = [...FALLBACK_ANNOUNCEMENTS];
+// In-Memory Storage Cache (Zero Mock Fallback - Initialized strictly to empty sets)
+let cachedTasks: EbTask[] = [];
+let cachedStations: EbStation[] = [];
+let cachedShifts: EbShift[] = [];
+let cachedAnnouncements: EbAnnouncement[] = [];
 let cachedIncidents: EbIncident[] = [];
 let cachedComments: Record<string, EbTaskComment[]> = {};
 let cachedSwaps: EbShiftSwap[] = [];
+let cachedTemplates: EbTemplate[] = [];
 
 // Helper: load from localStorage if present
 function initLocalStorage() {
@@ -654,7 +670,9 @@ function initLocalStorage() {
     if (savedAnn) cachedAnnouncements = JSON.parse(savedAnn);
     const savedInc = localStorage.getItem('wm_eb_incidents_store');
     if (savedInc) cachedIncidents = JSON.parse(savedInc);
-  } catch (e) {
+    const savedTemplates = localStorage.getItem('wm_eb_templates_store');
+    if (savedTemplates) cachedTemplates = JSON.parse(savedTemplates);
+  } catch {
     // Ignore storage issues
   }
 }
@@ -664,6 +682,14 @@ function persistTasks() {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem('wm_eb_tasks_store', JSON.stringify(cachedTasks));
+    } catch {}
+  }
+}
+
+function persistShifts() {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('wm_eb_shifts_store', JSON.stringify(cachedShifts));
     } catch {}
   }
 }
@@ -680,6 +706,14 @@ function persistIncidents() {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem('wm_eb_incidents_store', JSON.stringify(cachedIncidents));
+    } catch {}
+  }
+}
+
+function persistTemplates() {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('wm_eb_templates_store', JSON.stringify(cachedTemplates));
     } catch {}
   }
 }
