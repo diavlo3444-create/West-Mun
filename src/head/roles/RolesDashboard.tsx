@@ -67,6 +67,7 @@ interface RolesDashboardProps {
   section?: SectionKey | null;
   departmentLabel: string;
   testToken?: string | null;
+  coHeads?: Array<{ user_id: string; full_name: string; email: string; phone?: string | null; gender?: string | null }>;
 }
 
 type MainTab = 'tasks' | 'hierarchy';
@@ -103,6 +104,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
   section,
   departmentLabel,
   testToken,
+  coHeads = [],
 }) => {
   const scope = useMemo(
     () => ({ department, section: section || null, testToken: testToken || null }),
@@ -885,6 +887,36 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
       {/* TAB 2: ORGANIZATIONAL HIERARCHY */}
       {activeTab === 'hierarchy' && (
         <div className="space-y-4">
+          <section className="rounded-2xl border border-[#d4af37]/35 bg-gradient-to-br from-[#d4af37]/[0.10] via-neutral-950 to-neutral-950 p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#d4af37]">Department Leadership</p>
+                <h3 className="mt-1 text-base font-semibold text-white">Co-Heads</h3>
+                <p className="mt-1 text-xs text-neutral-400">Your Co-Heads are shown at the top of the organizational hierarchy.</p>
+              </div>
+              <span className="rounded-full border border-[#d4af37]/30 bg-[#d4af37]/10 px-3 py-1 text-xs font-semibold text-[#f3e5ab]">{coHeads.length}</span>
+            </div>
+            {coHeads.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {coHeads.map((member) => (
+                  <div key={member.user_id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d4af37]/35 bg-[#d4af37]/10 text-xs font-bold text-[#f3e5ab]">
+                        {(member.full_name || "C").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{member.full_name || "Co-Head"}</p>
+                        <p className="mt-1 break-all text-xs text-neutral-400">{member.email}</p>
+                        {member.phone && <p className="mt-1 text-xs text-neutral-500">{member.phone}</p>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-white/10 bg-black/20 p-4 text-xs text-neutral-400">No Co-Heads are assigned to this department yet. Once assigned, they will appear here automatically.</p>
+            )}
+          </section>
           {hierarchyMode === 'chart' ? (
             <OrgChartView
               positions={positions}
