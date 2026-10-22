@@ -1046,11 +1046,9 @@ export const ebOperationsService = {
               .order('sort_order', { ascending: true })
           : Promise.resolve({ data: null }),
         supabase
-          ? supabase
-              .from('department_heads')
-              .select('user_id, department, section, active')
-              .order('department', { ascending: true })
-          : Promise.resolve({ data: null }),
+          ? supabase.functions.invoke('wm-eb-access', { body: { action: 'list_active_heads' } })
+              .then(({ data, error }) => ({ data: error ? null : (data?.heads || null), error }))
+          : Promise.resolve({ data: null, error: null }),
         supabase
           ? supabase
               .from('wm_people')
