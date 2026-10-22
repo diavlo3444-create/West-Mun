@@ -70,6 +70,7 @@ export interface EbStation {
 
 export interface EbShift {
   id: string;
+  assignment_id?: string | null;
   department: string;
   section: string | null;
   station_id: string | null;
@@ -730,14 +731,17 @@ export const ebOperationsService = {
   /**
    * Fetch all tasks relevant to an EB member or department
    */
-  async getTasks(userId?: string, department?: string, includeDepartmentTasks = false): Promise<EbTask[]> {
+  async getTasks(userId?: string, department?: string, includeDepartmentTasks = false, userName?: string): Promise<EbTask[]> {
     if (!supabase) return [];
     let query = supabase.from('wm_eb_tasks').select('*').order('created_at', { ascending: false });
     if (department && department !== 'all') query = query.or(`department.eq.${department},department.eq.all`);
-    if (userId && !includeDepartmentTasks) query = query.eq('assigned_to_user_id', userId);
     const { data, error } = await query;
     if (error) throw new Error('Could not load tasks: ' + error.message);
-    return (data || []) as EbTask[];
+    const tasks = (data || []) as EbTask[];
+    if (includeDepartmentTasks || !userId) return tasks;
+    const normalizedName = (userName || '').trim().toLowerCase();
+    return tasks.filter((task) => task.assigned_to_user_id === userId ||
+      Boolean(normalizedName && task.assigned_to_name?.trim().toLowerCase() === normalizedName));
   },
 
   /**
@@ -879,13 +883,15 @@ export const ebOperationsService = {
     if (!supabase) return [];
     if (userId && !includeDepartmentShifts) {
       const { data: assignments, error: assignmentError } = await supabase
-        .from('wm_eb_shift_assignments').select('shift_id').eq('user_id', userId);
+        .from('wm_eb_shift_assignments').select('id, shift_id').eq('user_id', userId);
       if (assignmentError) throw new Error('Could not load your shift assignments: ' + assignmentError.message);
-      const shiftIds = Array.from(new Set((assignments || []).map((row: any) => row.shift_id).filter(Boolean)));
+      const assignmentByShift = new Map<string, string>();
+      (assignments || []).forEach((row: any) => { if (row.shift_id) assignmentByShift.set(row.shift_id, row.id); });
+      const shiftIds = Array.from(assignmentByShift.keys());
       if (shiftIds.length === 0) return [];
       const { data, error } = await supabase.from('wm_eb_shifts').select('*').in('id', shiftIds).order('starts_at', { ascending: true });
       if (error) throw new Error('Could not load your shifts: ' + error.message);
-      return (data || []) as EbShift[];
+      return ((data || []) as EbShift[]).map((shift) => ({ ...shift, assignment_id: assignmentByShift.get(shift.id) || null }));
     }
     let query = supabase.from('wm_eb_shifts').select('*').order('starts_at', { ascending: true });
     if (department && department !== 'all') query = query.or(`department.eq.${department},department.eq.all`);
