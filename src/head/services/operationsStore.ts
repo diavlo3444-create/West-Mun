@@ -1646,13 +1646,16 @@ export async function syncGroupMembers(
   if (!supabase) return { ok: false, error: 'Database client not initialized.' };
 
   try {
+    // Snapshot current members so a failed replacement can be rolled back.
+    const { data: previousMembers, error: readError } = await supabase
+      .from('wm_team_group_members')
+      .select('member_id, person_id, member_name, member_email, role_title')
+      .eq('group_id', groupId);
+    if (readError) throw readError;
+
     // Delete existing members and stop immediately if deletion fails.
     const { error: deleteError } = await supabase.from('wm_team_group_members').delete().eq('group_id', groupId);
     if (deleteError) throw deleteError;
-
-    if (members.length === 0) {
-      return { ok: true, data: [] };
-    }
 
     const payloads = members.map((m) => ({
       group_id: groupId,
@@ -1663,12 +1666,26 @@ export async function syncGroupMembers(
       role_title: m.role_title?.trim() || '',
     }));
 
+    if (payloads.length === 0) {
+      return { ok: true, data: [] };
+    }
+
     const { data, error } = await supabase
       .from('wm_team_group_members')
       .insert(payloads)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      // Best-effort restore: do not silently leave a group empty after a failed edit.
+      if (previousMembers?.length) {
+        const restorePayloads = previousMembers.map((m: any) => ({ ...m, group_id: groupId }));
+        const { error: restoreError } = await supabase.from('wm_team_group_members').insert(restorePayloads);
+        if (restoreError) {
+          throw new Error(`Could not save new group members (${error.message}) and restoring the previous members also failed (${restoreError.message}). Please refresh and verify this group.`);
+        }
+      }
+      throw error;
+    }
     return { ok: true, data: (data as WmTeamGroupMember[]) || [] };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to update group members.';
