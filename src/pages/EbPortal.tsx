@@ -82,16 +82,24 @@ export default function EbPortal() {
     try {
       setDataError('');
       const canReview = Boolean(prof.isHead || prof.isAdmin || prof.role === 'co_head');
-      const [t, s, st, a, h, inc, sw] = await Promise.all([
+      const results = await Promise.allSettled([
         ebOperationsService.getTasks(prof.id, prof.department, canReview),
         ebOperationsService.getShifts(prof.department, prof.id, canReview),
         ebOperationsService.getStations(prof.department),
         ebOperationsService.getAnnouncements(prof.id, prof.department),
         ebOperationsService.getHierarchy(prof.department),
-        ebOperationsService.getIncidents(prof.department, canReview),
+        ebOperationsService.getIncidents(prof.department),
         ebOperationsService.getShiftSwaps(prof.id, prof.department, canReview),
       ]);
-
+      const [taskResult, shiftResult, stationResult, announcementResult, hierarchyResult, incidentResult, swapResult] = results;
+      const t = taskResult.status === 'fulfilled' ? taskResult.value : [];
+      const s = shiftResult.status === 'fulfilled' ? shiftResult.value : [];
+      const st = stationResult.status === 'fulfilled' ? stationResult.value : [];
+      const a = announcementResult.status === 'fulfilled' ? announcementResult.value : [];
+      const h = hierarchyResult.status === 'fulfilled' ? hierarchyResult.value : [];
+      const inc = incidentResult.status === 'fulfilled' ? incidentResult.value : [];
+      const sw = swapResult.status === 'fulfilled' ? swapResult.value : [];
+      const failures = results.filter((result) => result.status === 'rejected') as PromiseRejectedResult[];
       setTasks(t);
       setShifts(s);
       setStations(st);
@@ -99,6 +107,9 @@ export default function EbPortal() {
       setHierarchy(h);
       setIncidents(inc);
       setSwaps(sw);
+      if (failures.length) {
+        setDataError(failures.map((failure) => failure.reason instanceof Error ? failure.reason.message : 'Some EB data could not be loaded.').join(' '));
+      }
 
       // Build real notifications
       const notifs: EbNotification[] = [];
