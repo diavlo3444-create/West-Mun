@@ -28,6 +28,7 @@ import {
 import type { DepartmentKey, SectionKey } from '../departments';
 import {
   createDepartmentShift,
+  deleteDepartmentShift,
   batchAssignShiftPeople,
   listDepartmentRosterCandidates,
   listDepartmentGroups,
@@ -480,7 +481,12 @@ export const ShiftCreationModal: React.FC<ShiftCreationModalProps> = ({
         );
 
         if (!assignResult.ok) {
-          console.warn('Shift created but some assignments failed:', assignResult.error);
+          // Avoid leaving a misleading success state or an orphaned shift after a failed batch.
+          const rollback = await deleteDepartmentShift(createdShift.id, testToken);
+          if (!rollback.ok) {
+            throw new Error(`Shift was created, but assignments failed (${assignResult.error || 'unknown error'}) and cleanup failed (${rollback.error || 'unknown error'}). Refresh before retrying to avoid creating a duplicate.`);
+          }
+          throw new Error(`Shift creation was rolled back because staff assignments failed: ${assignResult.error || 'Unknown assignment error'}`);
         }
       }
 
