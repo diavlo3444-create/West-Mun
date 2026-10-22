@@ -216,8 +216,9 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
       availableCount,
       activeTasksCount,
       completedTasksCount,
+      coHeadCount: coHeads.length,
     };
-  }, [members, positions, tasks]);
+  }, [members, positions, tasks, coHeads]);
 
   // Filtered Tasks
   const filteredTasks = useMemo(() => {
@@ -550,7 +551,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
         </div>
 
         {/* Metrics Grid */}
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5 border-t border-white/[0.07] pt-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 border-t border-white/[0.07] pt-4">
           <div className="rounded-lg border border-white/[0.06] bg-black/40 p-3">
             <span className="block text-[10px] font-mono uppercase tracking-wider text-neutral-400">
               Approved Members
@@ -576,6 +577,16 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
             <p className="mt-1 font-serif text-lg font-bold text-emerald-400">
               {metrics.availableCount}
             </p>
+          </div>
+
+          <div className="rounded-lg border border-[#d4af37]/25 bg-[#12110c] p-3">
+            <span className="block text-[10px] font-mono uppercase tracking-wider text-[#d4af37]">
+              Co-Heads
+            </span>
+            <p className="mt-1 font-serif text-lg font-bold text-[#f1d98c]">
+              {metrics.coHeadCount}
+            </p>
+            <p className="mt-1 text-[10px] text-neutral-500">Department leadership</p>
           </div>
 
           <div className="rounded-lg border border-white/[0.06] bg-black/40 p-3">
@@ -624,7 +635,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
             }`}
           >
             <Network className="h-3.5 w-3.5" />
-            <span>Organizational Hierarchy ({positions.length})</span>
+            <span>Organizational Hierarchy ({positions.length + coHeads.length})</span>
           </button>
         </div>
 
