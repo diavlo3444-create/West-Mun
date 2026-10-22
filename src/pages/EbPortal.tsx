@@ -194,8 +194,15 @@ export default function EbPortal() {
         department,
         section,
         phone: (userMeta.phone as string) || null,
-        reportingHeadId: (meta.wm_reporting_head_id as string) || null,
-        reportingHeadName: isHead ? 'Directorate Secretariat' : 'Department Head',
+        reportingHeadId: String(
+          meta.wm_reporting_head_id || userMeta.wm_reporting_head_id ||
+          meta.reporting_head_id || userMeta.reporting_head_id || ''
+        ) || null,
+        reportingHeadName: String(
+          meta.wm_reporting_head_name || userMeta.wm_reporting_head_name ||
+          meta.reporting_head_name || userMeta.reporting_head_name ||
+          (isHead ? 'Directorate Secretariat' : '')
+        ) || null,
         isHead,
         isAdmin,
       };
