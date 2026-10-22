@@ -83,7 +83,7 @@ export default function EbPortal() {
       setDataError('');
       const canReview = Boolean(prof.isHead || prof.isAdmin || prof.role === 'co_head');
       const results = await Promise.allSettled([
-        ebOperationsService.getTasks(prof.id, prof.department, canReview),
+        ebOperationsService.getTasks(prof.id, prof.department, canReview, prof.name),
         ebOperationsService.getShifts(prof.department, prof.id, canReview),
         ebOperationsService.getStations(prof.department),
         ebOperationsService.getAnnouncements(prof.id, prof.department),
