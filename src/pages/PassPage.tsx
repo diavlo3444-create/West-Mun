@@ -65,7 +65,20 @@ export default function PassPage() {
     <main className="min-h-screen bg-[#070707] px-4 py-10 text-[#f5f5f5]">
       <div className="mx-auto max-w-lg">
         <header className="mb-7 flex items-center justify-between border-b border-[#d4af37]/20 pb-5">
-          <a href="/" className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white"><ArrowLeft className="h-4 w-4" /> WEST MUN</a>
+          <a href={(() => {
+            if (!pass) return "/eb";
+            const role = (pass.account_role || "").toLowerCase().replace(/[ -]+/g, "_");
+            if (role === "admin" || role === "super_admin") return "/admin";
+            if (role === "head" || role === "department_head" || role === "co_head") return "/head";
+            if (role === "team_member") {
+              const team = (pass.team || "").toLowerCase();
+              if (team.includes("security")) return "/security";
+              if (team.includes("media")) return "/media";
+              if (team.includes("volunteer")) return "/volunteer";
+              return "/eb";
+            }
+            return "/eb";
+          })()} className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to dashboard</a>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#d4af37]">Official QR Pass</span>
         </header>
         <section className="overflow-hidden rounded-2xl border border-[#d4af37]/25 bg-gradient-to-b from-[#17150f] to-[#0b0b0c] shadow-2xl">
