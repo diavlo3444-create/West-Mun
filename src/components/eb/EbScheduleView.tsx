@@ -215,14 +215,16 @@ export const EbScheduleView: React.FC<EbScheduleViewProps> = ({
 
                   {/* Actions: Request Swap Button */}
                   <div className="flex items-center gap-2 self-end lg:self-center">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedShiftForSwap(shift)}
-                      className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/60 px-3.5 py-2 text-xs font-medium text-neutral-300 hover:border-[#d4af37]/40 hover:text-white"
-                    >
-                      <Repeat className="h-3.5 w-3.5 text-[#d4af37]" />
-                      <span>Request Swap</span>
-                    </button>
+                    {shift.assignment_id && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedShiftForSwap(shift)}
+                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/60 px-3.5 py-2 text-xs font-medium text-neutral-300 hover:border-[#d4af37]/40 hover:text-white"
+                      >
+                        <Repeat className="h-3.5 w-3.5 text-[#d4af37]" />
+                        <span>Request Swap</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
