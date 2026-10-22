@@ -1031,26 +1031,14 @@ export const ebOperationsService = {
         supabase.from('secretariat').select('id, role, name, department, bio, sort_order, published, confirmed')
           .eq('published', true).eq('confirmed', true).order('sort_order', { ascending: true }),
         supabase.from('department_heads').select('id, user_id, department, section, head_name, email, active')
-          .eq('active', true).order('department', { ascending: true }),
+          .order('department', { ascending: true }),
         supabase.from('wm_people').select('id, display_name, email, department, section, role_title, status')
           .eq('status', 'active').or('role_title.ilike.%co-head%,role_title.ilike.%co head%,role_title.ilike.%deputy head%'),
         supabase.from('wm_eb_hierarchy_nodes').select('*')
           .order('rank_level', { ascending: true }).order('sort_order', { ascending: true }),
       ]);
 
-      if (!configuredError && configuredRows?.length) {
-        const nodes = configuredRows as EbHierarchyNode[];
-        const map = new Map<string, EbHierarchyNode>();
-        const roots: EbHierarchyNode[] = [];
-        for (const node of nodes) map.set(node.id, { ...node, children: [] });
-        for (const node of nodes) {
-          const item = map.get(node.id)!;
-          if (node.parent_node_id && map.has(node.parent_node_id)) map.get(node.parent_node_id)!.children!.push(item);
-          else roots.push(item);
-        }
-        return roots;
-      }
-      if (secretariatError && headsError) {
+      // Live Secretariat and executive head records take precedence over the optional manual hierarchy.\n      if (secretariatError && headsError) {
         console.error('Unable to load the Secretariat hierarchy', { secretariatError, headsError });
         return [];
       }
@@ -1061,7 +1049,7 @@ export const ebOperationsService = {
 
       const secretariat = ((secretariatRows || []) as SecretariatRow[]).filter((row) => row.name && row.role)
         .sort((a,b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
-      const heads = ((headRows || []) as HeadRow[]).filter((row) => row.head_name && row.department);
+      const heads = ((headRows || []) as HeadRow[]).filter((row) => row.active !== false && row.department && (row.head_name || row.email));
       const coHeads = ((coHeadRows || []) as CoHeadRow[]).filter((row) => row.display_name && row.department);
 
       const makeNode = (id: string, roleTitle: string, name: string, departmentName: string, rank: number,
@@ -1073,9 +1061,19 @@ export const ebOperationsService = {
         });
 
       const roots: EbHierarchyNode[] = [];
-      const leadershipNodes = secretariat.map((row, index) => makeNode(
+      const orderedSecretariat = [...secretariat].sort((a, b) => {
+        const priority = (role: string) => {
+          if (/secretary[- ]general/i.test(role) && !/deputy|under/i.test(role)) return 0;
+          if (/senior advisor/i.test(role)) return 1;
+          if (/deputy secretary[- ]general/i.test(role)) return 2;
+          if (/under[- ]secretary[- ]general/i.test(role)) return 3;
+          return 4;
+        };
+        return priority(a.role) - priority(b.role) || (a.sort_order ?? 999) - (b.sort_order ?? 999);
+      });
+      const leadershipNodes = orderedSecretariat.map((row, index) => makeNode(
         `secretariat-${row.id}`, row.role, row.name, row.department || 'Executive Leadership',
-        index + 1, index === 0 ? null : `secretariat-${secretariat[index - 1].id}`, row.bio || '',
+        index + 1, index === 0 ? null : `secretariat-${orderedSecretariat[index - 1].id}`, row.bio || '',
       ));
       for (const node of leadershipNodes) {
         if (!node.parent_node_id) roots.push(node);
