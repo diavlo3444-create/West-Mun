@@ -3,6 +3,8 @@ import { AlertCircle, BriefcaseBusiness, Check, ChevronDown, LoaderCircle, Plus,
 import type { DepartmentKey, SectionKey } from './departments';
 import { TeamDeploymentPlanner } from './TeamDeploymentPlanner';
 import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
+import { ShiftManagementDashboard } from './shifts/ShiftManagementDashboard';
+import { GroupManagementDashboard } from './groups/GroupManagementDashboard';
 import {
   addProjectMember, assignPersonToShift, createDepartmentPerson, createDepartmentProject,
   createDepartmentShift, createProjectStage, createProjectTask, deleteDepartmentPerson,
@@ -12,11 +14,11 @@ import {
   updateDepartmentPerson, updateDepartmentProject, updateProjectStage, updateProjectTask,
   updateDepartmentShift, listShiftAssignments, updateAssignmentStatus,
   type WmPerson, type WmProject, type WmProjectStage, type WmProjectTask, type WmShift,
-  type WmRegistrationWindow,
+  type WmRegistrationWindow, type WmTeamGroup,
 } from './services/operationsStore';
 
 type Props = { department: DepartmentKey; section?: SectionKey | null; testToken?: string | null };
-type Tab = 'people' | 'projects' | 'shifts' | 'registrations' | 'deployment';
+type Tab = 'people' | 'groups' | 'projects' | 'shifts' | 'registrations' | 'deployment';
 const field = 'w-full rounded-md border border-white/10 bg-[#111115] px-3 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#d4af37] focus:outline-none';
 const button = 'inline-flex items-center justify-center gap-2 rounded-md border border-[#d4af37]/40 bg-[#d4af37]/10 px-3 py-2 text-xs font-semibold text-[#f1d98c] hover:bg-[#d4af37]/20 disabled:opacity-50';
 const panel = 'rounded-lg border border-white/10 bg-[#111115]/90 p-4';
@@ -41,6 +43,7 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
   const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium' as WmProjectTask['priority'], assigned_person_id: '' });
   const [shiftForm, setShiftForm] = useState({ title: '', location: '', starts_at: '', ends_at: '', capacity: 4 });
   const [memberForm, setMemberForm] = useState({ person_id: '', project_role: '' });
+  const [selectedGroupForShift, setSelectedGroupForShift] = useState<WmTeamGroup | null>(null);
 
   // Dedicated test token passed when running under a verified Super IT Test Session.
   // For ordinary department heads, this is strictly null so that queries execute
@@ -110,6 +113,7 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'people', label: 'Custom roles & people', icon: <Users size={15}/> },
+    { id: 'groups', label: 'Team groups', icon: <Users size={15}/> },
     { id: 'projects', label: department === 'media_press' ? 'Media production' : department === 'design' ? 'Design projects' : 'Projects & tasks', icon: <Video size={15}/> },
     { id: 'shifts', label: 'Shifts & coverage', icon: <Clock3 size={15}/> },
     ...(['media_press', 'security', 'volunteers'].includes(department) ? [{ id: 'deployment' as Tab, label: 'Team deployment', icon: <Users size={15}/> }] : []),
@@ -190,18 +194,26 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
       </div>
     </div>}
 
-    {tab === 'shifts' && <div className="grid gap-4 lg:grid-cols-[minmax(260px,.8fr)_minmax(0,1.2fr)]">
-      <form className={panel+' space-y-3'} onSubmit={e=>{e.preventDefault();createShift();}}><h2 className="font-semibold">Create a shift / coverage slot</h2>
-        <div><label className={label}>Position / shift title</label><input className={field} placeholder="e.g. Entrance Coordinator" value={shiftForm.title} onChange={e=>setShiftForm({...shiftForm,title:e.target.value})}/></div>
-        <div><label className={label}>Location</label><input className={field} placeholder="Hall / checkpoint / room" value={shiftForm.location} onChange={e=>setShiftForm({...shiftForm,location:e.target.value})}/></div>
-        <div><label className={label}>Starts</label><input type="datetime-local" className={field} value={shiftForm.starts_at} onChange={e=>setShiftForm({...shiftForm,starts_at:e.target.value})}/></div>
-        <div><label className={label}>Ends</label><input type="datetime-local" className={field} value={shiftForm.ends_at} onChange={e=>setShiftForm({...shiftForm,ends_at:e.target.value})}/></div>
-        <div><label className={label}>Staffing capacity</label><input type="number" min={1} max={500} className={field} value={shiftForm.capacity} onChange={e=>setShiftForm({...shiftForm,capacity:Number(e.target.value)})}/></div><button className={button} disabled={busy}><Plus size={14}/> Create shift</button>
-      </form>
-      <div className="space-y-3"><h2 className="font-semibold">Coverage & assignments</h2>{shifts.length===0&&<div className={panel+' text-sm text-neutral-400'}>No shifts yet. Create one to start tracking coverage.</div>}
-        {shifts.map(s=><ShiftCard key={s.id} shift={s} people={people} testToken={effectiveTestToken} refresh={load}/>)}
-      </div>
-    </div>}
+    {tab === 'groups' && (
+      <GroupManagementDashboard
+        department={department}
+        section={section}
+        testToken={effectiveTestToken}
+        onAssignGroupToShift={(group) => {
+          setSelectedGroupForShift(group);
+          setTab('shifts');
+        }}
+      />
+    )}
+
+    {tab === 'shifts' && (
+      <ShiftManagementDashboard
+        department={department}
+        section={section}
+        testToken={effectiveTestToken}
+        initialGroup={selectedGroupForShift}
+      />
+    )}
 
     {tab === 'deployment' && ['media_press', 'security', 'volunteers'].includes(department) && <TeamDeploymentPlanner department={department} section={section}/>}
 

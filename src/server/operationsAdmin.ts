@@ -90,7 +90,9 @@ interface MemoryShift {
   starts_at: string;
   ends_at: string;
   capacity: number;
-  status: 'open' | 'closed';
+  status: 'draft' | 'open' | 'published' | 'completed' | 'closed';
+  description?: string;
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -98,8 +100,17 @@ interface MemoryShift {
 interface MemoryShiftAssignment {
   id: string;
   shift_id: string;
-  person_id: string;
-  status: 'assigned' | 'completed' | 'no_show' | 'cancelled';
+  person_id?: string | null;
+  member_id?: string | null;
+  role_type?: 'co_head' | 'team_member' | 'supervisor' | 'staff';
+  responsibility?: string;
+  station?: string;
+  notes?: string;
+  is_supervisor?: boolean;
+  assignee_name?: string;
+  assignee_email?: string;
+  status: 'assigned' | 'confirmed' | 'completed' | 'no_show' | 'cancelled';
+  assigned_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -110,6 +121,28 @@ interface MemoryRegWindow {
   updated_at: string;
 }
 
+interface MemoryTeamGroup {
+  id: string;
+  department: DepartmentKey;
+  section?: SectionKey | null;
+  name: string;
+  description: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface MemoryTeamGroupMember {
+  id: string;
+  group_id: string;
+  member_id?: string | null;
+  person_id?: string | null;
+  member_name: string;
+  member_email: string;
+  role_title?: string;
+  created_at: string;
+}
+
 const memoryStore = {
   people: new Map<string, MemoryPerson>(),
   projects: new Map<string, MemoryProject>(),
@@ -118,6 +151,8 @@ const memoryStore = {
   tasks: new Map<string, MemoryTask>(),
   shifts: new Map<string, MemoryShift>(),
   shiftAssignments: new Map<string, MemoryShiftAssignment>(),
+  teamGroups: new Map<string, MemoryTeamGroup>(),
+  teamGroupMembers: new Map<string, MemoryTeamGroupMember>(),
   regWindows: new Map<string, MemoryRegWindow>([
     ['volunteers', { team: 'volunteers', is_open: true, updated_at: new Date().toISOString() }],
     ['security', { team: 'security', is_open: true, updated_at: new Date().toISOString() }],
@@ -757,6 +792,7 @@ export async function handleSuperAdminOperations(
           department: body?.department,
           section: body?.section || null,
           title: String(body?.title || '').trim(),
+          description: String(body?.description || '').trim(),
           location: String(body?.location || '').trim(),
           starts_at: body?.starts_at,
           ends_at: body?.ends_at,
@@ -820,7 +856,7 @@ export async function handleSuperAdminOperations(
       }
 
       // -----------------------------------------------------------------------
-      // 7. SHIFT ASSIGNMENTS
+      // 7. SHIFT ASSIGNMENTS & ROSTER CANDIDATES
       // -----------------------------------------------------------------------
       case 'list_shift_assignments': {
         const shiftId = body?.shiftId || body?.shift_id;
@@ -840,7 +876,7 @@ export async function handleSuperAdminOperations(
           .filter((a) => a.shift_id === shiftId)
           .map((a) => ({
             ...a,
-            person: memoryStore.people.get(a.person_id) || null,
+            person: a.person_id ? memoryStore.people.get(a.person_id) || null : null,
           }));
         return { statusCode: 200, body: { success: true, data: list } };
       }
@@ -849,7 +885,15 @@ export async function handleSuperAdminOperations(
         const payload = {
           id: body?.id || crypto.randomUUID(),
           shift_id: body?.shift_id,
-          person_id: body?.person_id,
+          person_id: body?.person_id || null,
+          member_id: body?.member_id || null,
+          role_type: body?.role_type || 'team_member',
+          responsibility: String(body?.responsibility || '').trim(),
+          station: String(body?.station || '').trim(),
+          notes: String(body?.notes || '').trim(),
+          is_supervisor: Boolean(body?.is_supervisor),
+          assignee_name: String(body?.assignee_name || '').trim(),
+          assignee_email: String(body?.assignee_email || '').trim(),
           status: body?.status || 'assigned',
           assigned_by: callerId,
           created_at: new Date().toISOString(),
@@ -876,10 +920,207 @@ export async function handleSuperAdminOperations(
             success: true,
             data: {
               ...payload,
-              person: memoryStore.people.get(payload.person_id) || null,
+              person: payload.person_id ? memoryStore.people.get(payload.person_id) || null : null,
             },
           },
         };
+      }
+
+      case 'batch_assign_shifts': {
+        const shiftId = body?.shift_id;
+        const incoming = Array.isArray(body?.assignments) ? body.assignments : [];
+        const savedAssignments: any[] = [];
+
+        for (const item of incoming) {
+          const payload = {
+            id: item.id || crypto.randomUUID(),
+            shift_id: shiftId,
+            person_id: item.person_id || null,
+            member_id: item.member_id || null,
+            role_type: item.role_type || 'team_member',
+            responsibility: String(item.responsibility || '').trim(),
+            station: String(item.station || '').trim(),
+            notes: String(item.notes || '').trim(),
+            is_supervisor: Boolean(item.is_supervisor),
+            assignee_name: String(item.assignee_name || '').trim(),
+            assignee_email: String(item.assignee_email || '').trim(),
+            status: item.status || 'assigned',
+            assigned_by: callerId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          if (supabaseAdmin) {
+            try {
+              const { data, error } = await supabaseAdmin
+                .from('wm_shift_assignments')
+                .insert(payload)
+                .select('*, person:wm_people(*)')
+                .single();
+              if (!error && data) {
+                savedAssignments.push(data);
+                continue;
+              }
+            } catch {}
+          }
+
+          memoryStore.shiftAssignments.set(payload.id, payload as MemoryShiftAssignment);
+          savedAssignments.push({
+            ...payload,
+            person: payload.person_id ? memoryStore.people.get(payload.person_id) || null : null,
+          });
+        }
+
+        return { statusCode: 200, body: { success: true, data: savedAssignments } };
+      }
+
+      case 'duplicate_shift': {
+        const origId = body?.shift_id;
+        const newStartsAt = body?.starts_at;
+        const newEndsAt = body?.ends_at;
+        const newTitle = body?.title;
+        const copyAssignments = Boolean(body?.copy_assignments);
+
+        let origShift: any = null;
+        if (supabaseAdmin) {
+          try {
+            const { data } = await supabaseAdmin.from('wm_shifts').select('*').eq('id', origId).single();
+            if (data) origShift = data;
+          } catch {}
+        }
+        if (!origShift) {
+          origShift = memoryStore.shifts.get(origId);
+        }
+
+        if (!origShift) {
+          return { statusCode: 404, body: { success: false, error: 'Original shift not found.' } };
+        }
+
+        const newShiftId = crypto.randomUUID();
+        const newShiftPayload = {
+          id: newShiftId,
+          department: origShift.department,
+          section: origShift.section || null,
+          title: newTitle || origShift.title,
+          description: origShift.description || '',
+          location: origShift.location,
+          starts_at: newStartsAt || origShift.starts_at,
+          ends_at: newEndsAt || origShift.ends_at,
+          capacity: origShift.capacity,
+          status: 'open',
+          created_by: callerId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        let createdShift: any = newShiftPayload;
+        if (supabaseAdmin) {
+          try {
+            const { data, error } = await supabaseAdmin.from('wm_shifts').insert(newShiftPayload).select().single();
+            if (!error && data) createdShift = data;
+          } catch {}
+        }
+        memoryStore.shifts.set(newShiftId, createdShift as MemoryShift);
+
+        if (copyAssignments) {
+          let origAssignments: any[] = [];
+          if (supabaseAdmin) {
+            try {
+              const { data } = await supabaseAdmin
+                .from('wm_shift_assignments')
+                .select('*')
+                .eq('shift_id', origId)
+                .neq('status', 'cancelled');
+              if (data) origAssignments = data;
+            } catch {}
+          }
+          if (origAssignments.length === 0) {
+            origAssignments = Array.from(memoryStore.shiftAssignments.values()).filter(
+              (a) => a.shift_id === origId && a.status !== 'cancelled'
+            );
+          }
+
+          for (const a of origAssignments) {
+            const copyPayload = {
+              id: crypto.randomUUID(),
+              shift_id: newShiftId,
+              person_id: a.person_id || null,
+              member_id: a.member_id || null,
+              role_type: a.role_type || 'team_member',
+              responsibility: a.responsibility || '',
+              station: a.station || '',
+              notes: a.notes || '',
+              is_supervisor: Boolean(a.is_supervisor),
+              assignee_name: a.assignee_name || '',
+              assignee_email: a.assignee_email || '',
+              status: 'assigned',
+              assigned_by: callerId,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            if (supabaseAdmin) {
+              try {
+                await supabaseAdmin.from('wm_shift_assignments').insert(copyPayload);
+              } catch {}
+            }
+            memoryStore.shiftAssignments.set(copyPayload.id, copyPayload as MemoryShiftAssignment);
+          }
+        }
+
+        return { statusCode: 200, body: { success: true, data: createdShift } };
+      }
+
+      case 'list_co_heads': {
+        const dept = body?.department;
+        const sec = body?.section;
+        if (supabaseAdmin) {
+          try {
+            let q = supabaseAdmin.from('department_heads').select('id, head_name, email, department, section, active').eq('active', true);
+            if (dept) q = q.eq('department', dept);
+            if (sec) q = q.eq('section', sec);
+            const { data, error } = await q.order('head_name', { ascending: true });
+            if (!error && data) {
+              return { statusCode: 200, body: { success: true, data } };
+            }
+          } catch {}
+        }
+        return {
+          statusCode: 200,
+          body: {
+            success: true,
+            data: [
+              {
+                id: 'test-co-head-1',
+                head_name: 'Co-Head Lead',
+                email: 'cohead@westmun.org',
+                department: dept || 'security',
+                section: sec || null,
+                active: true,
+              },
+            ],
+          },
+        };
+      }
+
+      case 'list_team_members': {
+        const dept = body?.department;
+        const sec = body?.section;
+        const teamValues = dept === 'media_press' ? ['media_press', 'media'] : [dept];
+
+        let members: any[] = [];
+        if (supabaseAdmin) {
+          try {
+            let q = supabaseAdmin
+              .from('team_registrations')
+              .select('id, full_name, email, phone, team, section, institution, status')
+              .in('team', teamValues)
+              .eq('status', 'accepted');
+            if (sec) q = q.eq('section', sec);
+            const { data, error } = await q.order('full_name', { ascending: true });
+            if (!error && data) members = data;
+          } catch {}
+        }
+        return { statusCode: 200, body: { success: true, data: members } };
       }
 
       case 'update_assignment_status': {
@@ -911,7 +1152,7 @@ export async function handleSuperAdminOperations(
               success: true,
               data: {
                 ...merged,
-                person: memoryStore.people.get(merged.person_id) || null,
+                person: merged.person_id ? memoryStore.people.get(merged.person_id) || null : null,
               },
             },
           };
@@ -928,6 +1169,283 @@ export async function handleSuperAdminOperations(
         }
         memoryStore.shiftAssignments.delete(id);
         return { statusCode: 200, body: { success: true, data: null } };
+      }
+
+      // -----------------------------------------------------------------------
+      // 7.5. CUSTOM TEAM GROUPS & MEMBERSHIPS
+      // -----------------------------------------------------------------------
+      case 'list_groups': {
+        const dept = body?.department;
+        const sec = body?.section;
+
+        if (supabaseAdmin) {
+          try {
+            let query = supabaseAdmin
+              .from('wm_team_groups')
+              .select('*, members:wm_team_group_members(*)');
+            if (dept) query = query.eq('department', dept);
+            if (sec) query = query.eq('section', sec);
+            const { data, error } = await query.order('name', { ascending: true });
+            if (!error && data) {
+              const mapped = (data as any[]).map((g) => ({
+                ...g,
+                member_count: Array.isArray(g.members) ? g.members.length : 0,
+              }));
+              return { statusCode: 200, body: { success: true, data: mapped } };
+            }
+          } catch {}
+        }
+
+        let groups = Array.from(memoryStore.teamGroups.values());
+        if (dept) groups = groups.filter((g) => g.department === dept);
+        if (sec) groups = groups.filter((g) => g.section === sec);
+        groups.sort((a, b) => a.name.localeCompare(b.name));
+
+        const mapped = groups.map((g) => {
+          const members = Array.from(memoryStore.teamGroupMembers.values()).filter(
+            (m) => m.group_id === g.id
+          );
+          return {
+            ...g,
+            member_count: members.length,
+            members,
+          };
+        });
+
+        return { statusCode: 200, body: { success: true, data: mapped } };
+      }
+
+      case 'create_group': {
+        const groupId = body?.id || crypto.randomUUID();
+        const payload = {
+          id: groupId,
+          department: body?.department,
+          section: body?.section || null,
+          name: String(body?.name || '').trim(),
+          description: String(body?.description || '').trim(),
+          created_by: callerId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const incomingMembers = Array.isArray(body?.members) ? body.members : [];
+        const savedMembers: any[] = [];
+
+        if (supabaseAdmin) {
+          try {
+            const { data: grpData, error: grpErr } = await supabaseAdmin
+              .from('wm_team_groups')
+              .insert(payload)
+              .select()
+              .single();
+
+            if (!grpErr && grpData) {
+              if (incomingMembers.length > 0) {
+                const memberPayloads = incomingMembers.map((m: any) => ({
+                  id: m.id || crypto.randomUUID(),
+                  group_id: groupId,
+                  member_id: m.member_id || null,
+                  person_id: m.person_id || null,
+                  member_name: String(m.member_name || m.name || '').trim(),
+                  member_email: String(m.member_email || m.email || '').trim(),
+                  role_title: String(m.role_title || m.roleTitle || '').trim(),
+                  created_at: new Date().toISOString(),
+                }));
+                const { data: mData } = await supabaseAdmin
+                  .from('wm_team_group_members')
+                  .insert(memberPayloads)
+                  .select();
+                if (mData) savedMembers.push(...mData);
+              }
+
+              return {
+                statusCode: 200,
+                body: {
+                  success: true,
+                  data: {
+                    ...grpData,
+                    member_count: savedMembers.length,
+                    members: savedMembers,
+                  },
+                },
+              };
+            }
+          } catch {}
+        }
+
+        memoryStore.teamGroups.set(groupId, payload as MemoryTeamGroup);
+        for (const m of incomingMembers) {
+          const memRecord: MemoryTeamGroupMember = {
+            id: m.id || crypto.randomUUID(),
+            group_id: groupId,
+            member_id: m.member_id || null,
+            person_id: m.person_id || null,
+            member_name: String(m.member_name || m.name || '').trim(),
+            member_email: String(m.member_email || m.email || '').trim(),
+            role_title: String(m.role_title || m.roleTitle || '').trim(),
+            created_at: new Date().toISOString(),
+          };
+          memoryStore.teamGroupMembers.set(memRecord.id, memRecord);
+          savedMembers.push(memRecord);
+        }
+
+        return {
+          statusCode: 200,
+          body: {
+            success: true,
+            data: {
+              ...payload,
+              member_count: savedMembers.length,
+              members: savedMembers,
+            },
+          },
+        };
+      }
+
+      case 'update_group': {
+        const id = body?.id || body?.groupId;
+        const updates = body?.updates || {};
+        const updated_at = new Date().toISOString();
+
+        if (supabaseAdmin) {
+          try {
+            const { data, error } = await supabaseAdmin
+              .from('wm_team_groups')
+              .update({ ...updates, updated_at })
+              .eq('id', id)
+              .select('*, members:wm_team_group_members(*)')
+              .single();
+            if (!error && data) {
+              return {
+                statusCode: 200,
+                body: {
+                  success: true,
+                  data: {
+                    ...data,
+                    member_count: Array.isArray(data.members) ? data.members.length : 0,
+                  },
+                },
+              };
+            }
+          } catch {}
+        }
+
+        const existing = memoryStore.teamGroups.get(id);
+        if (existing) {
+          const merged = { ...existing, ...updates, updated_at };
+          memoryStore.teamGroups.set(id, merged);
+          const members = Array.from(memoryStore.teamGroupMembers.values()).filter(
+            (m) => m.group_id === id
+          );
+          return {
+            statusCode: 200,
+            body: {
+              success: true,
+              data: {
+                ...merged,
+                member_count: members.length,
+                members,
+              },
+            },
+          };
+        }
+        return { statusCode: 200, body: { success: true, data: { id, ...updates } } };
+      }
+
+      case 'delete_group': {
+        const id = body?.id || body?.groupId;
+        if (supabaseAdmin) {
+          try {
+            await supabaseAdmin.from('wm_team_groups').delete().eq('id', id);
+          } catch {}
+        }
+        memoryStore.teamGroups.delete(id);
+        for (const [key, mem] of memoryStore.teamGroupMembers.entries()) {
+          if (mem.group_id === id) {
+            memoryStore.teamGroupMembers.delete(key);
+          }
+        }
+        return { statusCode: 200, body: { success: true, data: null } };
+      }
+
+      case 'list_group_members': {
+        const groupId = body?.groupId || body?.group_id;
+        if (supabaseAdmin) {
+          try {
+            const { data, error } = await supabaseAdmin
+              .from('wm_team_group_members')
+              .select('*')
+              .eq('group_id', groupId)
+              .order('member_name', { ascending: true });
+            if (!error && data) {
+              return { statusCode: 200, body: { success: true, data } };
+            }
+          } catch {}
+        }
+
+        const members = Array.from(memoryStore.teamGroupMembers.values())
+          .filter((m) => m.group_id === groupId)
+          .sort((a, b) => a.member_name.localeCompare(b.member_name));
+        return { statusCode: 200, body: { success: true, data: members } };
+      }
+
+      case 'sync_group_members': {
+        const groupId = body?.groupId || body?.group_id;
+        const incoming = Array.isArray(body?.members) ? body.members : [];
+
+        if (supabaseAdmin) {
+          try {
+            // Delete existing members for this group
+            await supabaseAdmin.from('wm_team_group_members').delete().eq('group_id', groupId);
+
+            if (incoming.length > 0) {
+              const payloads = incoming.map((m: any) => ({
+                id: m.id || crypto.randomUUID(),
+                group_id: groupId,
+                member_id: m.member_id || null,
+                person_id: m.person_id || null,
+                member_name: String(m.member_name || m.name || '').trim(),
+                member_email: String(m.member_email || m.email || '').trim(),
+                role_title: String(m.role_title || m.roleTitle || '').trim(),
+                created_at: new Date().toISOString(),
+              }));
+              const { data, error } = await supabaseAdmin
+                .from('wm_team_group_members')
+                .insert(payloads)
+                .select();
+              if (!error && data) {
+                return { statusCode: 200, body: { success: true, data } };
+              }
+            } else {
+              return { statusCode: 200, body: { success: true, data: [] } };
+            }
+          } catch {}
+        }
+
+        // Memory store fallback
+        for (const [key, mem] of memoryStore.teamGroupMembers.entries()) {
+          if (mem.group_id === groupId) {
+            memoryStore.teamGroupMembers.delete(key);
+          }
+        }
+
+        const saved: MemoryTeamGroupMember[] = [];
+        for (const m of incoming) {
+          const rec: MemoryTeamGroupMember = {
+            id: m.id || crypto.randomUUID(),
+            group_id: groupId,
+            member_id: m.member_id || null,
+            person_id: m.person_id || null,
+            member_name: String(m.member_name || m.name || '').trim(),
+            member_email: String(m.member_email || m.email || '').trim(),
+            role_title: String(m.role_title || m.roleTitle || '').trim(),
+            created_at: new Date().toISOString(),
+          };
+          memoryStore.teamGroupMembers.set(rec.id, rec);
+          saved.push(rec);
+        }
+
+        return { statusCode: 200, body: { success: true, data: saved } };
       }
 
       // -----------------------------------------------------------------------

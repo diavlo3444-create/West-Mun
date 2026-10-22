@@ -66,6 +66,10 @@ export interface WmProjectTask {
   assigned_person?: WmPerson;
 }
 
+export type ShiftStatus = 'draft' | 'open' | 'published' | 'completed' | 'closed';
+export type ShiftAssignmentStatus = 'assigned' | 'confirmed' | 'completed' | 'no_show' | 'cancelled';
+export type ShiftRoleType = 'co_head' | 'team_member' | 'supervisor' | 'staff';
+
 export interface WmShift {
   id: string;
   department: DepartmentKey;
@@ -75,7 +79,8 @@ export interface WmShift {
   starts_at: string;
   ends_at: string;
   capacity: number;
-  status: 'open' | 'closed';
+  status: ShiftStatus;
+  description?: string;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -85,13 +90,60 @@ export interface WmShift {
 export interface WmShiftAssignment {
   id: string;
   shift_id: string;
-  person_id: string;
-  status: 'assigned' | 'completed' | 'no_show' | 'cancelled';
+  person_id?: string | null;
+  member_id?: string | null;
+  role_type?: ShiftRoleType;
+  responsibility?: string;
+  station?: string;
+  notes?: string;
+  is_supervisor?: boolean;
+  assignee_name?: string;
+  assignee_email?: string;
+  status: ShiftAssignmentStatus;
   assigned_by?: string | null;
   created_at: string;
   updated_at: string;
-  person?: WmPerson;
+  person?: WmPerson | null;
   shift?: WmShift;
+}
+
+export interface ShiftCandidate {
+  id: string;
+  type: 'co_head' | 'team_member';
+  name: string;
+  email: string;
+  phone?: string | null;
+  roleTitle: string;
+  institution?: string | null;
+  section?: SectionKey | null;
+  status: string;
+  sourceId: string;
+  personId?: string | null;
+  memberId?: string | null;
+}
+
+export interface WmTeamGroup {
+  id: string;
+  department: DepartmentKey;
+  section?: SectionKey | null;
+  name: string;
+  description: string;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  member_count?: number;
+  members?: WmTeamGroupMember[];
+}
+
+export interface WmTeamGroupMember {
+  id: string;
+  group_id: string;
+  member_id?: string | null;
+  person_id?: string | null;
+  member_name: string;
+  member_email: string;
+  role_title?: string;
+  created_at: string;
 }
 
 export interface WmRegistrationWindow {
@@ -718,11 +770,12 @@ export async function createDepartmentShift(
     department: DepartmentKey;
     section?: SectionKey | null;
     title: string;
+    description?: string;
     location: string;
     starts_at: string;
     ends_at: string;
     capacity: number;
-    status?: 'open' | 'closed';
+    status?: ShiftStatus;
   },
   testToken?: string | null,
 ): Promise<OperationResult<WmShift>> {
@@ -736,6 +789,7 @@ export async function createDepartmentShift(
       department: input.department,
       section: input.section || null,
       title: input.title.trim(),
+      description: input.description?.trim() || '',
       location: input.location.trim(),
       starts_at: input.starts_at,
       ends_at: input.ends_at,
@@ -822,26 +876,69 @@ export async function listShiftAssignments(
   }
 }
 
-export async function assignPersonToShift(
+export interface AssignShiftInput {
+  shift_id: string;
+  person_id?: string | null;
+  member_id?: string | null;
+  role_type?: ShiftRoleType;
+  responsibility?: string;
+  station?: string;
+  notes?: string;
+  is_supervisor?: boolean;
+  assignee_name?: string;
+  assignee_email?: string;
+  status?: ShiftAssignmentStatus;
+}
+
+export function assignPersonToShift(
+  input: AssignShiftInput,
+  testToken?: string | null,
+): Promise<OperationResult<WmShiftAssignment>>;
+export function assignPersonToShift(
   shiftId: string,
   personId: string,
-  status: 'assigned' | 'completed' | 'no_show' | 'cancelled' = 'assigned',
+  status?: ShiftAssignmentStatus,
   testToken?: string | null,
+): Promise<OperationResult<WmShiftAssignment>>;
+export async function assignPersonToShift(
+  inputOrShiftId: AssignShiftInput | string,
+  personIdOrStatusOrToken?: string | null,
+  statusArg?: ShiftAssignmentStatus,
+  testTokenArg?: string | null,
 ): Promise<OperationResult<WmShiftAssignment>> {
+  let normalizedInput: AssignShiftInput;
+  let testToken: string | null | undefined;
+
+  if (typeof inputOrShiftId === 'object') {
+    normalizedInput = inputOrShiftId;
+    testToken = personIdOrStatusOrToken;
+  } else {
+    normalizedInput = {
+      shift_id: inputOrShiftId,
+      person_id: personIdOrStatusOrToken || '',
+      status: statusArg || 'assigned',
+    };
+    testToken = testTokenArg;
+  }
+
   if (testToken) {
-    return callSuperAdminOperations<WmShiftAssignment>(
-      'assign_to_shift',
-      { shiftId, personId, status },
-      testToken,
-    );
+    return callSuperAdminOperations<WmShiftAssignment>('assign_shift', normalizedInput as any, testToken);
   }
   if (!supabase) return { ok: false, error: 'Database client not initialized.' };
 
   try {
     const payload = {
-      shift_id: shiftId,
-      person_id: personId,
-      status,
+      shift_id: normalizedInput.shift_id,
+      person_id: normalizedInput.person_id || null,
+      member_id: normalizedInput.member_id || null,
+      role_type: normalizedInput.role_type || 'team_member',
+      responsibility: normalizedInput.responsibility?.trim() || '',
+      station: normalizedInput.station?.trim() || '',
+      notes: normalizedInput.notes?.trim() || '',
+      is_supervisor: Boolean(normalizedInput.is_supervisor),
+      assignee_name: normalizedInput.assignee_name?.trim() || '',
+      assignee_email: normalizedInput.assignee_email?.trim() || '',
+      status: normalizedInput.status || 'assigned',
     };
 
     const { data, error } = await supabase
@@ -858,9 +955,350 @@ export async function assignPersonToShift(
   }
 }
 
+export async function batchAssignShiftPeople(
+  shiftId: string,
+  assignments: Array<Omit<AssignShiftInput, 'shift_id'>>,
+  testToken?: string | null,
+): Promise<OperationResult<WmShiftAssignment[]>> {
+  if (testToken) {
+    return callSuperAdminOperations<WmShiftAssignment[]>(
+      'batch_assign_shifts',
+      { shift_id: shiftId, assignments },
+      testToken,
+    );
+  }
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    const payloads = assignments.map((a) => ({
+      shift_id: shiftId,
+      person_id: a.person_id || null,
+      member_id: a.member_id || null,
+      role_type: a.role_type || 'team_member',
+      responsibility: a.responsibility?.trim() || '',
+      station: a.station?.trim() || '',
+      notes: a.notes?.trim() || '',
+      is_supervisor: Boolean(a.is_supervisor),
+      assignee_name: a.assignee_name?.trim() || '',
+      assignee_email: a.assignee_email?.trim() || '',
+      status: a.status || 'assigned',
+    }));
+
+    if (payloads.length === 0) return { ok: true, data: [] };
+
+    const { data, error } = await supabase
+      .from('wm_shift_assignments')
+      .insert(payloads)
+      .select('*, person:wm_people(*)');
+
+    if (error) throw error;
+    return { ok: true, data: (data as WmShiftAssignment[]) || [] };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to save shift assignments.';
+    return { ok: false, error: msg };
+  }
+}
+
+export async function duplicateDepartmentShift(
+  shiftId: string,
+  input: {
+    starts_at: string;
+    ends_at: string;
+    title?: string;
+    copyAssignments?: boolean;
+  },
+  testToken?: string | null,
+): Promise<OperationResult<WmShift>> {
+  if (testToken) {
+    return callSuperAdminOperations<WmShift>(
+      'duplicate_shift',
+      {
+        shift_id: shiftId,
+        starts_at: input.starts_at,
+        ends_at: input.ends_at,
+        title: input.title,
+        copy_assignments: input.copyAssignments,
+      },
+      testToken,
+    );
+  }
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    const { data: origShift, error: sErr } = await supabase
+      .from('wm_shifts')
+      .select('*')
+      .eq('id', shiftId)
+      .single();
+
+    if (sErr || !origShift) throw sErr || new Error('Original shift not found.');
+
+    const newShiftPayload = {
+      department: origShift.department,
+      section: origShift.section || null,
+      title: input.title?.trim() || origShift.title,
+      description: origShift.description || '',
+      location: origShift.location,
+      starts_at: input.starts_at,
+      ends_at: input.ends_at,
+      capacity: origShift.capacity,
+      status: 'open' as ShiftStatus,
+    };
+
+    const { data: newShift, error: nErr } = await supabase
+      .from('wm_shifts')
+      .insert(newShiftPayload)
+      .select()
+      .single();
+
+    if (nErr || !newShift) throw nErr || new Error('Failed to clone shift.');
+
+    if (input.copyAssignments) {
+      const { data: assignments } = await supabase
+        .from('wm_shift_assignments')
+        .select('*')
+        .eq('shift_id', shiftId)
+        .neq('status', 'cancelled');
+
+      if (assignments && assignments.length > 0) {
+        const copyPayloads = assignments.map((a: any) => ({
+          shift_id: newShift.id,
+          person_id: a.person_id || null,
+          member_id: a.member_id || null,
+          role_type: a.role_type || 'team_member',
+          responsibility: a.responsibility || '',
+          station: a.station || '',
+          notes: a.notes || '',
+          is_supervisor: Boolean(a.is_supervisor),
+          assignee_name: a.assignee_name || '',
+          assignee_email: a.assignee_email || '',
+          status: 'assigned' as ShiftAssignmentStatus,
+        }));
+        await supabase.from('wm_shift_assignments').insert(copyPayloads);
+      }
+    }
+
+    return { ok: true, data: newShift as WmShift };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to duplicate shift.';
+    return { ok: false, error: msg };
+  }
+}
+
+export async function listDepartmentCoHeads(
+  department: DepartmentKey,
+  section?: SectionKey | null,
+  testToken?: string | null,
+): Promise<OperationResult<ShiftCandidate[]>> {
+  if (testToken) {
+    const r = await callSuperAdminOperations<any[]>('list_co_heads', { department, section }, testToken);
+    if (!r.ok) return { ok: false, error: r.error };
+    const candidates: ShiftCandidate[] = (r.data || []).map((h) => ({
+      id: h.id,
+      type: 'co_head',
+      name: h.head_name || (h.email ? h.email.split('@')[0] : 'Department Head'),
+      email: h.email,
+      phone: null,
+      roleTitle: 'Department Head / Co-Head',
+      institution: 'WEST MUN Secretariat',
+      section: h.section || null,
+      status: h.active ? 'active' : 'inactive',
+      sourceId: h.id,
+      memberId: h.id,
+    }));
+    return { ok: true, data: candidates };
+  }
+
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    await ensureFreshSupabaseSession();
+    let query = supabase
+      .from('department_heads')
+      .select('id, head_name, email, department, section, active')
+      .eq('department', department)
+      .eq('active', true)
+      .order('head_name', { ascending: true });
+
+    if (section) {
+      query = query.or(`section.eq.${section},section.is.null`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const candidates: ShiftCandidate[] = (data || []).map((h: any) => ({
+      id: h.id,
+      type: 'co_head',
+      name: h.head_name || (h.email ? h.email.split('@')[0] : 'Department Head'),
+      email: h.email,
+      phone: null,
+      roleTitle: 'Department Head / Co-Head',
+      institution: 'WEST MUN Secretariat',
+      section: h.section || null,
+      status: h.active ? 'active' : 'inactive',
+      sourceId: h.id,
+      memberId: h.id,
+    }));
+
+    return { ok: true, data: candidates };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to query department heads.';
+    return { ok: false, error: msg };
+  }
+}
+
+export async function listDepartmentTeamMembers(
+  department: DepartmentKey,
+  section?: SectionKey | null,
+  testToken?: string | null,
+): Promise<OperationResult<ShiftCandidate[]>> {
+  if (testToken) {
+    const [tmRes, peopleRes] = await Promise.all([
+      callSuperAdminOperations<any[]>('list_team_members', { department, section }, testToken),
+      listDepartmentPeople(department, section, testToken),
+    ]);
+
+    const candidates: ShiftCandidate[] = [];
+    const seenEmails = new Set<string>();
+
+    if (tmRes.ok && tmRes.data) {
+      for (const m of tmRes.data) {
+        if (m.email) seenEmails.add(m.email.toLowerCase());
+        candidates.push({
+          id: m.id,
+          type: 'team_member',
+          name: m.full_name || 'Team Member',
+          email: m.email || '',
+          phone: m.phone || null,
+          roleTitle: 'Team Member',
+          institution: m.institution || null,
+          section: m.section || null,
+          status: m.status || 'accepted',
+          sourceId: m.id,
+          memberId: m.id,
+        });
+      }
+    }
+
+    if (peopleRes.ok && peopleRes.data) {
+      for (const p of peopleRes.data) {
+        if (p.email && seenEmails.has(p.email.toLowerCase())) continue;
+        candidates.push({
+          id: p.id,
+          type: 'team_member',
+          name: p.display_name,
+          email: p.email || '',
+          phone: p.phone || null,
+          roleTitle: p.role_title || 'Operations Staff',
+          institution: null,
+          section: p.section || null,
+          status: p.status || 'active',
+          sourceId: p.id,
+          personId: p.id,
+        });
+      }
+    }
+
+    return { ok: true, data: candidates };
+  }
+
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    await ensureFreshSupabaseSession();
+    const teamValues = department === 'media_press' ? ['media_press', 'media'] : [department];
+
+    let query = supabase
+      .from('team_registrations')
+      .select('id, full_name, email, phone, institution, team, section, status')
+      .in('team', teamValues)
+      .eq('status', 'accepted')
+      .order('full_name', { ascending: true });
+
+    if (section) {
+      query = query.eq('section', section);
+    }
+
+    const [{ data: regs, error: rErr }, peopleResult] = await Promise.all([
+      query,
+      listDepartmentPeople(department, section, null),
+    ]);
+
+    if (rErr) throw rErr;
+
+    const candidates: ShiftCandidate[] = [];
+    const seenEmails = new Set<string>();
+
+    for (const r of regs || []) {
+      if (r.email) seenEmails.add(r.email.toLowerCase());
+      candidates.push({
+        id: r.id,
+        type: 'team_member',
+        name: r.full_name || 'Team Member',
+        email: r.email || '',
+        phone: r.phone || null,
+        roleTitle: 'Team Member',
+        institution: r.institution || null,
+        section: r.section || null,
+        status: r.status || 'accepted',
+        sourceId: r.id,
+        memberId: r.id,
+      });
+    }
+
+    if (peopleResult.ok && peopleResult.data) {
+      for (const p of peopleResult.data) {
+        if (p.email && seenEmails.has(p.email.toLowerCase())) continue;
+        candidates.push({
+          id: p.id,
+          type: 'team_member',
+          name: p.display_name,
+          email: p.email || '',
+          phone: p.phone || null,
+          roleTitle: p.role_title || 'Operations Staff',
+          institution: null,
+          section: p.section || null,
+          status: p.status || 'active',
+          sourceId: p.id,
+          personId: p.id,
+        });
+      }
+    }
+
+    return { ok: true, data: candidates };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to query department team members.';
+    return { ok: false, error: msg };
+  }
+}
+
+export async function listDepartmentRosterCandidates(
+  department: DepartmentKey,
+  section?: SectionKey | null,
+  testToken?: string | null,
+): Promise<OperationResult<{ coHeads: ShiftCandidate[]; teamMembers: ShiftCandidate[] }>> {
+  const [headsRes, membersRes] = await Promise.all([
+    listDepartmentCoHeads(department, section, testToken),
+    listDepartmentTeamMembers(department, section, testToken),
+  ]);
+
+  if (!headsRes.ok && !membersRes.ok) {
+    return { ok: false, error: headsRes.error || membersRes.error || 'Could not load shift candidates.' };
+  }
+
+  return {
+    ok: true,
+    data: {
+      coHeads: headsRes.data || [],
+      teamMembers: membersRes.data || [],
+    },
+  };
+}
+
 export async function updateAssignmentStatus(
   assignmentId: string,
-  status: 'assigned' | 'completed' | 'no_show' | 'cancelled',
+  status: ShiftAssignmentStatus,
   testToken?: string | null,
 ): Promise<OperationResult<WmShiftAssignment>> {
   if (testToken) {
@@ -979,6 +1417,250 @@ export async function setRegistrationWindowStatus(
     return { ok: true, data: data as WmRegistrationWindow };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to update registration window.';
+    return { ok: false, error: msg };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 7.5. WM_TEAM_GROUPS & WM_TEAM_GROUP_MEMBERS (CUSTOM TEAMS & BULK ASSIGNMENT)
+// ---------------------------------------------------------------------------
+
+export async function listDepartmentGroups(
+  department: DepartmentKey,
+  section?: SectionKey | null,
+  testToken?: string | null,
+): Promise<OperationResult<WmTeamGroup[]>> {
+  if (testToken) {
+    return callSuperAdminOperations<WmTeamGroup[]>('list_groups', { department, section }, testToken);
+  }
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    await ensureFreshSupabaseSession();
+    let query = supabase
+      .from('wm_team_groups')
+      .select('*, members:wm_team_group_members(*)')
+      .eq('department', department)
+      .order('name', { ascending: true });
+
+    if (section) {
+      query = query.eq('section', section);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const mapped: WmTeamGroup[] = (data || []).map((g: any) => ({
+      ...g,
+      member_count: Array.isArray(g.members) ? g.members.length : 0,
+    }));
+
+    return { ok: true, data: mapped };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to load team groups.';
+    return { ok: false, error: msg };
+  }
+}
+
+export async function createDepartmentGroup(
+  input: {
+    department: DepartmentKey;
+    section?: SectionKey | null;
+    name: string;
+    description?: string;
+    members?: Array<{
+      member_id?: string | null;
+      person_id?: string | null;
+      member_name: string;
+      member_email: string;
+      role_title?: string;
+    }>;
+  },
+  testToken?: string | null,
+): Promise<OperationResult<WmTeamGroup>> {
+  if (testToken) {
+    return callSuperAdminOperations<WmTeamGroup>('create_group', input as any, testToken);
+  }
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    const groupPayload = {
+      department: input.department,
+      section: input.section || null,
+      name: input.name.trim(),
+      description: input.description?.trim() || '',
+    };
+
+    const { data: grp, error: gErr } = await supabase
+      .from('wm_team_groups')
+      .insert(groupPayload)
+      .select()
+      .single();
+
+    if (gErr || !grp) throw gErr || new Error('Failed to create group.');
+
+    let savedMembers: WmTeamGroupMember[] = [];
+    if (input.members && input.members.length > 0) {
+      const memberPayloads = input.members.map((m) => ({
+        group_id: grp.id,
+        member_id: m.member_id || null,
+        person_id: m.person_id || null,
+        member_name: m.member_name.trim(),
+        member_email: m.member_email.trim(),
+        role_title: m.role_title?.trim() || '',
+      }));
+
+      const { data: mData, error: mErr } = await supabase
+        .from('wm_team_group_members')
+        .insert(memberPayloads)
+        .select();
+
+      if (!mErr && mData) {
+        savedMembers = mData as WmTeamGroupMember[];
+      }
+    }
+
+    return {
+      ok: true,
+      data: {
+        ...(grp as WmTeamGroup),
+        member_count: savedMembers.length,
+        members: savedMembers,
+      },
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to create group.';
+    return { ok: false, error: msg };
+  }
+}
+
+export async function updateDepartmentGroup(
+  id: string,
+  updates: { name?: string; description?: string },
+  testToken?: string | null,
+): Promise<OperationResult<WmTeamGroup>> {
+  if (testToken) {
+    return callSuperAdminOperations<WmTeamGroup>('update_group', { id, updates }, testToken);
+  }
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    const payload = {
+      ...(updates.name ? { name: updates.name.trim() } : {}),
+      ...(updates.description !== undefined ? { description: updates.description.trim() } : {}),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('wm_team_groups')
+      .update(payload)
+      .eq('id', id)
+      .select('*, members:wm_team_group_members(*)')
+      .single();
+
+    if (error) throw error;
+    return {
+      ok: true,
+      data: {
+        ...(data as WmTeamGroup),
+        member_count: Array.isArray((data as any).members) ? (data as any).members.length : 0,
+      },
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to update group.';
+    return { ok: false, error: msg };
+  }
+}
+
+export async function deleteDepartmentGroup(
+  id: string,
+  testToken?: string | null,
+): Promise<OperationResult<void>> {
+  if (testToken) {
+    return callSuperAdminOperations<void>('delete_group', { id }, testToken);
+  }
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    const { error } = await supabase.from('wm_team_groups').delete().eq('id', id);
+    if (error) throw error;
+    return { ok: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to delete group.';
+    return { ok: false, error: msg };
+  }
+}
+
+export async function listGroupMembers(
+  groupId: string,
+  testToken?: string | null,
+): Promise<OperationResult<WmTeamGroupMember[]>> {
+  if (testToken) {
+    return callSuperAdminOperations<WmTeamGroupMember[]>('list_group_members', { groupId }, testToken);
+  }
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    const { data, error } = await supabase
+      .from('wm_team_group_members')
+      .select('*')
+      .eq('group_id', groupId)
+      .order('member_name', { ascending: true });
+
+    if (error) throw error;
+    return { ok: true, data: (data as WmTeamGroupMember[]) || [] };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to load group members.';
+    return { ok: false, error: msg };
+  }
+}
+
+export async function syncGroupMembers(
+  groupId: string,
+  members: Array<{
+    member_id?: string | null;
+    person_id?: string | null;
+    member_name: string;
+    member_email: string;
+    role_title?: string;
+  }>,
+  testToken?: string | null,
+): Promise<OperationResult<WmTeamGroupMember[]>> {
+  if (testToken) {
+    return callSuperAdminOperations<WmTeamGroupMember[]>(
+      'sync_group_members',
+      { groupId, members },
+      testToken,
+    );
+  }
+  if (!supabase) return { ok: false, error: 'Database client not initialized.' };
+
+  try {
+    // Delete existing members
+    await supabase.from('wm_team_group_members').delete().eq('group_id', groupId);
+
+    if (members.length === 0) {
+      return { ok: true, data: [] };
+    }
+
+    const payloads = members.map((m) => ({
+      group_id: groupId,
+      member_id: m.member_id || null,
+      person_id: m.person_id || null,
+      member_name: m.member_name.trim(),
+      member_email: m.member_email.trim(),
+      role_title: m.role_title?.trim() || '',
+    }));
+
+    const { data, error } = await supabase
+      .from('wm_team_group_members')
+      .insert(payloads)
+      .select();
+
+    if (error) throw error;
+    return { ok: true, data: (data as WmTeamGroupMember[]) || [] };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to update group members.';
     return { ok: false, error: msg };
   }
 }
