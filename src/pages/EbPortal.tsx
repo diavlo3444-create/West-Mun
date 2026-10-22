@@ -399,7 +399,7 @@ export default function EbPortal() {
   const TABS: { id: TabKey; label: string; icon: any; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'tasks', label: canSeeOversight ? 'Department Tasks' : 'My Tasks', icon: FileCheck2, badge: pendingCount > 0 ? pendingCount : undefined },
-    { id: 'schedule', label: 'My Schedule', icon: Calendar },
+    { id: 'schedule', label: canSeeOversight ? 'Department Schedule' : 'My Schedule', icon: Calendar },
     { id: 'station', label: 'My Station', icon: Building2 },
     { id: 'hierarchy', label: 'Hierarchy', icon: Users },
     { id: 'announcements', label: 'Announcements', icon: Radio, badge: unreadAnnouncementsCount > 0 ? unreadAnnouncementsCount : undefined },
