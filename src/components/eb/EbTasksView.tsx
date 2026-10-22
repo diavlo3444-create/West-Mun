@@ -423,7 +423,7 @@ export const EbTasksView: React.FC<EbTasksViewProps> = ({
         /* List View */
         <div className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden divide-y divide-white/[0.06]">
           {filteredTasks.length === 0 ? (
-            <div className="p-8 text-center text-xs text-neutral-400">No tasks match your search filters.</div>
+            <div className="p-8 text-center text-xs text-neutral-400">{canManageTasks ? 'No department tasks match your current filters.' : 'No tasks are assigned to you yet, or no tasks match your current filters.'}</div>
           ) : (
             filteredTasks.map((task) => (
               <div
