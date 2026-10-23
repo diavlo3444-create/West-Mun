@@ -53,10 +53,10 @@ export const RegistrationSection: React.FC = React.memo(() => {
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
             transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm relative flex flex-col justify-between hover:border-[#d4af37]/40 transition-[transform,border-color,box-shadow] duration-300"
+            className="min-w-0 p-8 bg-[#0c0c0e] border border-neutral-800 rounded-sm relative flex flex-col justify-between hover:border-[#d4af37]/40 transition-[transform,border-color,box-shadow] duration-300"
           >
             <div>
-              <div className="flex justify-between items-start mb-4">
+              <div className="flex flex-wrap justify-between items-start gap-x-4 gap-y-2 mb-4">
                 <span className="text-[11px] font-mono uppercase tracking-widest text-[#d4af37]">Tier 01</span>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 bg-[#17171d] text-neutral-400 border border-neutral-800 rounded-sm">
                   Status: TBA
@@ -67,21 +67,21 @@ export const RegistrationSection: React.FC = React.memo(() => {
                 Preferred country matrix allocation for individual delegates and faculty-led groups.
               </p>
               <div className="space-y-2 py-4 border-t border-neutral-800 text-xs">
-                <div className="flex justify-between">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1">
                   <span className="text-neutral-500">Registration Fee:</span>
                   <span className="font-mono text-[#d4af37] font-bold">TBA</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1">
                   <span className="text-neutral-500">Application Deadline:</span>
                   <span className="font-mono text-neutral-300">TBA</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1">
                   <span className="text-neutral-500">Registration Window:</span>
                   <span className="font-mono text-neutral-400">To Be Announced</span>
                 </div>
               </div>
             </div>
-            <div className="mt-6 pt-4 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500">
+            <div className="mt-6 pt-4 border-t border-neutral-800/80 flex flex-wrap items-start gap-x-3 gap-y-2 text-[11px] text-neutral-500">
               <span>Eligibility: High School & Collegiate Delegates</span>
               <span className="font-mono text-[#d4af37]">TBA</span>
             </div>
@@ -93,13 +93,13 @@ export const RegistrationSection: React.FC = React.memo(() => {
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
             transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="p-8 bg-[#0e0e12] border border-[#d4af37]/40 rounded-sm relative flex flex-col justify-between shadow-[0_0_30px_rgba(212,175,55,0.06)] hover:border-[#d4af37] transition-[transform,border-color,box-shadow] duration-300"
+            className="min-w-0 p-8 bg-[#0e0e12] border border-[#d4af37]/40 rounded-sm relative flex flex-col justify-between shadow-[0_0_30px_rgba(212,175,55,0.06)] hover:border-[#d4af37] transition-[transform,border-color,box-shadow] duration-300"
           >
             <div className="absolute -top-3 left-6 px-3 py-0.5 bg-[#d4af37] text-black text-[10px] uppercase font-bold tracking-widest rounded-sm">
               Standard Delegate
             </div>
             <div>
-              <div className="flex justify-between items-start mb-4 mt-1">
+              <div className="flex flex-wrap justify-between items-start gap-x-4 gap-y-2 mb-4 mt-1">
                 <span className="text-[11px] font-mono uppercase tracking-widest text-[#d4af37]">Tier 02</span>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 bg-[#17171d] text-neutral-400 border border-neutral-800 rounded-sm">
                   Status: TBA
@@ -110,21 +110,21 @@ export const RegistrationSection: React.FC = React.memo(() => {
                 General registration window for single delegates, school delegations, and independent youth diplomats.
               </p>
               <div className="space-y-2 py-4 border-t border-neutral-800 text-xs">
-                <div className="flex justify-between">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1">
                   <span className="text-neutral-500">Registration Fee:</span>
                   <span className="font-mono text-[#d4af37] font-bold">TBA</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1">
                   <span className="text-neutral-500">Application Deadline:</span>
                   <span className="font-mono text-neutral-300">TBA</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1">
                   <span className="text-neutral-500">Registration Window:</span>
                   <span className="font-mono text-neutral-400">To Be Announced</span>
                 </div>
               </div>
             </div>
-            <div className="mt-6 pt-4 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-400">
+            <div className="mt-6 pt-4 border-t border-neutral-800/80 flex flex-wrap items-start gap-x-3 gap-y-2 text-[11px] text-neutral-400">
               <span>Eligibility: Open to All Registered Delegates</span>
               <span className="font-mono text-[#d4af37]">TBA</span>
             </div>
@@ -135,7 +135,7 @@ export const RegistrationSection: React.FC = React.memo(() => {
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
             transition={{ duration: 0.5, delay: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="p-8 bg-gradient-to-b from-[#17150f] to-[#0c0c0e] border border-[#d4af37]/30 rounded-sm relative flex flex-col justify-between hover:border-[#d4af37]/70 transition-[transform,border-color,box-shadow] duration-300"
+            className="min-w-0 p-8 bg-gradient-to-b from-[#17150f] to-[#0c0c0e] border border-[#d4af37]/30 rounded-sm relative flex flex-col justify-between hover:border-[#d4af37]/70 transition-[transform,border-color,box-shadow] duration-300"
           >
             <div>
               <div className="flex justify-between items-start mb-5">
