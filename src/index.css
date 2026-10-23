@@ -1315,7 +1315,7 @@ body:has(#hero) .wm-image-motion:hover {
 #secretariat::after {
   content: "";
   position: absolute;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   width: min(116vw, 1540px);
   height: clamp(180px, 34vw, 470px);
@@ -1334,7 +1334,7 @@ body:has(#hero) .wm-image-motion:hover {
 #secretariat::before {
   content: "";
   position: absolute;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   width: min(108vw, 1430px);
   height: clamp(150px, 29vw, 390px);
@@ -1396,5 +1396,58 @@ body:has(#hero) .wm-image-motion:hover {
   #secretariat::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+
+/* Orbital visibility + safe stacking: rings sit above the section paint,
+   but behind real content so they cannot cover text, buttons, or cards. */
+body:has(#hero) #highlights,
+body:has(#hero) #committees,
+body:has(#hero) #secretariat {
+  position: relative;
+  isolation: isolate;
+}
+body:has(#hero) #highlights > div,
+body:has(#hero) #committees > div,
+body:has(#hero) #secretariat > div {
+  position: relative;
+  z-index: 1;
+}
+
+/* Keep editorial type from colliding with multi-line headings on smaller
+   widths; preserve the hierarchy without forcing ultra-tight line spacing. */
+body:has(#hero) #intro h2,
+body:has(#hero) #highlights h2,
+body:has(#hero) #about h2,
+body:has(#hero) #committees h2,
+body:has(#hero) #schedule h2,
+body:has(#hero) #secretariat h2,
+body:has(#hero) #register h2,
+body:has(#hero) #faq h2,
+body:has(#hero) #contact h2,
+body:has(#hero) #announcements h2,
+body:has(#hero) #sponsors h2,
+body:has(#hero) #documents h2 {
+  line-height: 1.08 !important;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+@media (max-width: 640px) {
+  body:has(#hero) #intro h2,
+  body:has(#hero) #highlights h2,
+  body:has(#hero) #about h2,
+  body:has(#hero) #committees h2,
+  body:has(#hero) #schedule h2,
+  body:has(#hero) #secretariat h2,
+  body:has(#hero) #register h2,
+  body:has(#hero) #faq h2,
+  body:has(#hero) #contact h2,
+  body:has(#hero) #announcements h2,
+  body:has(#hero) #sponsors h2,
+  body:has(#hero) #documents h2 {
+    font-size: clamp(2.2rem, 10vw, 3.6rem) !important;
+    letter-spacing: -.03em !important;
+    line-height: 1.08 !important;
   }
 }
