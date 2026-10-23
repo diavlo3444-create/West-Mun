@@ -1127,28 +1127,28 @@ body:has(#hero) .wm-image-motion {
 
 
 /* =========================================================
-   WEST MUN — visual identity reset
-   Public page only. Leaves the cinematic hero/video, CMS,
-   registration flows, and .wm-app dashboards untouched.
-   Direction: international-affairs editorial / ink, paper, oxblood.
+   WEST MUN — dark cinematic identity reset
+   Public page only. Keep the established black-and-gold identity.
+   Hero video, backend, CMS, registration, and .wm-app dashboards
+   remain untouched.
    ========================================================= */
 body:has(#hero) {
-  --wm-paper: #eee9df;
-  --wm-paper-ink: #171715;
-  --wm-oxblood: #742d36;
-  --wm-ink-black: #101111;
-  --wm-rule: rgba(23, 23, 21, .18);
+  --wm-editorial-bg: #070707;
+  --wm-editorial-panel: #0d0d0f;
+  --wm-editorial-gold: #d4af37;
+  --wm-editorial-line: rgba(212,175,55,.2);
 }
 
-/* Alternate paper and ink chapters instead of repeating identical dark cards. */
+/* Keep every chapter dark, but vary depth and pacing so the page
+   feels composed rather than a stack of identical black sections. */
 body:has(#hero) #intro,
 body:has(#hero) #about,
 body:has(#hero) #schedule,
 body:has(#hero) #faq,
 body:has(#hero) #contact {
-  background: var(--wm-paper) !important;
-  color: var(--wm-paper-ink) !important;
-  border-color: var(--wm-rule) !important;
+  background: #080808 !important;
+  color: #f5f2eb !important;
+  border-color: rgba(212,175,55,.16) !important;
 }
 body:has(#hero) #highlights,
 body:has(#hero) #committees,
@@ -1157,130 +1157,33 @@ body:has(#hero) #register,
 body:has(#hero) #announcements,
 body:has(#hero) #sponsors,
 body:has(#hero) #documents {
-  background: var(--wm-ink-black) !important;
-  color: #f2eee6 !important;
-  border-color: rgba(238,233,223,.15) !important;
+  background: #0b0b0d !important;
+  color: #f5f2eb !important;
+  border-color: rgba(212,175,55,.16) !important;
 }
 
-/* Typography: editorial scale, compact labels, less template-like symmetry. */
+/* Oversized, tightly set editorial headings without changing copy. */
 body:has(#hero) #intro h2,
-body:has(#hero) #about h2,
-body:has(#hero) #schedule h2,
-body:has(#hero) #faq h2,
-body:has(#hero) #contact h2 {
-  color: var(--wm-paper-ink) !important;
-  font-family: var(--font-serif) !important;
-  font-weight: 500 !important;
-  letter-spacing: -.055em !important;
-  line-height: .98 !important;
-  font-size: clamp(2.8rem, 6vw, 5.6rem) !important;
-}
 body:has(#hero) #highlights h2,
+body:has(#hero) #about h2,
 body:has(#hero) #committees h2,
+body:has(#hero) #schedule h2,
 body:has(#hero) #secretariat h2,
 body:has(#hero) #register h2,
+body:has(#hero) #faq h2,
+body:has(#hero) #contact h2,
 body:has(#hero) #announcements h2,
 body:has(#hero) #sponsors h2,
 body:has(#hero) #documents h2 {
-  color: #f2eee6 !important;
+  color: #f5f2eb !important;
   font-family: var(--font-serif) !important;
   font-weight: 500 !important;
-  letter-spacing: -.055em !important;
+  letter-spacing: -.045em !important;
   line-height: .98 !important;
-  font-size: clamp(2.8rem, 6vw, 5.6rem) !important;
-}
-body:has(#hero) #intro p,
-body:has(#hero) #about p,
-body:has(#hero) #schedule p,
-body:has(#hero) #faq p,
-body:has(#hero) #contact p,
-body:has(#hero) #intro span,
-body:has(#hero) #about span,
-body:has(#hero) #schedule span,
-body:has(#hero) #faq span,
-body:has(#hero) #contact span,
-body:has(#hero) #intro h3,
-body:has(#hero) #about h3,
-body:has(#hero) #schedule h3,
-body:has(#hero) #faq h3,
-body:has(#hero) #contact h3 {
-  color: var(--wm-paper-ink);
-}
-body:has(#hero) #highlights p,
-body:has(#hero) #committees p,
-body:has(#hero) #secretariat p,
-body:has(#hero) #register p,
-body:has(#hero) #announcements p,
-body:has(#hero) #sponsors p,
-body:has(#hero) #documents p {
-  color: rgba(242,238,230,.7);
+  font-size: clamp(2.8rem, 6vw, 5.4rem) !important;
 }
 
-/* Eyebrows, dividers, and selected accents move from shiny gold to oxblood. */
-body:has(#hero) #intro .text-\\[\\#d4af37\\],
-body:has(#hero) #about .text-\\[\\#d4af37\\],
-body:has(#hero) #schedule .text-\\[\\#d4af37\\],
-body:has(#hero) #faq .text-\\[\\#d4af37\\],
-body:has(#hero) #contact .text-\\[\\#d4af37\\],
-body:has(#hero) #intro .bg-\\[\\#d4af37\\],
-body:has(#hero) #about .bg-\\[\\#d4af37\\],
-body:has(#hero) #schedule .bg-\\[\\#d4af37\\],
-body:has(#hero) #faq .bg-\\[\\#d4af37\\],
-body:has(#hero) #contact .bg-\\[\\#d4af37\\] {
-  color: var(--wm-oxblood) !important;
-  background-color: var(--wm-oxblood) !important;
-}
-body:has(#hero) #intro .border-\\[\\#d4af37\\]\\/20,
-body:has(#hero) #about .border-\\[\\#d4af37\\]\\/20,
-body:has(#hero) #schedule .border-\\[\\#d4af37\\]\\/20,
-body:has(#hero) #faq .border-\\[\\#d4af37\\]\\/20,
-body:has(#hero) #contact .border-\\[\\#d4af37\\]\\/20 {
-  border-color: rgba(116,45,54,.28) !important;
-}
-
-/* Cards become editorial panels: flatter, cleaner, and less like repeated widgets. */
-body:has(#hero) #intro .grid > *,
-body:has(#hero) #about .grid > *,
-body:has(#hero) #schedule .grid > *,
-body:has(#hero) #faq .grid > *,
-body:has(#hero) #contact .grid > * {
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-body:has(#hero) #intro .bg-\\[\\#0d0d0e\\],
-body:has(#hero) #intro .bg-\\[\\#0a0a0b\\],
-body:has(#hero) #about .bg-\\[\\#0c0c0e\\],
-body:has(#hero) #about .bg-\\[\\#121215\\],
-body:has(#hero) #schedule .bg-\\[\\#0c0c0e\\],
-body:has(#hero) #faq .bg-\\[\\#0c0c0e\\],
-body:has(#hero) #contact .bg-\\[\\#0c0c0e\\] {
-  background: rgba(255,255,255,.32) !important;
-}
-body:has(#hero) #intro [class*="border-neutral-800"],
-body:has(#hero) #about [class*="border-neutral-800"],
-body:has(#hero) #schedule [class*="border-neutral-800"],
-body:has(#hero) #faq [class*="border-neutral-800"],
-body:has(#hero) #contact [class*="border-neutral-800"] {
-  border-color: var(--wm-rule) !important;
-}
-body:has(#hero) #highlights .group,
-body:has(#hero) #committees .group,
-body:has(#hero) #secretariat .group,
-body:has(#hero) #register .group {
-  border-radius: 0 !important;
-  background: rgba(255,255,255,.025) !important;
-  border-color: rgba(238,233,223,.16) !important;
-  box-shadow: none !important;
-}
-body:has(#hero) #highlights .group:hover,
-body:has(#hero) #committees .group:hover,
-body:has(#hero) #secretariat .group:hover,
-body:has(#hero) #register .group:hover {
-  border-color: rgba(196,91,101,.7) !important;
-  transform: translateY(-5px);
-}
-
-/* A quiet chapter marker replaces decorative glow with a print-like rule. */
+/* Gold stays an accent, not a glowing fog behind every chapter. */
 body:has(#hero) #intro::before,
 body:has(#hero) #highlights::before,
 body:has(#hero) #about::before,
@@ -1292,6 +1195,7 @@ body:has(#hero) #faq::before,
 body:has(#hero) #contact::before {
   background: none !important;
   animation: none !important;
+  opacity: 0 !important;
 }
 body:has(#hero) #intro,
 body:has(#hero) #highlights,
@@ -1302,12 +1206,49 @@ body:has(#hero) #secretariat,
 body:has(#hero) #register,
 body:has(#hero) #faq,
 body:has(#hero) #contact {
-  border-top: 1px solid var(--wm-rule) !important;
+  border-top: 1px solid rgba(212,175,55,.16) !important;
 }
 
-/* Focused motion: a fine image crop reveal and small editorial number shift. */
+/* Replace generic rounded widgets with cleaner, architectural panels. */
+body:has(#hero) #intro .grid > *,
+body:has(#hero) #about .grid > *,
+body:has(#hero) #schedule .grid > *,
+body:has(#hero) #faq .grid > *,
+body:has(#hero) #contact .grid > *,
+body:has(#hero) #highlights .group,
+body:has(#hero) #committees .group,
+body:has(#hero) #secretariat .group,
+body:has(#hero) #register .group {
+  border-radius: 2px !important;
+}
+body:has(#hero) #intro .bg-\\[\\#0d0d0e\\],
+body:has(#hero) #intro .bg-\\[\\#0a0a0b\\],
+body:has(#hero) #about .bg-\\[\\#0c0c0e\\],
+body:has(#hero) #about .bg-\\[\\#121215\\] {
+  background: #101012 !important;
+}
+body:has(#hero) #highlights .group,
+body:has(#hero) #committees .group,
+body:has(#hero) #secretariat .group,
+body:has(#hero) #register .group {
+  background: #101012 !important;
+  border-color: rgba(212,175,55,.17) !important;
+  box-shadow: none !important;
+  transition: transform .45s cubic-bezier(.2,.7,.2,1), border-color .35s ease, background-color .35s ease !important;
+}
+body:has(#hero) #highlights .group:hover,
+body:has(#hero) #committees .group:hover,
+body:has(#hero) #secretariat .group:hover,
+body:has(#hero) #register .group:hover {
+  transform: translateY(-5px);
+  background: #151416 !important;
+  border-color: rgba(212,175,55,.48) !important;
+  box-shadow: 0 18px 45px rgba(0,0,0,.28) !important;
+}
+
+/* More cinematic, directional entrances without constant animation loops. */
 @keyframes wm-editorial-enter {
-  from { opacity: 0; transform: translateY(34px); clip-path: inset(0 0 12% 0); }
+  from { opacity: 0; transform: translateY(30px); clip-path: inset(0 0 10% 0); }
   to { opacity: 1; transform: translateY(0); clip-path: inset(0 0 0 0); }
 }
 body:has(#hero).westmun-motion-ready .wm-title-motion.wm-cinematic-in {
@@ -1318,14 +1259,12 @@ body:has(#hero) .wm-card-motion {
 }
 body:has(#hero) .wm-image-motion {
   transition: transform .9s cubic-bezier(.2,.7,.2,1), filter .6s ease;
-  filter: saturate(.82);
+  filter: saturate(.82) contrast(1.04);
 }
 body:has(#hero) .wm-image-motion:hover {
   transform: scale(1.035);
-  filter: saturate(1);
+  filter: saturate(1) contrast(1.04);
 }
-
-/* Mobile: preserve the cinematic hero, but give chapters a cleaner rhythm. */
 @media (max-width: 640px) {
   body:has(#hero) #intro,
   body:has(#hero) #highlights,
@@ -1348,15 +1287,11 @@ body:has(#hero) .wm-image-motion:hover {
   body:has(#hero) #register h2,
   body:has(#hero) #faq h2,
   body:has(#hero) #contact h2 {
-    font-size: clamp(2.65rem, 12vw, 4rem) !important;
+    font-size: clamp(2.5rem, 11vw, 4rem) !important;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  body:has(#hero) .wm-title-motion.wm-cinematic-in {
-    animation: none !important;
-  }
+  body:has(#hero) .wm-title-motion.wm-cinematic-in { animation: none !important; }
   body:has(#hero) .wm-image-motion,
-  body:has(#hero) .wm-card-motion {
-    transition: none !important;
-  }
+  body:has(#hero) .wm-card-motion { transition: none !important; }
 }
