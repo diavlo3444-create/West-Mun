@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   ChevronRight,
   ExternalLink,
+  CheckSquare,
 } from 'lucide-react';
 import {
   ebOperationsService,
@@ -268,7 +269,7 @@ export default function EbPortal() {
         meta.selected_head_email || userMeta.selected_head_email || ''
       ).trim().toLowerCase();
 
-      let reportingHead: { user_id: string; department: string; section: string | null } | null = null;
+      let reportingHead: { user_id: string; department: string; section: string | null; head_name?: string; email?: string } | null = null;
       if (!isHead && !isAdmin && (selectedHeadId || selectedHeadName || selectedHeadEmail)) {
         const { data: directory } = await supabase.functions.invoke('wm-eb-access', { body: { action: 'list_active_heads' } });
         const activeHeads = directory?.heads || [];
@@ -444,6 +445,7 @@ export default function EbPortal() {
 
   const TABS: { id: TabKey; label: string; icon: any; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'tasks', label: canSeeOversight ? 'Department Tasks' : 'My Tasks', icon: CheckSquare, badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'schedule', label: canSeeOversight ? 'Department Schedule' : 'My Schedule', icon: Calendar },
     { id: 'station', label: canSeeOversight ? 'Department Stations' : 'My Station', icon: Building2 },
     { id: 'hierarchy', label: 'Hierarchy', icon: Users },
@@ -534,7 +536,7 @@ export default function EbPortal() {
         ) : (
           <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
             {/* View Navigation Tab Bar */}
-            <div className="flex items-center gap-1.5 overflow-x-auto border-b border-white/[0.08] pb-3 scrollbar-none">
+            <div className="flex items-center gap-2 overflow-x-auto border-b border-white/[0.08] pb-3 scrollbar-none">
               {TABS.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -544,16 +546,16 @@ export default function EbPortal() {
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition ${
+                    className={`flex shrink-0 items-center gap-2 border px-4 py-2 text-xs transition ${
                       isActive
-                        ? 'border-[#d4af37] bg-gradient-to-r from-[#d4af37]/20 via-[#d4af37]/10 to-transparent text-white shadow-[0_0_16px_rgba(212,175,55,0.18)]'
-                        : 'border-white/5 bg-black/40 text-neutral-400 hover:border-white/20 hover:text-white'
+                        ? 'border-[#d4af37] bg-[#d4af37]/10 text-white font-medium'
+                        : 'border-white/10 bg-black/40 text-neutral-400 hover:border-white/25 hover:text-white'
                     }`}
                   >
-                    <Icon className={`h-4 w-4 ${isActive ? 'text-[#f5d47a]' : 'text-neutral-400'}`} />
-                    <span>{tab.label}</span>
+                    <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-[#f5d47a]' : 'text-neutral-500'}`} />
+                    <span className="font-mono text-[11px] uppercase tracking-wider">{tab.label}</span>
                     {tab.badge !== undefined && (
-                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#d4af37] px-1 font-mono text-[9px] font-bold text-black">
+                      <span className="flex h-3.5 min-w-3.5 items-center justify-center bg-[#d4af37] px-1 font-mono text-[9px] font-bold text-black">
                         {tab.badge}
                       </span>
                     )}
@@ -570,11 +572,24 @@ export default function EbPortal() {
                 shifts={shifts}
                 stations={stations}
                 announcements={announcements}
+                incidents={incidents}
+                swaps={swaps}
                 onNavigateTab={(tab) => setActiveTab(tab as TabKey)}
                 onAcknowledgeAnnouncement={handleAcknowledgeAnnouncement}
                 onUpdateTaskStatus={async (taskId, status) => {
                   await handleUpdateTask(taskId, { status });
                 }}
+                onToggleTaskChecklist={async (taskId, itemId) => {
+                  const task = tasks.find((t) => t.id === taskId);
+                  if (!task) return;
+                  const updatedList = task.checklist.map((i) =>
+                    i.id === itemId ? { ...i, completed: !i.completed } : i
+                  );
+                  await handleUpdateTask(taskId, { checklist: updatedList });
+                }}
+                onCreateTask={handleCreateTask}
+                onResolveIncident={canSeeOversight ? (id: string, notes?: string) => handleResolveIncident(id, notes || 'Resolved by Co-Head') : undefined}
+                onReviewSwap={canSeeOversight ? handleReviewSwap : undefined}
               />
             )}
 

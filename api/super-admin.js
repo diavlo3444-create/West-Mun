@@ -1671,6 +1671,7 @@ function signTestSessionToken(session) {
     headName: session.headName,
     department: session.department,
     section: session.section,
+    demoRole: session.demoRole,
     createdAt: session.createdAt,
     expiresAt: session.expiresAt
   };
@@ -1714,6 +1715,7 @@ function verifySignedTestToken(token) {
       headName: payload.headName,
       department: payload.department,
       section: payload.section,
+      demoRole: payload.demoRole,
       createdAt: payload.createdAt,
       expiresAt: payload.expiresAt,
       revoked: false
@@ -1776,12 +1778,24 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
   }
   const targetEmail = String(body.email || "").trim().toLowerCase();
   const targetId = String(body.id || body.headId || "").trim();
-  if (!targetEmail && !targetId) {
+  const requestedDemoRole = String(body.demoRole || "").trim().toLowerCase();
+  const demoRole = ["co_head", "marketing", "design"].includes(requestedDemoRole) ? requestedDemoRole : "";
+  if (!demoRole && !targetEmail && !targetId) {
     return { statusCode: 400, body: { success: false, error: "Target department head identification is required." } };
   }
   let targetHead = null;
+  if (demoRole) {
+    const department = demoRole === "co_head" ? "security" : demoRole;
+    targetHead = {
+      id: `demo_${demoRole}`,
+      email: `demo-${demoRole}@westmun.local`,
+      head_name: `Demo ${demoRole === "co_head" ? "Co-Head" : demoRole === "marketing" ? "Marketing" : "Design"}`,
+      department,
+      section: null
+    };
+  }
   const supabaseAdmin = getSupabaseAdmin();
-  if (supabaseAdmin) {
+  if (!demoRole && supabaseAdmin) {
     try {
       let query = supabaseAdmin.from("department_heads").select("*");
       if (targetId && UUID_REGEX.test(targetId)) {
@@ -1816,7 +1830,7 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
       console.warn("[handleCreateTestSession] Supabase lookup error:", err);
     }
   }
-  if (!targetHead) {
+  if (!demoRole && !targetHead) {
     const local = targetId ? HeadStore.getById(targetId) : HeadStore.getByEmail(targetEmail);
     if (local) {
       targetHead = {
@@ -1844,6 +1858,7 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
     headName: targetHead.head_name,
     department: targetHead.department,
     section: targetHead.section,
+    demoRole: demoRole || void 0,
     createdAt: now,
     expiresAt: now + TTL_MS,
     revoked: false,
@@ -1868,7 +1883,7 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
     rawSessionId,
     `Cryptographically signed test session generated. TTL: 15m.`
   );
-  const deptUrl = targetHead.section ? `/head/${targetHead.department}/${targetHead.section}` : `/head/${targetHead.department}`;
+  const deptUrl = demoRole ? "/eb" : targetHead.section ? `/head/${targetHead.department}/${targetHead.section}` : `/head/${targetHead.department}`;
   const launchUrl = `${origin}${deptUrl}?test_token=${encodeURIComponent(sessionToken)}&test_ticket=${encodeURIComponent(launchTicket)}`;
   return {
     statusCode: 200,
@@ -1883,7 +1898,8 @@ async function handleCreateTestSession(authHeader, body, origin, headers) {
         email: targetHead.email,
         name: targetHead.head_name,
         department: targetHead.department,
-        section: targetHead.section
+        section: targetHead.section,
+        demoRole: demoRole || void 0
       }
     }
   };
@@ -1916,7 +1932,8 @@ async function handleConsumeLaunchTicket(ticket) {
           email: signed.headEmail,
           headName: signed.headName,
           department: signed.department,
-          section: signed.section
+          section: signed.section,
+          demoRole: signed.demoRole
         }
       }
     };
@@ -1955,7 +1972,8 @@ async function handleConsumeLaunchTicket(ticket) {
             email: session.headEmail,
             headName: session.headName,
             department: session.department,
-            section: session.section
+            section: session.section,
+            demoRole: session.demoRole
           }
         }
       };
@@ -1996,7 +2014,8 @@ async function handleVerifyTestSession(sessionToken) {
         email: session.headEmail,
         headName: session.headName,
         department: session.department,
-        section: session.section
+        section: session.section,
+        demoRole: session.demoRole
       }
     }
   };

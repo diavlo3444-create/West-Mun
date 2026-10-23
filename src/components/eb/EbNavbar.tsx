@@ -51,22 +51,30 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
           </div>
 
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-serif text-sm font-semibold tracking-wide text-white sm:text-base">
+            <div className="flex items-center gap-2.5">
+              <span className="font-serif text-sm font-semibold tracking-wider text-white sm:text-base">
                 WEST MUN
               </span>
-              <span className="rounded bg-[#d4af37]/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[#d4af37]">
-                {profile.isAdmin ? 'Admin Operations' : profile.isHead ? 'Head Operations' : 'EB Operations'}
+              <span className="border-l border-[#d4af37]/40 pl-2 font-mono text-[10px] uppercase tracking-widest text-[#d4af37]">
+                {profile.isAdmin ? 'Admin Console' : profile.isHead ? 'Head Operations' : 'EB Operations'}
               </span>
             </div>
             <div className="flex items-center gap-2 text-xs text-neutral-400">
               <span className="truncate max-w-[140px] sm:max-w-[200px] text-neutral-200 font-medium">
                 {profile.name}
               </span>
-              <span className="hidden sm:inline text-neutral-600">•</span>
-              <span className="hidden sm:inline capitalize text-[#d4af37]/90">
+              <span className="hidden sm:inline text-neutral-600">·</span>
+              <span className="hidden sm:inline font-mono text-[11px] uppercase tracking-wider text-[#d4af37]">
                 {profile.role.replace(/_/g, ' ')}
               </span>
+              {profile.department && (
+                <>
+                  <span className="hidden sm:inline text-neutral-600">·</span>
+                  <span className="hidden sm:inline font-mono text-[11px] text-neutral-400 capitalize">
+                    {profile.department.replace(/_/g, ' ')}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -76,19 +84,19 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
           {/* EB quick access: scanner and personal QR pass */}
           <a
             href="/scanner"
-            className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/[0.06] px-2.5 text-xs font-semibold text-[#f5d47a] transition hover:bg-[#d4af37]/15 sm:px-3"
+            className="flex h-8 items-center justify-center gap-1.5 border border-[#d4af37]/30 bg-[#d4af37]/[0.06] px-2.5 text-xs font-medium text-[#f5d47a] transition hover:border-[#d4af37]/70 hover:bg-[#d4af37]/15 sm:px-3"
             title="Open QR scanner"
           >
-            <ScanLine className="h-4 w-4" />
-            <span className="hidden md:inline">Scanner</span>
+            <ScanLine className="h-3.5 w-3.5" />
+            <span className="hidden md:inline font-mono text-[11px] uppercase tracking-wider">Scanner</span>
           </a>
           <a
             href="/pass"
-            className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/[0.06] px-2.5 text-xs font-semibold text-[#f5d47a] transition hover:bg-[#d4af37]/15 sm:px-3"
+            className="flex h-8 items-center justify-center gap-1.5 border border-white/10 bg-black/60 px-2.5 text-xs text-neutral-300 transition hover:border-white/30 hover:text-white sm:px-3"
             title="Open your official QR pass"
           >
-            <QrCode className="h-4 w-4" />
-            <span className="hidden md:inline">My QR Pass</span>
+            <QrCode className="h-3.5 w-3.5 text-[#d4af37]" />
+            <span className="hidden md:inline font-mono text-[11px] uppercase tracking-wider">Pass</span>
           </a>
 
           {/* Notifications Trigger */}
@@ -96,12 +104,12 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
             <button
               type="button"
               onClick={() => setNotifOpen((prev) => !prev)}
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-black/40 text-neutral-300 hover:border-white/25 hover:text-white"
+              className="relative flex h-8 w-8 items-center justify-center border border-white/10 bg-black/60 text-neutral-300 hover:border-white/25 hover:text-white"
               title="Notifications"
             >
-              <Bell className="h-4 w-4" />
+              <Bell className="h-3.5 w-3.5" />
               {unreadNotifs.length > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#d4af37] font-mono text-[9px] font-bold text-black shadow-lg">
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center bg-[#d4af37] font-mono text-[8px] font-bold text-black">
                   {unreadNotifs.length}
                 </span>
               )}

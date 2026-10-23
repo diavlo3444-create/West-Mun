@@ -156,7 +156,7 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
         department={department}
         section={section}
         testToken={effectiveTestToken}
-        onAssignGroupToShift={(group) => {
+        onAssignGroupToShift={(group: WmTeamGroup) => {
           setSelectedGroupForShift(group);
           setTab('shifts');
         }}

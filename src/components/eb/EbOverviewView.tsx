@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Calendar,
   Clock,
@@ -15,6 +15,10 @@ import {
   FileCheck2,
   AlertCircle,
   Building2,
+  Layers,
+  Sparkles,
+  Megaphone,
+  Eye,
 } from 'lucide-react';
 import type { EbMemberProfile } from '../../pages/EbPortal';
 import type {
@@ -22,7 +26,12 @@ import type {
   EbShift,
   EbStation,
   EbAnnouncement,
+  EbIncident,
+  EbShiftSwap,
 } from '../../lib/ebOperationsService';
+import { CoHeadCommandView } from './roles/CoHeadCommandView';
+import { MarketingCampaignView } from './roles/MarketingCampaignView';
+import { DesignStudioView } from './roles/DesignStudioView';
 
 interface EbOverviewViewProps {
   profile: EbMemberProfile;
@@ -30,10 +39,18 @@ interface EbOverviewViewProps {
   shifts: EbShift[];
   stations: EbStation[];
   announcements: EbAnnouncement[];
+  incidents?: EbIncident[];
+  swaps?: EbShiftSwap[];
   onNavigateTab: (tabId: string) => void;
   onAcknowledgeAnnouncement: (id: string) => void;
   onUpdateTaskStatus: (taskId: string, status: 'completed' | 'in_progress') => void;
+  onToggleTaskChecklist?: (taskId: string, itemId: string) => void;
+  onCreateTask?: (task: any) => Promise<void> | void;
+  onResolveIncident?: (id: string, notes?: string) => Promise<void> | void;
+  onReviewSwap?: (swapId: string, status: 'approved' | 'rejected', notes: string) => Promise<void> | void;
 }
+
+export type RolePerspective = 'auto' | 'co_head' | 'marketing' | 'design' | 'standard';
 
 export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
   profile,
@@ -41,386 +58,472 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
   shifts,
   stations,
   announcements,
+  incidents = [],
+  swaps = [],
   onNavigateTab,
   onAcknowledgeAnnouncement,
   onUpdateTaskStatus,
+  onToggleTaskChecklist,
+  onCreateTask,
+  onResolveIncident,
+  onReviewSwap,
 }) => {
-  // Compute key stats
+  // Determine natural assigned role
+  const naturalRole: 'co_head' | 'marketing' | 'design' | 'standard' = useMemo(() => {
+    const r = (profile.role || '').toLowerCase().trim();
+    const d = (profile.department || '').toLowerCase().trim();
+
+    if (r.includes('co_head') || r.includes('co-head') || r === 'cohead') {
+      return 'co_head';
+    }
+    if (r.includes('market') || d === 'marketing') {
+      return 'marketing';
+    }
+    if (r.includes('design') || d === 'design') {
+      return 'design';
+    }
+    return 'standard';
+  }, [profile.role, profile.department]);
+
+  const [perspective, setPerspective] = useState<RolePerspective>('auto');
+
+  // Compute active rendered perspective
+  const effectivePerspective = perspective === 'auto' ? naturalRole : perspective;
+
+  // Render Co-Head bespoke view
+  if (effectivePerspective === 'co_head') {
+    return (
+      <div className="space-y-4">
+        <PerspectiveSelector
+          current={perspective}
+          natural={naturalRole}
+          onChange={setPerspective}
+        />
+        <CoHeadCommandView
+          profile={profile}
+          tasks={tasks}
+          shifts={shifts}
+          stations={stations}
+          announcements={announcements}
+          incidents={incidents}
+          swaps={swaps}
+          onNavigateTab={onNavigateTab}
+          onAcknowledgeAnnouncement={onAcknowledgeAnnouncement}
+          onUpdateTaskStatus={onUpdateTaskStatus}
+          onToggleTaskChecklist={onToggleTaskChecklist}
+          onCreateTask={onCreateTask}
+          onResolveIncident={onResolveIncident}
+          onReviewSwap={onReviewSwap}
+        />
+      </div>
+    );
+  }
+
+  // Render Marketing bespoke view
+  if (effectivePerspective === 'marketing') {
+    return (
+      <div className="space-y-4">
+        <PerspectiveSelector
+          current={perspective}
+          natural={naturalRole}
+          onChange={setPerspective}
+        />
+        <MarketingCampaignView
+          profile={profile}
+          tasks={tasks}
+          announcements={announcements}
+          onNavigateTab={onNavigateTab}
+          onAcknowledgeAnnouncement={onAcknowledgeAnnouncement}
+          onUpdateTaskStatus={onUpdateTaskStatus}
+          onToggleTaskChecklist={onToggleTaskChecklist}
+          onCreateTask={onCreateTask}
+        />
+      </div>
+    );
+  }
+
+  // Render Design bespoke view
+  if (effectivePerspective === 'design') {
+    return (
+      <div className="space-y-4">
+        <PerspectiveSelector
+          current={perspective}
+          natural={naturalRole}
+          onChange={setPerspective}
+        />
+        <DesignStudioView
+          profile={profile}
+          tasks={tasks}
+          announcements={announcements}
+          onNavigateTab={onNavigateTab}
+          onAcknowledgeAnnouncement={onAcknowledgeAnnouncement}
+          onUpdateTaskStatus={onUpdateTaskStatus}
+          onToggleTaskChecklist={onToggleTaskChecklist}
+          onCreateTask={onCreateTask}
+        />
+      </div>
+    );
+  }
+
+  // Standard / Generic EB Officer Redesigned View
   const pendingTasks = tasks.filter((t) => t.status !== 'completed');
   const completedTasks = tasks.filter((t) => t.status === 'completed');
   const overdueTasks = tasks.filter(
     (t) => t.status !== 'completed' && t.deadline && new Date(t.deadline).getTime() < Date.now()
   );
-  const completionRate = tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0;
-
-  // Next upcoming shift
   const nextShift = shifts[0] || null;
-
-  // Unacknowledged critical announcement
   const criticalAlert = announcements.find((a) => a.priority === 'critical' && !a.is_acknowledged);
 
   return (
     <div className="space-y-6">
+      <PerspectiveSelector
+        current={perspective}
+        natural={naturalRole}
+        onChange={setPerspective}
+      />
+
       {/* Critical Operational Broadcast Banner */}
       {criticalAlert && (
-        <div className="relative overflow-hidden rounded-2xl border border-rose-500/50 bg-gradient-to-r from-rose-950/40 via-black to-[#1a0e0e] p-5 shadow-[0_0_24px_rgba(244,63,94,0.18)] animate-in fade-in duration-200">
+        <div className="relative border border-rose-500/40 bg-rose-950/20 p-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-rose-500/40 bg-rose-500/20 text-rose-300">
-                <AlertCircle className="h-5 w-5 animate-pulse" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-rose-500/40 bg-rose-500/10 text-rose-300">
+                <AlertCircle className="h-4 w-4 animate-pulse" />
               </div>
-              <div>
+              <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="rounded bg-rose-500/30 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose-200 font-bold">
-                    Mandatory Acknowledgment
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-rose-300 font-bold">
+                    Mandatory Directive
                   </span>
-                  <span className="text-xs text-neutral-400">By {criticalAlert.author_name}</span>
+                  <span className="text-neutral-500">·</span>
+                  <span className="text-xs text-neutral-400">Issued by {criticalAlert.author_name}</span>
                 </div>
-                <h3 className="mt-1 text-base font-semibold text-white">{criticalAlert.title}</h3>
-                <p className="mt-1 text-xs text-neutral-300 max-w-2xl">{criticalAlert.body}</p>
+                <h3 className="text-sm font-semibold text-white">{criticalAlert.title}</h3>
+                <p className="text-xs text-neutral-300 max-w-2xl">{criticalAlert.body}</p>
               </div>
             </div>
 
             <button
               type="button"
               onClick={() => onAcknowledgeAnnouncement(criticalAlert.id)}
-              className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-5 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:brightness-110 active:scale-95"
+              className="shrink-0 flex items-center justify-center gap-2 bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500"
             >
               <CheckCircle2 className="h-4 w-4" />
-              Acknowledge Directive
+              <span>Acknowledge</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Hero Operational Status Bar */}
-      <div className="rounded-2xl border border-[#d4af37]/25 bg-gradient-to-r from-[#17150f] via-[#0d0c0e] to-[#08080a] p-6 shadow-2xl">
+      {/* Executive Board Briefing Header */}
+      <section className="border border-[#d4af37]/30 bg-[#0a0a0d] p-6 lg:p-7">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          {/* Member Overview */}
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="rounded-full border border-[#d4af37]/35 bg-[#d4af37]/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-[#d4af37]">
-                WEST MUN 2027 · Executive Board
+          <div className="space-y-2 max-w-3xl">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#d4af37]">
+                WEST MUN 2027 · Operations Board
               </span>
-              <span className="text-xs text-neutral-400">
-                Accredited Personnel ID: <span className="font-mono text-neutral-200">WM-EB-27</span>
+              <span className="text-neutral-600">/</span>
+              <span className="font-mono text-[11px] text-neutral-400 uppercase tracking-wider">
+                {profile.department.replace(/_/g, ' ')}
+              </span>
+              <span className="text-neutral-600">/</span>
+              <span className="font-mono text-[10px] text-neutral-400">
+                ID: <span className="text-neutral-200">WM-EB-27</span>
               </span>
             </div>
 
-            <h1 className="mt-2.5 font-serif text-3xl font-medium tracking-wide text-white sm:text-4xl">
+            <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-normal tracking-wide text-white">
               Welcome back, {profile.name}
             </h1>
 
-            <p className="mt-1.5 text-sm text-neutral-400 max-w-2xl">
-              Assigned to{' '}
-              <span className="font-semibold text-white capitalize">
-                {profile.department.replace(/_/g, ' ')}
-              </span>{' '}
-              as{' '}
-              <span className="font-semibold text-[#d4af37] capitalize">
-                {profile.role.replace(/_/g, ' ')}
-              </span>
-              {profile.section && (
-                <>
-                  {' '}
-                  ({profile.section} section)
-                </>
-              )}
-              . Below is your live operational briefing, shift schedule, and assigned deliverables.
+            <p className="text-sm leading-relaxed text-neutral-300">
+              Assigned as <span className="font-medium text-[#d4af37]">{profile.role.replace(/_/g, ' ')}</span> in the{' '}
+              <span className="font-medium text-white">{profile.department.replace(/_/g, ' ')}</span> department
+              {profile.section ? ` (${profile.section} section)` : ''}.
+              All assignments and shift stations below are populated from the live operational database.
             </p>
           </div>
 
-          {/* KPI Snapshot Pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 shrink-0">
-            <div className="rounded-xl border border-white/10 bg-black/40 p-3.5 text-center">
-              <span className="text-[10px] uppercase tracking-wider text-neutral-400">Tasks Pending</span>
-              <p className="mt-1 font-mono text-2xl font-bold text-white">{pendingTasks.length}</p>
+          <div className="grid grid-cols-3 gap-3 shrink-0">
+            <div className="border border-white/10 bg-black/50 p-3.5 text-center">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-400 block">Pending</span>
+              <span className="mt-1 font-mono text-xl font-light text-white block">{pendingTasks.length}</span>
             </div>
-
-            <div className="rounded-xl border border-white/10 bg-black/40 p-3.5 text-center">
-              <span className="text-[10px] uppercase tracking-wider text-neutral-400">Overdue Items</span>
-              <p className={`mt-1 font-mono text-2xl font-bold ${overdueTasks.length > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+            <div className="border border-white/10 bg-black/50 p-3.5 text-center">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-400 block">Overdue</span>
+              <span className={`mt-1 font-mono text-xl font-light block ${overdueTasks.length > 0 ? 'text-rose-400' : 'text-neutral-400'}`}>
                 {overdueTasks.length}
-              </p>
+              </span>
             </div>
-
-            <div className="col-span-2 sm:col-span-1 rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/[0.08] p-3.5 text-center">
-              <span className="text-[10px] uppercase tracking-wider text-[#d4af37]">Completion Rate</span>
-              <p className="mt-1 font-mono text-2xl font-bold text-[#f5d47a]">{completionRate}%</p>
+            <div className="border border-[#d4af37]/30 bg-[#d4af37]/[0.05] p-3.5 text-center">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[#d4af37] block">Completed</span>
+              <span className="mt-1 font-mono text-xl font-light text-[#f5d47a] block">{completedTasks.length}</span>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 2-Column Core Operational Deck */}
+      {/* 2-Column Operational Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Next Shift & Station Card (7 Cols) */}
+        {/* Next Shift Assignment (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          <div className="rounded-2xl border border-white/10 bg-black/50 p-5 sm:p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d4af37]/40 bg-[#d4af37]/15 text-[#f5d47a]">
-                  <Calendar className="h-4 w-4" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-white">Next Assigned Shift</h2>
-                  <p className="text-[11px] text-neutral-400">Official conference roster assignment</p>
-                </div>
+          <div className="border border-white/10 bg-[#0d0d10] p-5">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-[#d4af37]" />
+                <h2 className="font-serif text-base text-white">Next Scheduled Shift</h2>
               </div>
-
-
+              <button
+                type="button"
+                onClick={() => onNavigateTab('schedule')}
+                className="text-xs text-[#d4af37] hover:underline flex items-center gap-1"
+              >
+                <span>Full Schedule</span>
+                <ChevronRight className="h-3 w-3" />
+              </button>
             </div>
 
             {nextShift ? (
-              <div className="mt-5 space-y-4">
-                <div className="rounded-xl border border-[#d4af37]/30 bg-gradient-to-br from-[#1a170f] to-[#0c0c0e] p-4.5">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="mt-4 space-y-4">
+                <div className="border border-[#d4af37]/30 bg-black/40 p-4 space-y-3">
+                  <div className="flex items-start justify-between">
                     <div>
                       <span className="font-mono text-[10px] uppercase tracking-wider text-[#d4af37]">
-                        Scheduled Station
+                        Station Assignment
                       </span>
-                      <h3 className="mt-0.5 text-base font-semibold text-white">{nextShift.station_name}</h3>
+                      <h3 className="text-base font-semibold text-white">{nextShift.station_name}</h3>
                     </div>
-                    <span className="rounded-full border border-emerald-500/30 bg-emerald-950/30 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald-300">
-                      Confirmed Shift
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-400">
+                      Confirmed Roster
                     </span>
                   </div>
 
-                  <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-2 border-t border-white/5">
                     <div className="flex items-center gap-2 text-neutral-300">
-                      <MapPin className="h-4 w-4 text-[#d4af37] shrink-0" />
+                      <MapPin className="h-3.5 w-3.5 text-[#d4af37]" />
                       <span>{nextShift.location}</span>
                     </div>
-
                     <div className="flex items-center gap-2 text-neutral-300">
-                      <Clock className="h-4 w-4 text-[#d4af37] shrink-0" />
-                      <span>
+                      <Clock className="h-3.5 w-3.5 text-[#d4af37]" />
+                      <span className="font-mono">
                         {new Date(nextShift.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         {' — '}
                         {new Date(nextShift.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        {' (' + nextShift.shift_date + ')'}
                       </span>
                     </div>
                   </div>
 
-                  <div className="mt-3 border-t border-white/[0.06] pt-3 text-xs">
-                    <span className="font-medium text-neutral-400">Duties during this shift:</span>
-                    <p className="mt-0.5 text-neutral-300 leading-relaxed">{nextShift.responsibilities}</p>
-                  </div>
+                  {nextShift.responsibilities && (
+                    <div className="pt-2 border-t border-white/5 text-xs">
+                      <span className="text-neutral-400 font-mono text-[10px] uppercase">Roster Duties:</span>
+                      <p className="mt-0.5 text-neutral-300 leading-relaxed">{nextShift.responsibilities}</p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Supervisor & Station Shortcuts */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-white/10 bg-black/40 p-3.5">
-                    <span className="text-[10px] uppercase tracking-wider text-neutral-400">Supervisor On Duty</span>
-                    <p className="mt-1 font-semibold text-sm text-white">{nextShift.supervisor_name}</p>
-                    <p className="mt-0.5 text-xs text-neutral-400">Floor Coordination & Escalations</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="border border-white/10 bg-black/40 p-3.5 space-y-1">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-400">Supervisor</span>
+                    <p className="text-white font-medium">{nextShift.supervisor_name}</p>
                   </div>
-
                   <button
                     type="button"
                     onClick={() => onNavigateTab('station')}
-                    className="flex flex-col justify-between rounded-xl border border-white/10 bg-black/40 p-3.5 text-left transition hover:border-[#d4af37]/40 hover:bg-white/[0.02]"
+                    className="border border-white/10 bg-black/40 p-3.5 text-left hover:border-[#d4af37]/40 transition space-y-1"
                   >
-                    <span className="text-[10px] uppercase tracking-wider text-neutral-400">Station Procedures</span>
-                    <span className="flex items-center justify-between text-xs font-semibold text-[#d4af37] mt-1">
-                      <span>View Operating Manual</span>
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-[#d4af37]">Station Manual</span>
+                    <p className="text-neutral-300 flex items-center justify-between">
+                      <span>Procedures & Opening Checklist</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 text-[#d4af37]" />
+                    </p>
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="py-8 text-center text-xs text-neutral-400">
-                No active shifts scheduled at this moment. Check back closer to event day.
+              <div className="py-10 text-center text-neutral-500 text-xs">
+                No active shift assigned yet. Your department head will publish shift rosters prior to summit opening.
               </div>
             )}
           </div>
-
-          {/* Quick High-Priority Tasks Card */}
-          <div className="rounded-2xl border border-white/10 bg-black/50 p-5 sm:p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#d4af37]/40 bg-[#d4af37]/15 text-[#f5d47a]">
-                  <FileCheck2 className="h-4 w-4" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-white">Assigned Action Items</h2>
-                  <p className="text-[11px] text-neutral-400">Top priority operational deliverables</p>
-                </div>
-              </div>
-
-
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {tasks.slice(0, 3).map((task) => {
-                const isOverdue =
-                  task.status !== 'completed' && task.deadline && new Date(task.deadline).getTime() < Date.now();
-
-                return (
-                  <div
-                    key={task.id}
-                    className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-black/40 p-3.5 transition hover:border-white/20"
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onUpdateTaskStatus(task.id, task.status === 'completed' ? 'in_progress' : 'completed')
-                        }
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition ${
-                          task.status === 'completed'
-                            ? 'border-[#d4af37] bg-[#d4af37] text-black'
-                            : 'border-white/30 hover:border-[#d4af37]'
-                        }`}
-                        title={task.status === 'completed' ? 'Reopen task' : 'Mark completed'}
-                      >
-                        {task.status === 'completed' && <CheckCircle2 className="h-3.5 w-3.5 stroke-[3]" />}
-                      </button>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4
-                            className={`truncate text-xs font-semibold ${
-                              task.status === 'completed' ? 'line-through text-neutral-500' : 'text-white'
-                            }`}
-                          >
-                            {task.title}
-                          </h4>
-                          <span
-                            className={`rounded px-1.5 py-0.2 font-mono text-[9px] uppercase ${
-                              task.priority === 'urgent'
-                                ? 'bg-rose-500/20 text-rose-300'
-                                : task.priority === 'high'
-                                ? 'bg-amber-500/20 text-amber-300'
-                                : 'bg-white/10 text-neutral-400'
-                            }`}
-                          >
-                            {task.priority}
-                          </span>
-                        </div>
-
-                        <p className="mt-0.5 truncate text-[11px] text-neutral-400">{task.description}</p>
-
-                        <div className="mt-2 flex items-center gap-3 text-[10px] text-neutral-500">
-                          {task.deadline && (
-                            <span className={isOverdue ? 'text-rose-400 font-semibold' : ''}>
-                              Due: {new Date(task.deadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
-                          <span>•</span>
-                          <span>By: {task.assigned_by_name}</span>
-                        </div>
-                      </div>
-                    </div>
-
-
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
-        {/* Right Sidebar: Reporting Supervisor & Station Directory (5 Cols) */}
+        {/* Action Items & Reporting Supervisor (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Supervisor Information Card */}
-          <div className="rounded-2xl border border-[#d4af37]/30 bg-gradient-to-b from-[#18150f] via-[#0d0c0e] to-[#070707] p-5 sm:p-6 shadow-xl">
-            <div className="flex items-center gap-3 border-b border-white/[0.08] pb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#d4af37]/40 bg-[#d4af37]/15 text-[#f5d47a]">
-                <UserCheck className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-[#d4af37]">
-                  Chain of Command
-                </span>
-                <h3 className="text-sm font-semibold text-white">Your Reporting Supervisor</h3>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <p className="text-xs text-neutral-300 leading-relaxed">
-                You report directly to your assigned Directorate Head for task assignments, shift coordination, and emergency escalations.
-              </p>
-
-              <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-2.5">
-                {profile.reportingHeadName ? (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold text-white">{profile.reportingHeadName}</span>
-                      <span className="rounded bg-[#d4af37]/15 px-2 py-0.5 text-[9px] font-mono text-[#d4af37] uppercase">Assigned Head</span>
-                    </div>
-                    {profile.reportingHeadDepartment && (
-                      <p className="text-[10px] uppercase tracking-wider text-neutral-400">
-                        {profile.reportingHeadDepartment.replace(/_/g, ' ')}{profile.reportingHeadSection ? ` · ${profile.reportingHeadSection} section` : ''}
-                      </p>
-                    )}
-                    {profile.reportingHeadEmail ? (
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-3.5 w-3.5 text-[#d4af37] shrink-0" />
-                        <a href={`mailto:${profile.reportingHeadEmail}`} className="break-all font-mono text-[11px] text-neutral-300 hover:text-[#f5d47a]">
-                          {profile.reportingHeadEmail}
-                        </a>
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-neutral-400">Contact details have not been provided.</p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold text-white">No reporting head linked</span>
-                      <span className="rounded bg-amber-400/10 px-2 py-0.5 text-[9px] font-mono text-amber-300 uppercase">Needs review</span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-neutral-400">
-                      The head selected during sign-up could not be matched to an active department-head record. No contact information is shown rather than displaying incorrect details.
-                    </p>
-                  </>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onNavigateTab('hierarchy')}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#d4af37]/35 bg-[#d4af37]/10 py-2.5 text-xs font-semibold text-[#f5d47a] transition hover:bg-[#d4af37]/20"
-              >
-                <span>View Department Org Hierarchy</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Announcements Snippet */}
-          <div className="rounded-2xl border border-white/10 bg-black/50 p-5 shadow-xl">
+          <div className="border border-white/10 bg-[#0d0d10] p-5">
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-300">
-                Recent Broadcasts ({announcements.length})
-              </h3>
+              <div className="flex items-center gap-2">
+                <FileCheck2 className="h-4 w-4 text-[#d4af37]" />
+                <h2 className="font-serif text-base text-white">Action Deliverables</h2>
+              </div>
               <button
                 type="button"
-                onClick={() => onNavigateTab('announcements')}
+                onClick={() => onNavigateTab('tasks')}
                 className="text-xs text-[#d4af37] hover:underline"
               >
-                All Bulletins
+                View all ({tasks.length})
               </button>
             </div>
 
-            <div className="mt-3 divide-y divide-white/[0.06] text-xs">
-              {announcements.slice(0, 3).map((a) => (
-                <div key={a.id} className="py-2.5 first:pt-0 last:pb-0">
-                  <div className="flex items-center justify-between gap-1">
-                    <h4 className="font-medium text-white truncate">{a.title}</h4>
-                    <span className="font-mono text-[9px] text-neutral-500 shrink-0">
-                      {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 line-clamp-2 text-[11px] text-neutral-400">{a.body}</p>
+            <div className="mt-3.5 space-y-2.5">
+              {tasks.length === 0 ? (
+                <div className="py-8 text-center text-xs text-neutral-500">
+                  No personal tasks currently assigned.
                 </div>
-              ))}
+              ) : (
+                tasks.slice(0, 4).map((task) => {
+                  const isDone = task.status === 'completed';
+                  return (
+                    <div
+                      key={task.id}
+                      className="border border-white/5 bg-black/40 p-3 flex items-start justify-between gap-3"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 text-[10px] font-mono">
+                          <span className={task.priority === 'urgent' ? 'text-rose-400 font-bold' : 'text-[#d4af37]'}>
+                            {task.priority}
+                          </span>
+                          <span className="text-neutral-600">·</span>
+                          <span className="text-neutral-400 truncate">{task.station_name || 'HQ'}</span>
+                        </div>
+                        <h4 className={`text-xs font-medium truncate ${isDone ? 'line-through text-neutral-500' : 'text-white'}`}>
+                          {task.title}
+                        </h4>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => onUpdateTaskStatus(task.id, isDone ? 'in_progress' : 'completed')}
+                        className={`shrink-0 border px-2.5 py-1 text-[11px] font-mono ${
+                          isDone
+                            ? 'border-white/10 bg-white/5 text-neutral-500'
+                            : 'border-[#d4af37]/40 text-[#f5d47a] hover:bg-[#d4af37]/10'
+                        }`}
+                      >
+                        {isDone ? 'Done' : 'Complete'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
+
+          {/* Supervisor Card */}
+          {profile.reportingHeadName && (
+            <div className="border border-[#d4af37]/25 bg-[#0a0a0d] p-5">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[#d4af37]">
+                Assigned Department Head
+              </span>
+              <h3 className="mt-1 font-serif text-lg text-white">{profile.reportingHeadName}</h3>
+              <p className="text-xs text-neutral-400">
+                Department Head · {profile.reportingHeadDepartment || profile.department}
+              </p>
+
+              {profile.reportingHeadEmail && (
+                <div className="mt-3 pt-3 border-t border-white/10 text-xs text-neutral-300 flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-[#d4af37]" />
+                  <a href={`mailto:${profile.reportingHeadEmail}`} className="hover:text-white">
+                    {profile.reportingHeadEmail}
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Perspective Selector Bar (Zero pills, clean typographic switcher)
+interface PerspectiveSelectorProps {
+  current: RolePerspective;
+  natural: 'co_head' | 'marketing' | 'design' | 'standard';
+  onChange: (p: RolePerspective) => void;
+}
+
+const PerspectiveSelector: React.FC<PerspectiveSelectorProps> = ({ current, natural, onChange }) => {
+  return (
+    <div className="border-b border-white/[0.08] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <div className="flex items-center gap-2 text-neutral-400">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-400">
+          Role Workspace View:
+        </span>
+        <span className="font-medium text-neutral-200 capitalize">
+          {natural.replace(/_/g, ' ')} EB Member
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onChange('auto')}
+          className={`px-2.5 py-1 font-mono text-[11px] transition ${
+            current === 'auto'
+              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+          title="Default view matching your official assigned role"
+        >
+          Active Role (Auto)
+        </button>
+
+        <span className="text-neutral-600">·</span>
+
+        <button
+          type="button"
+          onClick={() => onChange('co_head')}
+          className={`px-2.5 py-1 font-mono text-[11px] transition ${
+            current === 'co_head'
+              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+        >
+          Co-Head Command
+        </button>
+
+        <span className="text-neutral-600">·</span>
+
+        <button
+          type="button"
+          onClick={() => onChange('marketing')}
+          className={`px-2.5 py-1 font-mono text-[11px] transition ${
+            current === 'marketing'
+              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+        >
+          Marketing Campaign
+        </button>
+
+        <span className="text-neutral-600">·</span>
+
+        <button
+          type="button"
+          onClick={() => onChange('design')}
+          className={`px-2.5 py-1 font-mono text-[11px] transition ${
+            current === 'design'
+              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+        >
+          Design Studio
+        </button>
+
+        <span className="text-neutral-600">·</span>
+
+        <button
+          type="button"
+          onClick={() => onChange('standard')}
+          className={`px-2.5 py-1 font-mono text-[11px] transition ${
+            current === 'standard'
+              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+        >
+          General Briefing
+        </button>
       </div>
     </div>
   );
