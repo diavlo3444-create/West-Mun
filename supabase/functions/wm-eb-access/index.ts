@@ -219,13 +219,24 @@ Deno.serve(async (req: Request) => {
     const head = await headQuery.limit(1).maybeSingle();
     if (head.error) return json({ error: "Could not verify your head assignment." }, 500);
     if (head.data) {
-      // Include every active EB account explicitly linked to this head (Co-Head,
-      // Designer, or Marketing), not just accounts whose role is "co_head".
+      // Older EB signup paths did not always save reporting_head_id. Include
+      // accounts assigned to this head OR active members in the same team and
+      // section, while filtering on the server so unrelated teams stay private.
       const result = await db.from("wm_qr_passes")
         .select("user_id,full_name,email,phone,gender,created_at,reporting_head_id,team,section,account_role")
-        .eq("reporting_head_id", head.data.user_id).eq("active", true).order("full_name");
+        .eq("active", true).order("full_name").limit(1000);
       if (result.error) return json({ error: "Could not load your EB members." }, 500);
-      return json({ success: true, accessMode: "head", coHeads: result.data || [] });
+      const teamKey = (value: unknown) => {
+        const key = clean(value).toLowerCase().replace(/[\\s_-]+/g, "");
+        return key === "media" ? "mediapress" : key;
+      };
+      const headTeam = teamKey(head.data.department);
+      const coHeads = (result.data || []).filter((member: any) => {
+        if (member.reporting_head_id === head.data!.user_id) return true;
+        if (!member.team || teamKey(member.team) !== headTeam) return false;
+        return !head.data!.section || member.section === head.data!.section;
+      });
+      return json({ success: true, accessMode: "head", coHeads });
     }
 
     // Admins may manage Co-Heads from the admin dashboard, scoped to the
@@ -244,9 +255,20 @@ Deno.serve(async (req: Request) => {
     if (!headIds.length) return json({ success: true, accessMode: "admin", coHeads: [] });
     const coHeadsResult = await db.from("wm_qr_passes")
       .select("user_id,full_name,email,phone,gender,created_at,reporting_head_id,team,section,account_role")
-      .in("reporting_head_id", headIds).eq("active", true).order("full_name");
+      .eq("active", true).order("full_name").limit(1000);
     if (coHeadsResult.error) return json({ error: "Could not load EB members for this department." }, 500);
-    return json({ success: true, accessMode: "admin", coHeads: coHeadsResult.data || [] });
+    const teamKey = (value: unknown) => {
+      const key = clean(value).toLowerCase().replace(/[\\s_-]+/g, "");
+      return key === "media" ? "mediapress" : key;
+    };
+    const targetTeam = teamKey(department);
+    const targetHeads = new Set(headIds);
+    const members = (coHeadsResult.data || []).filter((member: any) => {
+      if (member.reporting_head_id && targetHeads.has(member.reporting_head_id)) return true;
+      if (!member.team || teamKey(member.team) !== targetTeam) return false;
+      return !section || member.section === section;
+    });
+    return json({ success: true, accessMode: "admin", coHeads: members });
   }
 
   if (body.action === "signup_public") {
