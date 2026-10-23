@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import {
   Calendar,
   Clock,
@@ -27,9 +27,6 @@ import type {
   EbStation,
   EbAnnouncement,
 } from '../../lib/ebOperationsService';
-import { CoHeadCommandView } from './roles/CoHeadCommandView';
-import { MarketingCampaignView } from './roles/MarketingCampaignView';
-import { DesignStudioView } from './roles/DesignStudioView';
 
 interface EbOverviewViewProps {
   profile: EbMemberProfile;
@@ -42,8 +39,6 @@ interface EbOverviewViewProps {
   onUpdateTaskStatus: (taskId: string, status: 'completed' | 'in_progress') => void;
 }
 
-export type RolePerspective = 'auto' | 'co_head' | 'marketing' | 'design' | 'standard';
-
 export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
   profile,
   tasks,
@@ -54,97 +49,6 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
   onAcknowledgeAnnouncement,
   onUpdateTaskStatus,
 }) => {
-  // Determine natural assigned role
-  const naturalRole: 'co_head' | 'marketing' | 'design' | 'standard' = useMemo(() => {
-    const r = (profile.role || '').toLowerCase().trim();
-    const d = (profile.department || '').toLowerCase().trim();
-
-    if (r.includes('co_head') || r.includes('co-head') || r === 'cohead') {
-      return 'co_head';
-    }
-    if (r.includes('market') || d === 'marketing') {
-      return 'marketing';
-    }
-    if (r.includes('design') || d === 'design') {
-      return 'design';
-    }
-    return 'standard';
-  }, [profile.role, profile.department]);
-
-  const [perspective, setPerspective] = useState<RolePerspective>('auto');
-
-  // Compute active rendered perspective
-  const effectivePerspective = perspective === 'auto' ? naturalRole : perspective;
-
-  // Render Co-Head bespoke view
-  if (effectivePerspective === 'co_head') {
-    return (
-      <div className="space-y-4">
-        <PerspectiveSelector
-          current={perspective}
-          natural={naturalRole}
-          onChange={setPerspective}
-        />
-        <CoHeadCommandView
-          profile={profile}
-          tasks={tasks}
-          shifts={shifts}
-          stations={stations}
-          announcements={announcements}
-          onNavigateTab={onNavigateTab}
-          onAcknowledgeAnnouncement={onAcknowledgeAnnouncement}
-          onUpdateTaskStatus={onUpdateTaskStatus}
-        />
-      </div>
-    );
-  }
-
-  // Render Marketing bespoke view
-  if (effectivePerspective === 'marketing') {
-    return (
-      <div className="space-y-4">
-        <PerspectiveSelector
-          current={perspective}
-          natural={naturalRole}
-          onChange={setPerspective}
-        />
-        <MarketingCampaignView
-          profile={profile}
-          tasks={tasks}
-          shifts={shifts}
-          stations={stations}
-          announcements={announcements}
-          onNavigateTab={onNavigateTab}
-          onAcknowledgeAnnouncement={onAcknowledgeAnnouncement}
-          onUpdateTaskStatus={onUpdateTaskStatus}
-        />
-      </div>
-    );
-  }
-
-  // Render Design bespoke view
-  if (effectivePerspective === 'design') {
-    return (
-      <div className="space-y-4">
-        <PerspectiveSelector
-          current={perspective}
-          natural={naturalRole}
-          onChange={setPerspective}
-        />
-        <DesignStudioView
-          profile={profile}
-          tasks={tasks}
-          shifts={shifts}
-          stations={stations}
-          announcements={announcements}
-          onNavigateTab={onNavigateTab}
-          onAcknowledgeAnnouncement={onAcknowledgeAnnouncement}
-          onUpdateTaskStatus={onUpdateTaskStatus}
-        />
-      </div>
-    );
-  }
-
   // Standard / Generic EB Officer Redesigned View
   const pendingTasks = tasks.filter((t) => t.status !== 'completed');
   const completedTasks = tasks.filter((t) => t.status === 'completed');
@@ -156,11 +60,6 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <PerspectiveSelector
-        current={perspective}
-        natural={naturalRole}
-        onChange={setPerspective}
-      />
 
       {/* Critical Operational Broadcast Banner */}
       {criticalAlert && (
@@ -411,99 +310,6 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
-  );
-};
-
-// Perspective Selector Bar (Zero pills, clean typographic switcher)
-interface PerspectiveSelectorProps {
-  current: RolePerspective;
-  natural: 'co_head' | 'marketing' | 'design' | 'standard';
-  onChange: (p: RolePerspective) => void;
-}
-
-const PerspectiveSelector: React.FC<PerspectiveSelectorProps> = ({ current, natural, onChange }) => {
-  return (
-    <div className="border-b border-white/[0.08] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-      <div className="flex items-center gap-2 text-neutral-400">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-400">
-          Role Workspace View:
-        </span>
-        <span className="font-medium text-neutral-200 capitalize">
-          {natural.replace(/_/g, ' ')} EB Member
-        </span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onChange('auto')}
-          className={`px-2.5 py-1 font-mono text-[11px] transition ${
-            current === 'auto'
-              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
-              : 'text-neutral-400 hover:text-neutral-200'
-          }`}
-          title="Default view matching your official assigned role"
-        >
-          Active Role (Auto)
-        </button>
-
-        <span className="text-neutral-600">·</span>
-
-        <button
-          type="button"
-          onClick={() => onChange('co_head')}
-          className={`px-2.5 py-1 font-mono text-[11px] transition ${
-            current === 'co_head'
-              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
-              : 'text-neutral-400 hover:text-neutral-200'
-          }`}
-        >
-          Co-Head Command
-        </button>
-
-        <span className="text-neutral-600">·</span>
-
-        <button
-          type="button"
-          onClick={() => onChange('marketing')}
-          className={`px-2.5 py-1 font-mono text-[11px] transition ${
-            current === 'marketing'
-              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
-              : 'text-neutral-400 hover:text-neutral-200'
-          }`}
-        >
-          Marketing Campaign
-        </button>
-
-        <span className="text-neutral-600">·</span>
-
-        <button
-          type="button"
-          onClick={() => onChange('design')}
-          className={`px-2.5 py-1 font-mono text-[11px] transition ${
-            current === 'design'
-              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
-              : 'text-neutral-400 hover:text-neutral-200'
-          }`}
-        >
-          Design Studio
-        </button>
-
-        <span className="text-neutral-600">·</span>
-
-        <button
-          type="button"
-          onClick={() => onChange('standard')}
-          className={`px-2.5 py-1 font-mono text-[11px] transition ${
-            current === 'standard'
-              ? 'border-b-2 border-[#d4af37] text-white font-medium bg-white/[0.04]'
-              : 'text-neutral-400 hover:text-neutral-200'
-          }`}
-        >
-          General Briefing
-        </button>
       </div>
     </div>
   );
