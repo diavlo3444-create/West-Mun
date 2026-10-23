@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { OpeningIntro } from './components/OpeningIntro';
+import { PublicMotionLayer } from './components/PublicMotionLayer';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { ConferenceIntro } from './components/ConferenceIntro';
@@ -170,6 +171,9 @@ export default function App() {
 
       {/* L. Conference Footer */}
       <Footer onReplayIntro={handleReplayIntro} />
+
+      {/* Public-page-only cinematic scroll reveals. Does not touch the hero video. */}
+      <PublicMotionLayer />
     </div>
   );
 }

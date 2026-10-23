@@ -312,3 +312,295 @@ body {
 }
 
 
+
+
+/* =========================================================
+   WEST MUN — cinematic public-page motion layer
+   Inspired by immersive editorial conference sites.
+   Intentionally does not touch #hero or its scroll-controlled
+   background video; dashboard styles remain scoped to .wm-app.
+   ========================================================= */
+@supports selector(body:has(#hero)) {
+  body:has(#hero)::after {
+    content: "";
+    position: fixed;
+    z-index: 100;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    pointer-events: none;
+    transform-origin: left center;
+    background: linear-gradient(90deg, #997a3a, #f3e5ab 48%, #d4af37);
+    animation: westmun-scroll-progress linear both;
+    animation-timeline: scroll(root block);
+  }
+
+  @keyframes westmun-scroll-progress {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+}
+
+/* Editorial pacing: each section gets its own quiet atmosphere. */
+#highlights,
+#about,
+#committees,
+#schedule,
+#secretariat,
+#register,
+#faq,
+#contact,
+#announcements,
+#sponsors,
+#documents {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+}
+
+#highlights::before,
+#about::before,
+#committees::before,
+#schedule::before,
+#secretariat::before,
+#register::before,
+#faq::before,
+#contact::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  opacity: .7;
+  background:
+    radial-gradient(ellipse at 88% 12%, rgba(212,175,55,.075), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,.012), transparent 32%, rgba(0,0,0,.12));
+}
+
+/* Long gold hairlines create a deliberate transition between chapters. */
+#highlights,
+#about,
+#committees,
+#schedule,
+#secretariat,
+#register,
+#faq,
+#contact {
+  border-top-color: rgba(212,175,55,.13) !important;
+}
+
+#highlights h2,
+#about h2,
+#committees h2,
+#schedule h2,
+#secretariat h2,
+#register h2,
+#faq h2,
+#contact h2 {
+  text-wrap: balance;
+  letter-spacing: -.025em;
+}
+
+#highlights h2::selection,
+#about h2::selection,
+#committees h2::selection,
+#schedule h2::selection,
+#secretariat h2::selection,
+#register h2::selection,
+#faq h2::selection,
+#contact h2::selection {
+  background: rgba(212,175,55,.32);
+  color: #fff;
+}
+
+/* Tactile, restrained interaction: lift and light, never cartoon bounce. */
+#highlights .group,
+#about .group,
+#committees .group,
+#secretariat .group,
+#register .group {
+  transition:
+    border-color .45s cubic-bezier(.2,.7,.2,1),
+    background-color .45s cubic-bezier(.2,.7,.2,1),
+    box-shadow .45s cubic-bezier(.2,.7,.2,1),
+    transform .45s cubic-bezier(.2,.7,.2,1);
+}
+
+#highlights .group:hover,
+#about .group:hover,
+#committees .group:hover,
+#secretariat .group:hover,
+#register .group:hover {
+  border-color: rgba(212,175,55,.38);
+  box-shadow: 0 18px 65px rgba(0,0,0,.22), 0 0 32px rgba(212,175,55,.035);
+}
+
+#highlights a,
+#about a,
+#committees a,
+#schedule a,
+#secretariat a,
+#register a,
+#faq a,
+#contact a {
+  text-underline-offset: 4px;
+  transition: color .25s ease, text-decoration-color .25s ease;
+}
+
+#highlights button,
+#about button,
+#committees button,
+#schedule button,
+#secretariat button,
+#register button,
+#faq button,
+#contact button {
+  transition:
+    border-color .3s ease,
+    background-color .3s ease,
+    color .3s ease,
+    box-shadow .3s ease,
+    transform .3s cubic-bezier(.2,.7,.2,1);
+}
+
+#highlights button:hover,
+#about button:hover,
+#committees button:hover,
+#schedule button:hover,
+#secretariat button:hover,
+#register button:hover,
+#faq button:hover,
+#contact button:hover {
+  box-shadow: 0 8px 28px rgba(212,175,55,.08);
+}
+
+/* Scroll-driven atmospheric drift is progressive enhancement only. */
+@supports (animation-timeline: view()) {
+  #highlights::before,
+  #about::before,
+  #committees::before,
+  #schedule::before,
+  #secretariat::before,
+  #register::before,
+  #faq::before,
+  #contact::before {
+    animation: westmun-chapter-glow linear both;
+    animation-timeline: view(block);
+    animation-range: entry 0% exit 100%;
+  }
+
+  @keyframes westmun-chapter-glow {
+    from { opacity: .24; }
+    35% { opacity: .8; }
+    70% { opacity: .58; }
+    to { opacity: .2; }
+  }
+}
+
+@media (hover: none) {
+  #highlights .group:hover,
+  #about .group:hover,
+  #committees .group:hover,
+  #secretariat .group:hover,
+  #register .group:hover {
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(#hero)::after {
+    animation: none !important;
+    transform: scaleX(1);
+    opacity: .35;
+  }
+
+  #highlights::before,
+  #about::before,
+  #committees::before,
+  #schedule::before,
+  #secretariat::before,
+  #register::before,
+  #faq::before,
+  #contact::before {
+    animation: none !important;
+  }
+
+  #highlights .group,
+  #about .group,
+  #committees .group,
+  #secretariat .group,
+  #register .group,
+  #highlights button,
+  #about button,
+  #committees button,
+  #schedule button,
+  #secretariat button,
+  #register button,
+  #faq button,
+  #contact button {
+    transition: none !important;
+  }
+}
+
+
+/* Progressive scroll reveals: only activated after the observer is ready. */
+body.westmun-motion-ready .wm-cinematic-item {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+  transition:
+    opacity 760ms cubic-bezier(.2,.7,.2,1) var(--wm-reveal-delay, 0ms),
+    transform 760ms cubic-bezier(.2,.7,.2,1) var(--wm-reveal-delay, 0ms);
+  backface-visibility: hidden;
+}
+body.westmun-motion-ready .wm-cinematic-item.wm-cinematic-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Soft chapter divider, drawn with a single gradient rather than animated particles. */
+#intro,
+#highlights,
+#about,
+#committees,
+#schedule,
+#secretariat,
+#register,
+#faq,
+#contact {
+  scroll-margin-top: 84px;
+}
+#highlights::after,
+#about::after,
+#committees::after,
+#schedule::after,
+#secretariat::after,
+#register::after,
+#faq::after,
+#contact::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(72vw, 880px);
+  height: 1px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(212,175,55,.26), rgba(243,229,171,.48), rgba(212,175,55,.26), transparent);
+  opacity: .8;
+}
+
+@media (max-width: 640px) {
+  body.westmun-motion-ready .wm-cinematic-item {
+    transform: translate3d(0, 14px, 0);
+    transition-duration: 560ms;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.westmun-motion-ready .wm-cinematic-item,
+  body.westmun-motion-ready .wm-cinematic-item.wm-cinematic-in {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
