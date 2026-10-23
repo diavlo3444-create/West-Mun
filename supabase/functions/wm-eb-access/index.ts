@@ -208,7 +208,7 @@ Deno.serve(async (req: Request) => {
     const auth = await db.auth.getUser(bearer[1]);
     if (auth.error || !auth.data.user) return json({ error: "Your session is invalid or expired." }, 401);
 
-    // Department Heads see only Co-Heads reporting to their own account.
+    // Department Heads see EB members assigned to their account or matching team/section.
     const requestedDepartment = clean(body.department);
     const requestedSection = clean(body.section);
     let headQuery = db.from("department_heads").select("user_id,department,section,active")
@@ -227,7 +227,7 @@ Deno.serve(async (req: Request) => {
         .eq("active", true).order("full_name").limit(1000);
       if (result.error) return json({ error: "Could not load your EB members." }, 500);
       const teamKey = (value: unknown) => {
-        const key = clean(value).toLowerCase().replace(/[\\s_-]+/g, "");
+        const key = clean(value).toLowerCase().replace(/[\s_-]+/g, "");
         return key === "media" ? "mediapress" : key;
       };
       const headTeam = teamKey(head.data.department);
@@ -258,7 +258,7 @@ Deno.serve(async (req: Request) => {
       .eq("active", true).order("full_name").limit(1000);
     if (coHeadsResult.error) return json({ error: "Could not load EB members for this department." }, 500);
     const teamKey = (value: unknown) => {
-      const key = clean(value).toLowerCase().replace(/[\\s_-]+/g, "");
+      const key = clean(value).toLowerCase().replace(/[\s_-]+/g, "");
       return key === "media" ? "mediapress" : key;
     };
     const targetTeam = teamKey(department);
