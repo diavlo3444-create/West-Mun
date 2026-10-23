@@ -118,9 +118,11 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const committeeAccess = department === 'dcc';
   const registrationAccess = canManageRegistrations(department);
   const rolesAccess = canManageRoles(department) || Boolean(testMode?.isActive);
-  // Operations Studio is restricted to the three operational department heads.
-  // Super IT test sessions are separately authenticated and audit-logged.
-  const operationsAccess = Boolean(testMode?.isActive) || ['media_press', 'security', 'volunteers'].includes(department);
+  // Shifts, roster, operations studio, and team-group management belong only
+  // to the three operational departments. Test mode does not change a head's
+  // department permissions; it remains a separate, explicitly authorized session.
+  const operationsAccess = ['media_press', 'security', 'volunteers'].includes(department);
+  const securityScannerAccess = department === 'security';
   const workspaceModules = useMemo(() => getWorkspaceModules(department), [department]);
 
   const isModuleView = useCallback(
@@ -525,7 +527,9 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
   const navigate = (id: string) => {
     if (id === 'security-website') { window.location.assign('/scanner'); return; }
-    if (id === 'operations' && !operationsAccess) return;
+    if (['operations', 'shifts', 'groups'].includes(id) && !operationsAccess) return;
+    if (id === 'security-website' && !securityScannerAccess) return;
+    if (id === 'website-editor' && !isCmsDepartment) return;
     if (id === 'registrations' && !registrationAccess) return;
     if (id === 'roles' && !rolesAccess) return;
     if (id === 'sponsors' && !isPr) return;
@@ -559,10 +563,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
     ...(operationsAccess ? [{ id: 'operations', label: 'Operations studio', icon: Users }] : []),
     ...(operationsAccess ? [{ id: 'shifts', label: 'Shifts & Roster', icon: Clock3 }] : []),
-    ...(operationsAccess ? [{ id: 'groups', label: 'Team groups', icon: Users }] : []),
+    ...(operationsAccess ? [{ id: 'groups', label: 'Team Management', icon: Users }] : []),
     { id: 'cohead-management', label: 'Co-Head Management', icon: Users },
     { id: 'department', label: 'Assignment', icon: Building2 },
-    { id: 'security-website', label: 'Security Website', icon: QrCode },
+    ...(securityScannerAccess ? [{ id: 'security-website', label: 'Security Scanner', icon: QrCode }] : []),
   ];
 
   const navGroups: NavGroup[] = [
@@ -578,7 +582,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       : view === 'shifts'
         ? 'Shifts & Roster'
       : view === 'groups'
-        ? 'Custom Team Groups'
+        ? 'Team Management'
       : view === 'website-editor'
         ? 'Website CMS'
         : view === 'registrations'
@@ -825,8 +829,22 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           />
         )}
 
-        {view === 'website-editor' && (
+        {view === 'website-editor' && isCmsDepartment && (
           <WebsiteEditor authorName={displayName} authorEmail={headEmail} />
+        )}
+
+        {view === 'security-website' && securityScannerAccess && (
+          <div className="rounded-xl border border-white/10 bg-[#0e0e14] p-5">
+            <h2 className="text-base font-semibold text-white">Security Scanner</h2>
+            <p className="mt-1 text-sm text-neutral-400">Open the conference check-in scanner.</p>
+            <button
+              type="button"
+              onClick={() => window.location.assign('/scanner')}
+              className="mt-4 rounded-lg border border-[#d4af37] bg-[#d4af37] px-4 py-2 text-sm font-semibold text-black hover:brightness-110"
+            >
+              Open Security Scanner
+            </button>
+          </div>
         )}
 
         {view === 'department' && (
