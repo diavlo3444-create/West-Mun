@@ -295,7 +295,11 @@ export const ShiftManagementDashboard: React.FC<ShiftManagementDashboardProps> =
       {mainView === 'calendar' ? (
         <ShiftCalendarView
           shifts={shifts}
-          onSelectDate={(dateStr) => {}}
+          onSelectDate={(dateStr) => {
+            setCreateInitialDate(dateStr);
+            setActiveInitialGroup(null);
+            setIsCreateModalOpen(true);
+          }}
           onOpenCreate={handleOpenCreateWithDate}
           onSelectShift={(shift) => setActiveShiftForDetails(shift)}
         />
