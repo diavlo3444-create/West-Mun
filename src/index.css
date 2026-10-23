@@ -542,3 +542,65 @@ body {
     transition: none !important;
   }
 }
+
+
+/* Progressive scroll reveals: only activated after the observer is ready. */
+body.westmun-motion-ready .wm-cinematic-item {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+  transition:
+    opacity 760ms cubic-bezier(.2,.7,.2,1) var(--wm-reveal-delay, 0ms),
+    transform 760ms cubic-bezier(.2,.7,.2,1) var(--wm-reveal-delay, 0ms);
+  backface-visibility: hidden;
+}
+body.westmun-motion-ready .wm-cinematic-item.wm-cinematic-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Soft chapter divider, drawn with a single gradient rather than animated particles. */
+#intro,
+#highlights,
+#about,
+#committees,
+#schedule,
+#secretariat,
+#register,
+#faq,
+#contact {
+  scroll-margin-top: 84px;
+}
+#highlights::after,
+#about::after,
+#committees::after,
+#schedule::after,
+#secretariat::after,
+#register::after,
+#faq::after,
+#contact::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(72vw, 880px);
+  height: 1px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(212,175,55,.26), rgba(243,229,171,.48), rgba(212,175,55,.26), transparent);
+  opacity: .8;
+}
+
+@media (max-width: 640px) {
+  body.westmun-motion-ready .wm-cinematic-item {
+    transform: translate3d(0, 14px, 0);
+    transition-duration: 560ms;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.westmun-motion-ready .wm-cinematic-item,
+  body.westmun-motion-ready .wm-cinematic-item.wm-cinematic-in {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
