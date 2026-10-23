@@ -10,7 +10,7 @@
     "build:api": "node scripts/build-api.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "lint": "tsc --noEmit",
-    "test": "npm run build && node scripts/test-secretariat-fix.mjs && node scripts/test-eb-operations-portal.mjs && node scripts/test-eb-phone-and-roles.mjs && node scripts/test-preview-and-operations.mjs && node scripts/test-department-workspaces.mjs && node scripts/test-auth-and-heads.mjs && node scripts/test-pr-hr-permissions.mjs && node scripts/test-login-as-head.mjs && node scripts/test-security-team-registration.mjs && node scripts/test-roles-and-hierarchy.mjs && tsx scripts/test-workspace-render.tsx && tsx scripts/security-check.ts"
+    "test": "npm run build && node scripts/test-team-groups.mjs && node scripts/test-shift-management.mjs && node scripts/test-department-workspaces.mjs && node scripts/test-auth-and-heads.mjs && node scripts/test-pr-hr-permissions.mjs && node scripts/test-login-as-head.mjs && node scripts/test-security-team-registration.mjs && node scripts/test-roles-and-hierarchy.mjs && tsx scripts/test-workspace-render.tsx && tsx scripts/security-check.ts"
   },
   "dependencies": {
     "@fontsource/cinzel": "^5.3.0",

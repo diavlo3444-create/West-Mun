@@ -26,8 +26,6 @@ import type {
   EbShift,
   EbStation,
   EbAnnouncement,
-  EbIncident,
-  EbShiftSwap,
 } from '../../lib/ebOperationsService';
 import { CoHeadCommandView } from './roles/CoHeadCommandView';
 import { MarketingCampaignView } from './roles/MarketingCampaignView';
@@ -39,15 +37,9 @@ interface EbOverviewViewProps {
   shifts: EbShift[];
   stations: EbStation[];
   announcements: EbAnnouncement[];
-  incidents?: EbIncident[];
-  swaps?: EbShiftSwap[];
   onNavigateTab: (tabId: string) => void;
   onAcknowledgeAnnouncement: (id: string) => void;
   onUpdateTaskStatus: (taskId: string, status: 'completed' | 'in_progress') => void;
-  onToggleTaskChecklist?: (taskId: string, itemId: string) => void;
-  onCreateTask?: (task: any) => Promise<void> | void;
-  onResolveIncident?: (id: string, notes?: string) => Promise<void> | void;
-  onReviewSwap?: (swapId: string, status: 'approved' | 'rejected', notes: string) => Promise<void> | void;
 }
 
 export type RolePerspective = 'auto' | 'co_head' | 'marketing' | 'design' | 'standard';
@@ -58,15 +50,9 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
   shifts,
   stations,
   announcements,
-  incidents = [],
-  swaps = [],
   onNavigateTab,
   onAcknowledgeAnnouncement,
   onUpdateTaskStatus,
-  onToggleTaskChecklist,
-  onCreateTask,
-  onResolveIncident,
-  onReviewSwap,
 }) => {
   // Determine natural assigned role
   const naturalRole: 'co_head' | 'marketing' | 'design' | 'standard' = useMemo(() => {
@@ -105,15 +91,9 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
           shifts={shifts}
           stations={stations}
           announcements={announcements}
-          incidents={incidents}
-          swaps={swaps}
           onNavigateTab={onNavigateTab}
           onAcknowledgeAnnouncement={onAcknowledgeAnnouncement}
           onUpdateTaskStatus={onUpdateTaskStatus}
-          onToggleTaskChecklist={onToggleTaskChecklist}
-          onCreateTask={onCreateTask}
-          onResolveIncident={onResolveIncident}
-          onReviewSwap={onReviewSwap}
         />
       </div>
     );
@@ -131,12 +111,12 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
         <MarketingCampaignView
           profile={profile}
           tasks={tasks}
+          shifts={shifts}
+          stations={stations}
           announcements={announcements}
           onNavigateTab={onNavigateTab}
           onAcknowledgeAnnouncement={onAcknowledgeAnnouncement}
           onUpdateTaskStatus={onUpdateTaskStatus}
-          onToggleTaskChecklist={onToggleTaskChecklist}
-          onCreateTask={onCreateTask}
         />
       </div>
     );
@@ -154,12 +134,12 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
         <DesignStudioView
           profile={profile}
           tasks={tasks}
+          shifts={shifts}
+          stations={stations}
           announcements={announcements}
           onNavigateTab={onNavigateTab}
           onAcknowledgeAnnouncement={onAcknowledgeAnnouncement}
           onUpdateTaskStatus={onUpdateTaskStatus}
-          onToggleTaskChecklist={onToggleTaskChecklist}
-          onCreateTask={onCreateTask}
         />
       </div>
     );

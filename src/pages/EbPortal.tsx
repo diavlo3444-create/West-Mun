@@ -445,7 +445,6 @@ export default function EbPortal() {
 
   const TABS: { id: TabKey; label: string; icon: any; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'tasks', label: canSeeOversight ? 'Department Tasks' : 'My Tasks', icon: CheckSquare, badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'schedule', label: canSeeOversight ? 'Department Schedule' : 'My Schedule', icon: Calendar },
     { id: 'station', label: canSeeOversight ? 'Department Stations' : 'My Station', icon: Building2 },
     { id: 'hierarchy', label: 'Hierarchy', icon: Users },
@@ -572,24 +571,11 @@ export default function EbPortal() {
                 shifts={shifts}
                 stations={stations}
                 announcements={announcements}
-                incidents={incidents}
-                swaps={swaps}
                 onNavigateTab={(tab) => setActiveTab(tab as TabKey)}
                 onAcknowledgeAnnouncement={handleAcknowledgeAnnouncement}
                 onUpdateTaskStatus={async (taskId, status) => {
                   await handleUpdateTask(taskId, { status });
                 }}
-                onToggleTaskChecklist={async (taskId, itemId) => {
-                  const task = tasks.find((t) => t.id === taskId);
-                  if (!task) return;
-                  const updatedList = task.checklist.map((i) =>
-                    i.id === itemId ? { ...i, completed: !i.completed } : i
-                  );
-                  await handleUpdateTask(taskId, { checklist: updatedList });
-                }}
-                onCreateTask={handleCreateTask}
-                onResolveIncident={canSeeOversight ? (id: string, notes?: string) => handleResolveIncident(id, notes || 'Resolved by Co-Head') : undefined}
-                onReviewSwap={canSeeOversight ? handleReviewSwap : undefined}
               />
             )}
 

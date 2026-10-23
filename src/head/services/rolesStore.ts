@@ -652,3 +652,16 @@ export async function deleteDepartmentTask(
     return { ok: false, error: msg };
   }
 }
+
+// Backward-compatible aliases for RolesManagement
+export type RolesPosition = DepartmentPosition;
+export type MemberTask = DepartmentTask;
+export const listRolesPositions = listDepartmentPositions;
+export const listMemberTasks = listDepartmentTasks;
+export const createRolesPosition = createDepartmentPosition;
+export const updateRolesPosition = updateDepartmentPosition;
+export const deleteRolesPosition = deleteDepartmentPosition;
+export const createMemberTask = createDepartmentTask;
+export const updateMemberTask = updateDepartmentTask;
+export const deleteMemberTask = deleteDepartmentTask;
+

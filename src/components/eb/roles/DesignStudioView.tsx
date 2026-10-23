@@ -5,62 +5,52 @@ import {
   Sparkles,
   CheckCircle2,
   Clock,
-  ExternalLink,
-  Plus,
   Search,
-  Filter,
   CheckSquare,
   Square,
   FileCheck2,
   Image as ImageIcon,
   Monitor,
   Printer,
-  SlidersHorizontal,
+  Calendar,
+  MapPin,
   ChevronRight,
-  Maximize2,
-  Download,
+  Radio,
+  UserCheck,
 } from 'lucide-react';
 import type { EbMemberProfile } from '../../../pages/EbPortal';
 import type {
   EbTask,
+  EbShift,
+  EbStation,
   EbAnnouncement,
-  TaskPriority,
-  TaskStatus,
 } from '../../../lib/ebOperationsService';
 
 interface DesignStudioViewProps {
   profile: EbMemberProfile;
   tasks: EbTask[];
+  shifts: EbShift[];
+  stations: EbStation[];
   announcements: EbAnnouncement[];
   onNavigateTab: (tabId: string) => void;
   onAcknowledgeAnnouncement: (id: string) => void;
   onUpdateTaskStatus: (taskId: string, status: 'completed' | 'in_progress') => void;
-  onToggleTaskChecklist?: (taskId: string, itemId: string) => void;
-  onCreateTask?: (task: any) => Promise<void> | void;
 }
 
-type DesignCategory = 'all' | 'placards' | 'passes' | 'screens' | 'social' | 'print';
+type DesignCategory = 'all' | 'placards' | 'passes' | 'screens' | 'social';
 
 export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
   profile,
   tasks,
+  shifts,
+  stations,
   announcements,
   onNavigateTab,
   onAcknowledgeAnnouncement,
   onUpdateTaskStatus,
-  onToggleTaskChecklist,
-  onCreateTask,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<DesignCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showNewDeliverableModal, setShowNewDeliverableModal] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newCategory, setNewCategory] = useState('Placards & Signage');
-  const [newSpec, setNewSpec] = useState('A4 Landscape · Vector CMYK 300DPI');
-  const [newDeadline, setNewDeadline] = useState('');
-  const [newNotes, setNewNotes] = useState('');
-  const [newChecklist, setNewChecklist] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
   // Official Brand Guidelines Quick Reference
   const BRAND_SPECS = [
@@ -70,7 +60,7 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
     { label: 'Technical Mono', value: 'JetBrains Mono', note: 'Code, IDs, telemetry & specifications' },
   ];
 
-  // Category filter buttons
+  // Category filter tabs
   const CATEGORIES = [
     { id: 'all' as const, label: 'All Studio Deliverables', icon: Layers },
     { id: 'placards' as const, label: 'Placards & Signage', icon: Printer },
@@ -79,20 +69,25 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
     { id: 'social' as const, label: 'Social & Digital Assets', icon: ImageIcon },
   ];
 
-  // Filter tasks
+  // Filter tasks based on search and category
   const filteredDeliverables = useMemo(() => {
     return tasks.filter((t) => {
+      const fullText = (t.title + ' ' + (t.description || '') + ' ' + (t.station_name || '')).toLowerCase();
       const matchSearch =
-        t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.station_name.toLowerCase().includes(searchQuery.toLowerCase());
+        searchQuery === '' ||
+        fullText.includes(searchQuery.toLowerCase()) ||
+        t.assigned_to_name.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const fullText = (t.title + ' ' + t.description + ' ' + t.station_name).toLowerCase();
       let matchCat = true;
-      if (selectedCategory === 'placards') matchCat = fullText.includes('placard') || fullText.includes('signage') || fullText.includes('banner');
-      else if (selectedCategory === 'passes') matchCat = fullText.includes('pass') || fullText.includes('badge') || fullText.includes('lanyard');
-      else if (selectedCategory === 'screens') matchCat = fullText.includes('screen') || fullText.includes('stage') || fullText.includes('backdrop');
-      else if (selectedCategory === 'social') matchCat = fullText.includes('social') || fullText.includes('tile') || fullText.includes('post');
+      if (selectedCategory === 'placards') {
+        matchCat = fullText.includes('placard') || fullText.includes('signage') || fullText.includes('banner') || fullText.includes('print');
+      } else if (selectedCategory === 'passes') {
+        matchCat = fullText.includes('pass') || fullText.includes('badge') || fullText.includes('lanyard') || fullText.includes('card');
+      } else if (selectedCategory === 'screens') {
+        matchCat = fullText.includes('screen') || fullText.includes('stage') || fullText.includes('backdrop') || fullText.includes('display');
+      } else if (selectedCategory === 'social') {
+        matchCat = fullText.includes('social') || fullText.includes('tile') || fullText.includes('post') || fullText.includes('digital');
+      }
 
       return matchSearch && matchCat;
     });
@@ -100,52 +95,39 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
 
   const approvedCount = tasks.filter((t) => t.status === 'completed').length;
   const inProgressCount = tasks.filter((t) => t.status !== 'completed').length;
-
-  const handleCreateDeliverable = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim() || !onCreateTask) return;
-    setSubmitting(true);
-    try {
-      const items = newChecklist
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .map((text, idx) => ({
-          id: `item-${Date.now()}-${idx}`,
-          text,
-          completed: false,
-        }));
-
-      await onCreateTask({
-        department: 'design',
-        section: profile.section,
-        assigned_to_user_id: profile.id,
-        assigned_to_name: profile.name,
-        assigned_by_name: `${profile.name} (Design Studio)`,
-        title: `[${newCategory}] ${newTitle.trim()}`,
-        description: `Format Spec: ${newSpec}. ${newNotes.trim()}`,
-        priority: 'high',
-        status: 'not_started',
-        deadline: newDeadline || null,
-        station_name: newCategory,
-        checklist: items,
-        completion_note: '',
-        blocker_reason: '',
-        reference_links: [],
-      });
-
-      setNewTitle('');
-      setNewNotes('');
-      setNewDeadline('');
-      setNewChecklist('');
-      setShowNewDeliverableModal(false);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const nextShift = shifts[0] || null;
+  const criticalAlert = announcements.find((a) => a.priority === 'critical' && !a.is_acknowledged);
 
   return (
     <div className="space-y-6">
+      {/* Critical Broadcast */}
+      {criticalAlert && (
+        <div className="border border-rose-500/40 bg-rose-950/20 p-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-rose-300 font-bold">
+                  Mandatory Directive
+                </span>
+                <span className="text-neutral-500">·</span>
+                <span className="text-xs text-neutral-400">Issued by {criticalAlert.author_name}</span>
+              </div>
+              <h3 className="text-sm font-semibold text-white">{criticalAlert.title}</h3>
+              <p className="text-xs text-neutral-300 max-w-2xl">{criticalAlert.body}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onAcknowledgeAnnouncement(criticalAlert.id)}
+              className="shrink-0 flex items-center gap-2 bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Acknowledge</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Design Studio Header */}
       <section className="relative overflow-hidden border border-[#d4af37]/30 bg-[#0a0a0d] p-6 lg:p-7">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -178,11 +160,19 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
               type="button"
-              onClick={() => setShowNewDeliverableModal(true)}
-              className="flex items-center gap-2 bg-[#d4af37] px-4 py-2.5 text-xs font-semibold text-black transition hover:bg-[#e5c158] active:scale-95 shadow-[0_0_20px_rgba(212,175,55,0.25)]"
+              onClick={() => onNavigateTab('station')}
+              className="flex items-center gap-2 border border-white/10 bg-black/60 px-4 py-2 text-xs text-neutral-300 transition hover:border-[#d4af37]/40 hover:text-white"
             >
-              <Plus className="h-4 w-4" />
-              <span>New Studio Deliverable</span>
+              <MapPin className="h-3.5 w-3.5 text-[#d4af37]" />
+              <span className="font-mono text-[11px] uppercase tracking-wider">Design Stations</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('schedule')}
+              className="flex items-center gap-2 border border-white/10 bg-black/60 px-4 py-2 text-xs text-neutral-300 transition hover:border-[#d4af37]/40 hover:text-white"
+            >
+              <Calendar className="h-3.5 w-3.5 text-[#d4af37]" />
+              <span className="font-mono text-[11px] uppercase tracking-wider">Studio Roster</span>
             </button>
           </div>
         </div>
@@ -262,7 +252,7 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
         </div>
       </section>
 
-      {/* Studio Category Navigation */}
+      {/* Studio Category Navigation & Search */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
         <div className="flex flex-wrap items-center gap-1.5">
           {CATEGORIES.map((cat) => {
@@ -293,7 +283,7 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
             placeholder="Search deliverables & specs…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-black/60 border border-white/10 pl-8 pr-3 py-1 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#d4af37] w-40 sm:w-52"
+            className="bg-black/60 border border-white/10 pl-8 pr-3 py-1 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#d4af37] w-48 sm:w-56"
           />
         </div>
       </div>
@@ -303,9 +293,9 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
         {filteredDeliverables.length === 0 ? (
           <div className="border border-white/10 bg-[#0d0d10] py-14 text-center space-y-3">
             <Palette className="h-8 w-8 text-[#d4af37]/40 mx-auto" />
-            <h3 className="font-serif text-base text-white">No studio deliverables in this category</h3>
+            <h3 className="font-serif text-base text-white">No studio deliverables match this view</h3>
             <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-              Create a new design deliverable above to track placards, badges, banners, or stage graphics.
+              Any design tasks, placard layouts, or stage graphics assigned to your team appear here automatically from operations.
             </p>
           </div>
         ) : (
@@ -361,7 +351,7 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
                       </div>
                     )}
 
-                    {/* Milestone Checklist */}
+                    {/* Quality Checkpoints Checklist if present */}
                     {totalChecks > 0 && (
                       <div className="pt-2 border-t border-white/5 space-y-1.5">
                         <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400">
@@ -370,10 +360,9 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
                         </div>
                         <div className="space-y-1">
                           {item.checklist.map((check) => (
-                            <label
+                            <div
                               key={check.id}
-                              className="flex items-center gap-2 text-xs text-neutral-300 hover:text-white cursor-pointer select-none"
-                              onClick={() => onToggleTaskChecklist?.(item.id, check.id)}
+                              className="flex items-center gap-2 text-xs text-neutral-300"
                             >
                               {check.completed ? (
                                 <CheckSquare className="h-3.5 w-3.5 text-[#d4af37] shrink-0" />
@@ -383,7 +372,7 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
                               <span className={check.completed ? 'line-through text-neutral-500' : ''}>
                                 {check.text}
                               </span>
-                            </label>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -403,134 +392,88 @@ export const DesignStudioView: React.FC<DesignStudioViewProps> = ({
         )}
       </section>
 
-      {/* New Deliverable Modal */}
-      {showNewDeliverableModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg border border-[#d4af37]/40 bg-[#0e0e12] p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-[#d4af37]">
-                  Design Studio Intake
-                </span>
-                <h3 className="font-serif text-lg text-white">New Creative Deliverable</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowNewDeliverableModal(false)}
-                className="text-neutral-400 hover:text-white text-xs font-mono"
-              >
-                [Close]
-              </button>
+      {/* Roster & Studio Station Grounding */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Next Shift */}
+        <div className="border border-white/10 bg-[#0d0d10] p-5">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-[#d4af37]" />
+              <h2 className="font-serif text-base text-white">Next Assigned Studio Shift</h2>
             </div>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('schedule')}
+              className="text-xs font-mono uppercase tracking-wider text-[#d4af37] hover:underline"
+            >
+              Full Roster →
+            </button>
+          </div>
 
-            <form onSubmit={handleCreateDeliverable} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-neutral-300">Deliverable Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. UNSC Committee Country Placards"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="mt-1 w-full bg-black/60 border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d4af37]"
-                />
+          {nextShift ? (
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                <h3 className="font-serif text-lg text-white">{nextShift.station_name || 'Design Production Lab'}</h3>
+                <span className="font-mono text-xs text-[#f5d47a]">
+                  {nextShift.shift_date} · {new Date(nextShift.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(nextShift.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
+              <div className="flex items-center gap-2 text-xs text-neutral-400">
+                <MapPin className="h-3.5 w-3.5 text-neutral-500" />
+                <span>Station: {nextShift.location || nextShift.station_name}</span>
+              </div>
+              {nextShift.responsibilities && (
+                <p className="text-xs text-neutral-300 leading-relaxed">{nextShift.responsibilities}</p>
+              )}
+            </div>
+          ) : (
+            <div className="mt-4 py-6 text-center text-xs text-neutral-500">
+              No active shift assigned for this period.
+            </div>
+          )}
+        </div>
 
-              <div className="grid grid-cols-2 gap-3">
+        {/* Assigned Stations */}
+        <div className="border border-white/10 bg-[#0d0d10] p-5">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-[#d4af37]" />
+              <h2 className="font-serif text-base text-white">Design Lab & Distribution Stations</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('station')}
+              className="text-xs font-mono uppercase tracking-wider text-[#d4af37] hover:underline"
+            >
+              All Stations →
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-2.5">
+            {stations.slice(0, 3).map((st) => (
+              <div
+                key={st.id}
+                className="border border-white/5 bg-black/40 p-3 flex items-center justify-between"
+              >
                 <div>
-                  <label className="block text-xs font-medium text-neutral-300">Category</label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    className="mt-1 w-full bg-black/60 border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d4af37]"
-                  >
-                    <option value="Placards & Signage">Placards & Signage</option>
-                    <option value="Badges & Passes">Badges & Passes</option>
-                    <option value="Stage & LED Screens">Stage & LED Screens</option>
-                    <option value="Social & Digital Assets">Social & Digital Assets</option>
-                    <option value="Summit Publications">Summit Publications</option>
-                  </select>
+                  <h4 className="text-xs font-medium text-white">{st.name}</h4>
+                  <p className="font-mono text-[10px] text-neutral-400">
+                    {st.location} · {st.purpose}
+                  </p>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-neutral-300">Technical Specs</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. A4 Landscape · 300DPI PDF/X-1a"
-                    value={newSpec}
-                    onChange={(e) => setNewSpec(e.target.value)}
-                    className="mt-1 w-full bg-black/60 border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d4af37]"
-                  />
-                </div>
+                <span className="font-mono text-[10px] uppercase text-[#d4af37] border border-[#d4af37]/20 px-2 py-0.5">
+                  Supervisor: {st.supervisor_name || 'Active'}
+                </span>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-neutral-300">Print / Delivery Deadline</label>
-                  <input
-                    type="date"
-                    value={newDeadline}
-                    onChange={(e) => setNewDeadline(e.target.value)}
-                    className="mt-1 w-full bg-black/60 border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d4af37]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-neutral-300">Resolution / Profile</label>
-                  <input
-                    type="text"
-                    defaultValue="CMYK 300DPI Print Vector"
-                    className="mt-1 w-full bg-black/60 border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d4af37]"
-                  />
-                </div>
+            ))}
+            {stations.length === 0 && (
+              <div className="py-6 text-center text-xs text-neutral-500">
+                No design workstations currently listed.
               </div>
-
-              <div>
-                <label className="block text-xs font-medium text-neutral-300">
-                  Specification Notes / Asset Links
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Drive folder link, country flag asset vector path, bleed specifications..."
-                  value={newNotes}
-                  onChange={(e) => setNewNotes(e.target.value)}
-                  className="mt-1 w-full bg-black/60 border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d4af37]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-neutral-300">
-                  Quality Checkpoints (one per line)
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Verify flag aspect ratios&#10;Check country name spelling against UN roster&#10;Ensure 3mm print bleed on all edges"
-                  value={newChecklist}
-                  onChange={(e) => setNewChecklist(e.target.value)}
-                  className="mt-1 w-full bg-black/60 border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d4af37]"
-                />
-              </div>
-
-              <div className="pt-2 border-t border-white/10 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowNewDeliverableModal(false)}
-                  className="border border-white/15 px-4 py-2 text-xs text-neutral-300 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="bg-[#d4af37] px-5 py-2 text-xs font-semibold text-black hover:bg-[#e5c158] disabled:opacity-50"
-                >
-                  {submitting ? 'Registering…' : 'Register Deliverable'}
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
