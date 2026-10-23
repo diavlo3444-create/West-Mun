@@ -37,6 +37,7 @@ interface EbOverviewViewProps {
   onNavigateTab: (tabId: string) => void;
   onAcknowledgeAnnouncement: (id: string) => void;
   onUpdateTaskStatus: (taskId: string, status: 'completed' | 'in_progress') => void;
+  onReplayWelcome?: () => void;
 }
 
 export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
@@ -48,6 +49,7 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
   onNavigateTab,
   onAcknowledgeAnnouncement,
   onUpdateTaskStatus,
+  onReplayWelcome,
 }) => {
   // Standard / Generic EB Officer Redesigned View
   const pendingTasks = tasks.filter((t) => t.status !== 'completed');
@@ -112,9 +114,22 @@ export const EbOverviewView: React.FC<EbOverviewViewProps> = ({
               </span>
             </div>
 
-            <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-normal tracking-wide text-white">
-              Welcome back, {profile.name}
-            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-normal tracking-wide text-white">
+                Welcome back, {profile.name}
+              </h1>
+              {onReplayWelcome && (
+                <button
+                  type="button"
+                  onClick={onReplayWelcome}
+                  className="inline-flex items-center gap-1.5 font-mono text-[11px] text-[#d4af37] hover:text-[#f5d47a] tracking-wider uppercase border border-[#d4af37]/30 bg-[#d4af37]/10 px-2.5 py-1 rounded transition-colors"
+                  title="Replay cinematic welcome animation"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  <span>Replay Intro</span>
+                </button>
+              )}
+            </div>
 
             <p className="text-sm leading-relaxed text-neutral-300">
               Assigned as <span className="font-medium text-[#d4af37]">{profile.role.replace(/_/g, ' ')}</span> in the{' '}

@@ -6,6 +6,7 @@ import {
   LogOut,
   ScanLine,
   QrCode,
+  Sparkles,
 } from 'lucide-react';
 import type { EbMemberProfile } from '../../pages/EbPortal';
 import type { EbNotification } from '../../lib/ebOperationsService';
@@ -20,6 +21,7 @@ interface EbNavbarProps {
   overdueTasksCount: number;
   unreadAnnouncementsCount: number;
   onSignOut: () => void;
+  onReplayWelcome?: () => void;
 }
 
 export const EbNavbar: React.FC<EbNavbarProps> = ({
@@ -32,6 +34,7 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
   overdueTasksCount,
   unreadAnnouncementsCount,
   onSignOut,
+  onReplayWelcome,
 }) => {
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -98,6 +101,18 @@ export const EbNavbar: React.FC<EbNavbarProps> = ({
             <QrCode className="h-3.5 w-3.5 text-[#d4af37]" />
             <span className="hidden md:inline font-mono text-[11px] uppercase tracking-wider">Pass</span>
           </a>
+
+          {onReplayWelcome && (
+            <button
+              type="button"
+              onClick={onReplayWelcome}
+              className="flex h-8 items-center justify-center gap-1.5 border border-[#d4af37]/30 bg-[#d4af37]/[0.06] px-2.5 text-xs font-medium text-[#f5d47a] transition hover:border-[#d4af37]/70 hover:bg-[#d4af37]/15 sm:px-3"
+              title="Replay diplomatic sign-in welcome intro"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-[#d4af37]" />
+              <span className="hidden lg:inline font-mono text-[11px] uppercase tracking-wider">Welcome</span>
+            </button>
+          )}
 
           {/* Notifications Trigger */}
           <div className="relative">

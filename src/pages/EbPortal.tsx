@@ -37,6 +37,7 @@ import { EbHierarchyView } from '../components/eb/EbHierarchyView';
 import { EbAnnouncementsView } from '../components/eb/EbAnnouncementsView';
 import { EbOversightView } from '../components/eb/EbOversightView';
 import { EbEventDayMode } from '../components/eb/EbEventDayMode';
+import { EbWelcomeAnimation } from '../components/eb/EbWelcomeAnimation';
 
 export interface EbMemberProfile {
   id: string;
@@ -60,6 +61,7 @@ type TabKey = 'overview' | 'tasks' | 'schedule' | 'station' | 'hierarchy' | 'ann
 export default function EbPortal() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<EbMemberProfile | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [demoSessionToken, setDemoSessionToken] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
@@ -190,17 +192,29 @@ export default function EbPortal() {
             const head = result.head;
             const demoProfile: EbMemberProfile = {
               id: head.id,
-              name: head.headName || `Demo ${demoRole}`,
+              name: head.headName || `Demo ${demoRole === 'co_head' ? 'Co-Head' : demoRole === 'marketing' ? 'Marketing' : 'Design'}`,
               email: head.email || `demo-${demoRole}@westmun.local`,
               role: demoRole === 'co_head' ? 'co_head' : demoRole === 'marketing' ? 'Marketing' : 'Design',
               department: head.department || (demoRole === 'co_head' ? 'security' : demoRole),
               section: head.section || null,
+              reportingHeadId: head.reportingHeadId || (demoRole === 'co_head' ? 'demo_security_head' : null),
+              reportingHeadName: head.reportingHeadName || (demoRole === 'co_head' ? 'Security Department Head' : null),
+              reportingHeadEmail: head.reportingHeadEmail || (demoRole === 'co_head' ? 'security.head@westmun.org' : null),
+              reportingHeadDepartment: head.reportingHeadDepartment || (demoRole === 'co_head' ? 'security' : null),
+              reportingHeadSection: head.reportingHeadSection || head.section || null,
               isHead: false,
               isAdmin: false,
             };
             if (!live) return;
             setProfile(demoProfile);
             setLoading(false);
+            try {
+              if (sessionStorage.getItem(`wm_eb_welcome_${demoProfile.id}`) !== 'true') {
+                setShowWelcome(true);
+              }
+            } catch {
+              setShowWelcome(true);
+            }
             void loadData(demoProfile);
             return;
           }
@@ -301,6 +315,13 @@ export default function EbPortal() {
       if (!live) return;
       setProfile(builtProfile);
       setLoading(false);
+      try {
+        if (sessionStorage.getItem(`wm_eb_welcome_${builtProfile.id}`) !== 'true') {
+          setShowWelcome(true);
+        }
+      } catch {
+        setShowWelcome(true);
+      }
       void loadData(builtProfile);
     };
 
@@ -311,6 +332,11 @@ export default function EbPortal() {
   }, [loadData]);
 
   const handleSignOut = async () => {
+    if (profile?.id) {
+      try {
+        sessionStorage.removeItem(`wm_eb_welcome_${profile.id}`);
+      } catch {}
+    }
     if (demoSessionToken) {
       try {
         await fetch('/api/super-admin?action=terminate-test-session', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${demoSessionToken}` }, body: JSON.stringify({ token: demoSessionToken }) });
@@ -322,6 +348,19 @@ export default function EbPortal() {
     await supabase?.auth.signOut();
     window.location.replace('/login');
   };
+
+  const handleWelcomeComplete = useCallback(() => {
+    if (profile?.id) {
+      try {
+        sessionStorage.setItem(`wm_eb_welcome_${profile.id}`, 'true');
+      } catch {}
+    }
+    setShowWelcome(false);
+  }, [profile?.id]);
+
+  const handleReplayWelcome = useCallback(() => {
+    setShowWelcome(true);
+  }, []);
 
   // Task Actions
   const handleUpdateTask = async (
@@ -480,26 +519,38 @@ export default function EbPortal() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070707] text-[#f5f5f5] selection:bg-[#d4af37]/30 selection:text-white flex flex-col justify-between">
-      <div>
-        {demoSessionToken && <div className="border-b border-[#d4af37]/40 bg-[#d4af37]/10 px-4 py-2 text-center text-xs text-[#f5d47a]"><span className="font-semibold">SUPER IT DEMO SESSION</span> · Temporary role preview · Live operational data · Expires automatically after 15 minutes</div>}
-        {/* Sticky Operations Topbar */}
-        <EbNavbar
+    <>
+      {showWelcome && profile && (
+        <EbWelcomeAnimation
           profile={profile}
-          notifications={notifications}
-          onMarkNotificationRead={handleMarkNotificationRead}
-          onNavigateNotification={(tabId) => {
-            if (['overview', 'schedule', 'station', 'hierarchy', 'announcements', 'oversight'].includes(tabId)) {
-              setActiveTab(tabId as TabKey);
-              setIsEventDayMode(false);
-            }
-          }}
-          onClearAllNotifications={handleClearAllNotifications}
-          pendingTasksCount={pendingCount}
-          overdueTasksCount={overdueCount}
-          unreadAnnouncementsCount={unreadAnnouncementsCount}
-          onSignOut={handleSignOut}
+          onComplete={handleWelcomeComplete}
         />
+      )}
+      <div
+        className={`min-h-screen bg-[#070707] text-[#f5f5f5] selection:bg-[#d4af37]/30 selection:text-white flex flex-col justify-between transition-opacity duration-700 ${
+          showWelcome ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+      >
+        <div>
+          {demoSessionToken && <div className="border-b border-[#d4af37]/40 bg-[#d4af37]/10 px-4 py-2 text-center text-xs text-[#f5d47a]"><span className="font-semibold">SUPER IT DEMO SESSION</span> · Temporary role preview · Live operational data · Expires automatically after 15 minutes</div>}
+          {/* Sticky Operations Topbar */}
+          <EbNavbar
+            profile={profile}
+            notifications={notifications}
+            onMarkNotificationRead={handleMarkNotificationRead}
+            onNavigateNotification={(tabId) => {
+              if (['overview', 'schedule', 'station', 'hierarchy', 'announcements', 'oversight'].includes(tabId)) {
+                setActiveTab(tabId as TabKey);
+                setIsEventDayMode(false);
+              }
+            }}
+            onClearAllNotifications={handleClearAllNotifications}
+            pendingTasksCount={pendingCount}
+            overdueTasksCount={overdueCount}
+            unreadAnnouncementsCount={unreadAnnouncementsCount}
+            onSignOut={handleSignOut}
+            onReplayWelcome={handleReplayWelcome}
+          />
 
         {dataError && (
           <div role="alert" className="mx-auto mb-4 max-w-7xl px-4 sm:px-6">
@@ -576,6 +627,7 @@ export default function EbPortal() {
                 onUpdateTaskStatus={async (taskId, status) => {
                   await handleUpdateTask(taskId, { status });
                 }}
+                onReplayWelcome={handleReplayWelcome}
               />
             )}
 
@@ -649,5 +701,6 @@ export default function EbPortal() {
         </div>
       </footer>
     </div>
+    </>
   );
 }

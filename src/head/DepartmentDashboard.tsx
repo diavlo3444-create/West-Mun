@@ -10,9 +10,11 @@ import {
   Globe,
   Network,
   QrCode,
+  Clock3,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { WebsiteEditor } from '../admin/WebsiteEditor';
+import { ShiftManagementDashboard } from './shifts/ShiftManagementDashboard';
 import {
   DEPARTMENTS,
   canManageRegistrations,
@@ -39,6 +41,8 @@ import { DCCCommitteeManager } from './DCCCommitteeManager';
 import { DCCApplicationsManager } from './DCCApplicationsManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
 import { OperationsWorkspace } from './OperationsWorkspace';
+import { GroupManagementDashboard } from './groups/GroupManagementDashboard';
+import type { WmTeamGroup } from './services/operationsStore';
 import { HeadCoHeadManagement } from './HeadCoHeadManagement';
 import { WorkspaceModuleGrid, WorkspaceOverview } from './WorkspaceOverview';
 import {
@@ -137,6 +141,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   });
 
   const [registrations, setRegistrations] = useState<HeadRegistration[]>([]);
+  const [selectedGroupForShift, setSelectedGroupForShift] = useState<WmTeamGroup | null>(null);
   const [coHeads, setCoHeads] = useState<Array<{user_id:string;full_name:string;email:string;phone?:string|null;gender?:string|null}>>([]);
   const [coHeadsError, setCoHeadsError] = useState("");
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -553,6 +558,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
     ...(operationsAccess ? [{ id: 'operations', label: 'Operations studio', icon: Users }] : []),
+    ...(operationsAccess ? [{ id: 'shifts', label: 'Shifts & Roster', icon: Clock3 }] : []),
+    ...(operationsAccess ? [{ id: 'groups', label: 'Team groups', icon: Users }] : []),
     { id: 'cohead-management', label: 'Co-Head Management', icon: Users },
     { id: 'department', label: 'Assignment', icon: Building2 },
     { id: 'security-website', label: 'Security Website', icon: QrCode },
@@ -568,6 +575,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const viewLabel =
     view === 'overview'
       ? 'Overview'
+      : view === 'shifts'
+        ? 'Shifts & Roster'
+      : view === 'groups'
+        ? 'Custom Team Groups'
       : view === 'website-editor'
         ? 'Website CMS'
         : view === 'registrations'
@@ -784,8 +795,34 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           <HeadCoHeadManagement department={department} section={section} headName={headName} />
         )}
 
+        {view === 'groups' && operationsAccess && (
+          <GroupManagementDashboard
+            department={department}
+            section={section}
+            testToken={testMode?.token || null}
+            onAssignGroupToShift={(group) => {
+              setSelectedGroupForShift(group);
+              setView('shifts');
+            }}
+          />
+        )}
+
+        {view === 'shifts' && operationsAccess && (
+          <ShiftManagementDashboard
+            department={department}
+            section={section}
+            testToken={testMode?.token || null}
+            initialGroup={selectedGroupForShift}
+          />
+        )}
+
         {view === 'operations' && operationsAccess && (
-          <OperationsWorkspace department={department} section={section} testToken={testMode?.token || null} />
+          <OperationsWorkspace
+            department={department}
+            section={section}
+            testToken={testMode?.token || null}
+            initialGroup={selectedGroupForShift}
+          />
         )}
 
         {view === 'website-editor' && (

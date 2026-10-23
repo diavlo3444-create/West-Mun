@@ -12,15 +12,20 @@ import {
   type WmPerson, type WmShift, type WmRegistrationWindow, type WmTeamGroup,
 } from './services/operationsStore';
 
-type Props = { department: DepartmentKey; section?: SectionKey | null; testToken?: string | null };
+type Props = {
+  department: DepartmentKey;
+  section?: SectionKey | null;
+  testToken?: string | null;
+  initialGroup?: WmTeamGroup | null;
+};
 type Tab = 'people' | 'groups' | 'shifts' | 'registrations' | 'deployment';
 const field = 'w-full rounded-md border border-white/10 bg-[#111115] px-3 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#d4af37] focus:outline-none';
 const button = 'inline-flex items-center justify-center gap-2 rounded-md border border-[#d4af37]/40 bg-[#d4af37]/10 px-3 py-2 text-xs font-semibold text-[#f1d98c] hover:bg-[#d4af37]/20 disabled:opacity-50';
 const panel = 'rounded-lg border border-white/10 bg-[#111115]/90 p-4';
 const label = 'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-neutral-400';
 
-export const OperationsWorkspace: React.FC<Props> = ({ department, section, testToken }) => {
-  const [tab, setTab] = useState<Tab>('people');
+export const OperationsWorkspace: React.FC<Props> = ({ department, section, testToken, initialGroup }) => {
+  const [tab, setTab] = useState<Tab>(initialGroup ? 'shifts' : 'people');
   const [people, setPeople] = useState<WmPerson[]>([]);
   const [shifts, setShifts] = useState<WmShift[]>([]);
   const [windows, setWindows] = useState<WmRegistrationWindow[]>([]);
@@ -29,7 +34,14 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
   const [notice, setNotice] = useState('');
   const [roleForm, setRoleForm] = useState({ display_name: '', email: '', role_title: '', private_notes: '' });
   const [shiftForm, setShiftForm] = useState({ title: '', location: '', starts_at: '', ends_at: '', capacity: 4 });
-  const [selectedGroupForShift, setSelectedGroupForShift] = useState<WmTeamGroup | null>(null);
+  const [selectedGroupForShift, setSelectedGroupForShift] = useState<WmTeamGroup | null>(initialGroup || null);
+
+  useEffect(() => {
+    if (initialGroup) {
+      setSelectedGroupForShift(initialGroup);
+      setTab('shifts');
+    }
+  }, [initialGroup]);
 
   // Dedicated test token passed when running under a verified Super IT Test Session.
   // For ordinary department heads, this is strictly null so that queries execute
