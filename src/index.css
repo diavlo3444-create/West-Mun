@@ -1124,3 +1124,239 @@ body:has(#hero) .wm-image-motion {
     filter: none !important;
   }
 }
+
+
+/* =========================================================
+   WEST MUN — visual identity reset
+   Public page only. Leaves the cinematic hero/video, CMS,
+   registration flows, and .wm-app dashboards untouched.
+   Direction: international-affairs editorial / ink, paper, oxblood.
+   ========================================================= */
+body:has(#hero) {
+  --wm-paper: #eee9df;
+  --wm-paper-ink: #171715;
+  --wm-oxblood: #742d36;
+  --wm-ink-black: #101111;
+  --wm-rule: rgba(23, 23, 21, .18);
+}
+
+/* Alternate paper and ink chapters instead of repeating identical dark cards. */
+body:has(#hero) #intro,
+body:has(#hero) #about,
+body:has(#hero) #schedule,
+body:has(#hero) #faq,
+body:has(#hero) #contact {
+  background: var(--wm-paper) !important;
+  color: var(--wm-paper-ink) !important;
+  border-color: var(--wm-rule) !important;
+}
+body:has(#hero) #highlights,
+body:has(#hero) #committees,
+body:has(#hero) #secretariat,
+body:has(#hero) #register,
+body:has(#hero) #announcements,
+body:has(#hero) #sponsors,
+body:has(#hero) #documents {
+  background: var(--wm-ink-black) !important;
+  color: #f2eee6 !important;
+  border-color: rgba(238,233,223,.15) !important;
+}
+
+/* Typography: editorial scale, compact labels, less template-like symmetry. */
+body:has(#hero) #intro h2,
+body:has(#hero) #about h2,
+body:has(#hero) #schedule h2,
+body:has(#hero) #faq h2,
+body:has(#hero) #contact h2 {
+  color: var(--wm-paper-ink) !important;
+  font-family: var(--font-serif) !important;
+  font-weight: 500 !important;
+  letter-spacing: -.055em !important;
+  line-height: .98 !important;
+  font-size: clamp(2.8rem, 6vw, 5.6rem) !important;
+}
+body:has(#hero) #highlights h2,
+body:has(#hero) #committees h2,
+body:has(#hero) #secretariat h2,
+body:has(#hero) #register h2,
+body:has(#hero) #announcements h2,
+body:has(#hero) #sponsors h2,
+body:has(#hero) #documents h2 {
+  color: #f2eee6 !important;
+  font-family: var(--font-serif) !important;
+  font-weight: 500 !important;
+  letter-spacing: -.055em !important;
+  line-height: .98 !important;
+  font-size: clamp(2.8rem, 6vw, 5.6rem) !important;
+}
+body:has(#hero) #intro p,
+body:has(#hero) #about p,
+body:has(#hero) #schedule p,
+body:has(#hero) #faq p,
+body:has(#hero) #contact p,
+body:has(#hero) #intro span,
+body:has(#hero) #about span,
+body:has(#hero) #schedule span,
+body:has(#hero) #faq span,
+body:has(#hero) #contact span,
+body:has(#hero) #intro h3,
+body:has(#hero) #about h3,
+body:has(#hero) #schedule h3,
+body:has(#hero) #faq h3,
+body:has(#hero) #contact h3 {
+  color: var(--wm-paper-ink);
+}
+body:has(#hero) #highlights p,
+body:has(#hero) #committees p,
+body:has(#hero) #secretariat p,
+body:has(#hero) #register p,
+body:has(#hero) #announcements p,
+body:has(#hero) #sponsors p,
+body:has(#hero) #documents p {
+  color: rgba(242,238,230,.7);
+}
+
+/* Eyebrows, dividers, and selected accents move from shiny gold to oxblood. */
+body:has(#hero) #intro .text-\\[\\#d4af37\\],
+body:has(#hero) #about .text-\\[\\#d4af37\\],
+body:has(#hero) #schedule .text-\\[\\#d4af37\\],
+body:has(#hero) #faq .text-\\[\\#d4af37\\],
+body:has(#hero) #contact .text-\\[\\#d4af37\\],
+body:has(#hero) #intro .bg-\\[\\#d4af37\\],
+body:has(#hero) #about .bg-\\[\\#d4af37\\],
+body:has(#hero) #schedule .bg-\\[\\#d4af37\\],
+body:has(#hero) #faq .bg-\\[\\#d4af37\\],
+body:has(#hero) #contact .bg-\\[\\#d4af37\\] {
+  color: var(--wm-oxblood) !important;
+  background-color: var(--wm-oxblood) !important;
+}
+body:has(#hero) #intro .border-\\[\\#d4af37\\]\\/20,
+body:has(#hero) #about .border-\\[\\#d4af37\\]\\/20,
+body:has(#hero) #schedule .border-\\[\\#d4af37\\]\\/20,
+body:has(#hero) #faq .border-\\[\\#d4af37\\]\\/20,
+body:has(#hero) #contact .border-\\[\\#d4af37\\]\\/20 {
+  border-color: rgba(116,45,54,.28) !important;
+}
+
+/* Cards become editorial panels: flatter, cleaner, and less like repeated widgets. */
+body:has(#hero) #intro .grid > *,
+body:has(#hero) #about .grid > *,
+body:has(#hero) #schedule .grid > *,
+body:has(#hero) #faq .grid > *,
+body:has(#hero) #contact .grid > * {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+body:has(#hero) #intro .bg-\\[\\#0d0d0e\\],
+body:has(#hero) #intro .bg-\\[\\#0a0a0b\\],
+body:has(#hero) #about .bg-\\[\\#0c0c0e\\],
+body:has(#hero) #about .bg-\\[\\#121215\\],
+body:has(#hero) #schedule .bg-\\[\\#0c0c0e\\],
+body:has(#hero) #faq .bg-\\[\\#0c0c0e\\],
+body:has(#hero) #contact .bg-\\[\\#0c0c0e\\] {
+  background: rgba(255,255,255,.32) !important;
+}
+body:has(#hero) #intro [class*="border-neutral-800"],
+body:has(#hero) #about [class*="border-neutral-800"],
+body:has(#hero) #schedule [class*="border-neutral-800"],
+body:has(#hero) #faq [class*="border-neutral-800"],
+body:has(#hero) #contact [class*="border-neutral-800"] {
+  border-color: var(--wm-rule) !important;
+}
+body:has(#hero) #highlights .group,
+body:has(#hero) #committees .group,
+body:has(#hero) #secretariat .group,
+body:has(#hero) #register .group {
+  border-radius: 0 !important;
+  background: rgba(255,255,255,.025) !important;
+  border-color: rgba(238,233,223,.16) !important;
+  box-shadow: none !important;
+}
+body:has(#hero) #highlights .group:hover,
+body:has(#hero) #committees .group:hover,
+body:has(#hero) #secretariat .group:hover,
+body:has(#hero) #register .group:hover {
+  border-color: rgba(196,91,101,.7) !important;
+  transform: translateY(-5px);
+}
+
+/* A quiet chapter marker replaces decorative glow with a print-like rule. */
+body:has(#hero) #intro::before,
+body:has(#hero) #highlights::before,
+body:has(#hero) #about::before,
+body:has(#hero) #committees::before,
+body:has(#hero) #schedule::before,
+body:has(#hero) #secretariat::before,
+body:has(#hero) #register::before,
+body:has(#hero) #faq::before,
+body:has(#hero) #contact::before {
+  background: none !important;
+  animation: none !important;
+}
+body:has(#hero) #intro,
+body:has(#hero) #highlights,
+body:has(#hero) #about,
+body:has(#hero) #committees,
+body:has(#hero) #schedule,
+body:has(#hero) #secretariat,
+body:has(#hero) #register,
+body:has(#hero) #faq,
+body:has(#hero) #contact {
+  border-top: 1px solid var(--wm-rule) !important;
+}
+
+/* Focused motion: a fine image crop reveal and small editorial number shift. */
+@keyframes wm-editorial-enter {
+  from { opacity: 0; transform: translateY(34px); clip-path: inset(0 0 12% 0); }
+  to { opacity: 1; transform: translateY(0); clip-path: inset(0 0 0 0); }
+}
+body:has(#hero).westmun-motion-ready .wm-title-motion.wm-cinematic-in {
+  animation: wm-editorial-enter .85s cubic-bezier(.16,1,.3,1) both;
+}
+body:has(#hero) .wm-card-motion {
+  transition: transform .5s cubic-bezier(.2,.7,.2,1), border-color .35s ease, background-color .35s ease !important;
+}
+body:has(#hero) .wm-image-motion {
+  transition: transform .9s cubic-bezier(.2,.7,.2,1), filter .6s ease;
+  filter: saturate(.82);
+}
+body:has(#hero) .wm-image-motion:hover {
+  transform: scale(1.035);
+  filter: saturate(1);
+}
+
+/* Mobile: preserve the cinematic hero, but give chapters a cleaner rhythm. */
+@media (max-width: 640px) {
+  body:has(#hero) #intro,
+  body:has(#hero) #highlights,
+  body:has(#hero) #about,
+  body:has(#hero) #committees,
+  body:has(#hero) #schedule,
+  body:has(#hero) #secretariat,
+  body:has(#hero) #register,
+  body:has(#hero) #faq,
+  body:has(#hero) #contact {
+    padding-top: 4.25rem !important;
+    padding-bottom: 4.25rem !important;
+  }
+  body:has(#hero) #intro h2,
+  body:has(#hero) #highlights h2,
+  body:has(#hero) #about h2,
+  body:has(#hero) #committees h2,
+  body:has(#hero) #schedule h2,
+  body:has(#hero) #secretariat h2,
+  body:has(#hero) #register h2,
+  body:has(#hero) #faq h2,
+  body:has(#hero) #contact h2 {
+    font-size: clamp(2.65rem, 12vw, 4rem) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body:has(#hero) .wm-title-motion.wm-cinematic-in {
+    animation: none !important;
+  }
+  body:has(#hero) .wm-image-motion,
+  body:has(#hero) .wm-card-motion {
+    transition: none !important;
+  }
+}
