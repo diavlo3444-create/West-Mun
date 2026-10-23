@@ -209,13 +209,22 @@ Deno.serve(async (req: Request) => {
     if (auth.error || !auth.data.user) return json({ error: "Your session is invalid or expired." }, 401);
 
     // Department Heads see only Co-Heads reporting to their own account.
-    const head = await db.from("department_heads").select("user_id,department,section,active")
-      .eq("user_id", auth.data.user.id).eq("active", true).maybeSingle();
+    const requestedDepartment = clean(body.department);
+    const requestedSection = clean(body.section);
+    let headQuery = db.from("department_heads").select("user_id,department,section,active")
+      .eq("user_id", auth.data.user.id).eq("active", true);
+    if (requestedDepartment) headQuery = headQuery.eq("department", requestedDepartment);
+    if (requestedSection) headQuery = headQuery.eq("section", requestedSection);
+    else if (requestedDepartment) headQuery = headQuery.is("section", null);
+    const head = await headQuery.limit(1).maybeSingle();
     if (head.error) return json({ error: "Could not verify your head assignment." }, 500);
     if (head.data) {
-      const result = await db.from("wm_qr_passes").select("user_id,full_name,email,phone,gender,created_at,reporting_head_id,team,section")
-        .eq("reporting_head_id", head.data.user_id).eq("account_role", "co_head").eq("active", true).order("full_name");
-      if (result.error) return json({ error: "Could not load your Co-Heads." }, 500);
+      // Include every active EB account explicitly linked to this head (Co-Head,
+      // Designer, or Marketing), not just accounts whose role is "co_head".
+      const result = await db.from("wm_qr_passes")
+        .select("user_id,full_name,email,phone,gender,created_at,reporting_head_id,team,section,account_role")
+        .eq("reporting_head_id", head.data.user_id).eq("active", true).order("full_name");
+      if (result.error) return json({ error: "Could not load your EB members." }, 500);
       return json({ success: true, accessMode: "head", coHeads: result.data || [] });
     }
 
@@ -233,9 +242,10 @@ Deno.serve(async (req: Request) => {
     if (headsResult.error) return json({ error: "Could not load heads for this department." }, 500);
     const headIds = (headsResult.data || []).map((row: any) => row.user_id);
     if (!headIds.length) return json({ success: true, accessMode: "admin", coHeads: [] });
-    const coHeadsResult = await db.from("wm_qr_passes").select("user_id,full_name,email,phone,gender,created_at,reporting_head_id,team,section")
-      .in("reporting_head_id", headIds).eq("account_role", "co_head").eq("active", true).order("full_name");
-    if (coHeadsResult.error) return json({ error: "Could not load Co-Heads for this department." }, 500);
+    const coHeadsResult = await db.from("wm_qr_passes")
+      .select("user_id,full_name,email,phone,gender,created_at,reporting_head_id,team,section,account_role")
+      .in("reporting_head_id", headIds).eq("active", true).order("full_name");
+    if (coHeadsResult.error) return json({ error: "Could not load EB members for this department." }, 500);
     return json({ success: true, accessMode: "admin", coHeads: coHeadsResult.data || [] });
   }
 
