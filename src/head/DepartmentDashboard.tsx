@@ -313,7 +313,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   useEffect(() => {
     let active = true;
     if (!supabase) return;
-    supabase.functions.invoke("wm-eb-access", { body: { action: "list_my_coheads" } })
+    supabase.functions.invoke("wm-eb-access", { body: { action: "list_my_coheads", department, section: section || null } })
       .then(({ data, error }) => {
         if (!active) return;
         if (error || !data?.success) { setCoHeadsError(data?.error || "Co-Head list unavailable."); return; }
