@@ -55,11 +55,25 @@ export function PublicMotionLayer() {
     sections.forEach((section) => {
       const header = section.querySelector<HTMLElement>('h1, h2');
       const intro = section.querySelector<HTMLElement>(':scope > div > p, :scope > div > div > p');
-      if (header) candidates.push(header);
+      if (header) {
+        header.classList.add('wm-title-motion');
+        candidates.push(header);
+      }
       if (intro && intro !== header) candidates.push(intro);
+
+      // Mark meaningful content cards for their own stagger and hover choreography.
       section.querySelectorAll<HTMLElement>(
         ':scope > div > div.grid > *, :scope > div > div.flex > *, [data-motion-item]'
-      ).forEach((item) => candidates.push(item));
+      ).forEach((item, index) => {
+        item.classList.add('wm-card-motion');
+        item.style.setProperty('--wm-card-index', String(index % 6));
+        candidates.push(item);
+      });
+
+      // Keep the original section markup and content intact; only add motion hooks.
+      section.querySelectorAll<HTMLElement>('img').forEach((img) => {
+        if (!img.closest('a, button')) img.classList.add('wm-image-motion');
+      });
     });
 
     const unique = Array.from(new Set(candidates)).filter((el) =>
@@ -87,8 +101,9 @@ export function PublicMotionLayer() {
       revealObserver.disconnect();
       document.body.classList.remove('westmun-motion-ready');
       unique.forEach((el) => {
-        el.classList.remove('wm-cinematic-item', 'wm-cinematic-in');
+        el.classList.remove('wm-cinematic-item', 'wm-cinematic-in', 'wm-title-motion', 'wm-card-motion');
         el.style.removeProperty('--wm-reveal-delay');
+        el.style.removeProperty('--wm-card-index');
       });
     };
   }, []);
