@@ -3,6 +3,7 @@ import { OpeningIntro } from './components/OpeningIntro';
 import { PublicMotionLayer } from './components/PublicMotionLayer';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
+import { DiplomaticGlobe } from './components/DiplomaticGlobe';
 import { ConferenceIntro } from './components/ConferenceIntro';
 import { ConferenceHighlights } from './components/ConferenceHighlights';
 import { AboutSection } from './components/AboutSection';
@@ -129,6 +130,9 @@ export default function App() {
 
       {/* B. Scroll-Controlled Cinematic Hero Section */}
       <Hero />
+
+      {/* Interactive diplomatic globe: the global story begins in Riyadh. */}
+      <DiplomaticGlobe />
 
       {/* Announcements (hidden until the first one is published) */}
       <AnnouncementsSection />
