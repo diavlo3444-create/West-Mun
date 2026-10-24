@@ -979,8 +979,20 @@ export const DEPARTMENT_WORKSPACES: Record<DepartmentKey, WorkspaceModule[]> = {
   dcc: dccModules,
 };
 
+/**
+ * Readiness, directives, and task-list modules are intentionally hidden from
+ * every department head portal. Keep their definitions in the registry so
+ * existing Supabase records remain untouched; they are simply not routable or
+ * shown in navigation, overview cards, or module grids.
+ */
+const HIDDEN_HEAD_MODULE = /readiness|directive|task/i;
+
 export function getWorkspaceModules(department: DepartmentKey): WorkspaceModule[] {
-  return DEPARTMENT_WORKSPACES[department] || [];
+  return (DEPARTMENT_WORKSPACES[department] || []).filter((module) => {
+    return !HIDDEN_HEAD_MODULE.test(
+      [module.id, module.category, module.label, module.navLabel].join(' '),
+    );
+  });
 }
 
 export function getWorkspaceModule(
