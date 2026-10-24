@@ -43,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   instagram_handle: '@westmun_27',
   instagram_url: 'https://www.instagram.com/westmun_27',
   registration_open: 'false',
+  chair_applications_open: 'false',
   registration_currency: 'USD',
   fee_early_bird: '',
   fee_regular: '',
