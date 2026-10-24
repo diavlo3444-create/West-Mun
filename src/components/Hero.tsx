@@ -949,30 +949,6 @@ export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) 
           </a>
         </div>
 
-        {/* HIGH-PERFORMANCE VIDEO SCRUB INDICATOR PILL */}
-        <div
-          className="absolute bottom-6 right-6 sm:bottom-8 sm:right-8 z-20 hidden md:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-[#0a0a0c]/85 border border-[#d4af37]/30 shadow-lg text-[10px] font-mono text-neutral-400 select-none pointer-events-none will-change-transform"
-          aria-hidden="true"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-pulse" />
-          <span className="text-[#f3e5ab]">SUMMIT REEL</span>
-          <span className="text-neutral-600">|</span>
-          <span ref={scrubSecRef} className="text-neutral-300">
-            00:00s
-          </span>
-          <span className="text-neutral-600">|</span>
-          <span ref={scrubPctRef} className="text-[#d4af37]">
-            0%
-          </span>
-          {/* Hardware-accelerated progress bar using scaleX */}
-          <div className="w-12 h-1 bg-neutral-800 rounded-full overflow-hidden ml-1">
-            <div
-              ref={scrubBarRef}
-              className="h-full bg-gradient-to-r from-[#d4af37] to-[#f7e7b4] origin-left will-change-transform"
-              style={{ transform: 'scaleX(0)' }}
-            />
-          </div>
-        </div>
       </div>
     </section>
   );
