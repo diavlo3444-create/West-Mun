@@ -177,7 +177,24 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
         listDepartmentTasks(scope),
       ]);
 
-      if (membersRes.data) setMembers(membersRes.data);
+      if (membersRes.data) {
+        // Co-head accounts are real auth users, not team_registrations rows.
+        // Keep them in the same assignment directory using their auth user UUID.
+        const coHeadMembers: ApprovedMember[] = coHeads.map((member) => ({
+          id: member.user_id,
+          full_name: member.full_name,
+          email: member.email,
+          phone: member.phone || null,
+          institution: 'WEST MUN Co-Head',
+          team: department,
+          section: (member.section as SectionKey | null | undefined) || scope.section || null,
+          status: 'accepted',
+          created_at: new Date().toISOString(),
+        }));
+        const byId = new Map<string, ApprovedMember>();
+        [...membersRes.data, ...coHeadMembers].forEach((member) => byId.set(member.id, member));
+        setMembers(Array.from(byId.values()));
+      }
       if (positionsRes.data) setPositions(positionsRes.data);
       if (tasksRes.data) setTasks(tasksRes.data);
 
@@ -191,7 +208,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [scope]);
+  }, [scope, coHeads, department]);
 
   useEffect(() => {
     loadData();
@@ -199,7 +216,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
 
   // Summary Metrics
   const metrics = useMemo(() => {
-    const totalApproved = members.length + coHeads.length;
+    const totalApproved = members.length;
     const memberIdsWithTask = new Set(tasks.map((t) => t.member_id));
     const memberIdsWithPos = new Set(positions.filter((p) => p.member_id).map((p) => p.member_id!));
     const allAssignedIds = new Set([...memberIdsWithTask, ...memberIdsWithPos]);
