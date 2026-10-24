@@ -2,10 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { RotateCcw, MoveHorizontal } from 'lucide-react';
 import * as THREE from 'three';
 
-const TEXTURES = {
-  earth: 'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
-};
-
 export const DiplomaticGlobe: React.FC = React.memo(() => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<THREE.Group | null>(null);
@@ -67,65 +63,78 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       scene.add(group);
       groupRef.current = group;
 
-      const loader = new THREE.TextureLoader();
-      const sphereGeometry = new THREE.SphereGeometry(1.28, 96, 96);
-      const earthMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-          map: { value: null },
-          landColor: { value: new THREE.Color('#c9ad68') },
-          oceanColor: { value: new THREE.Color('#080a0e') },
-          gridColor: { value: new THREE.Color('#8e7848') },
-        },
-        vertexShader: `
-          varying vec2 vUv;
-          varying vec3 vNormal;
-          varying vec3 vViewPosition;
-          void main() {
-            vUv = uv;
-            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-            vNormal = normalize(normalMatrix * normal);
-            vViewPosition = -mvPosition.xyz;
-            gl_Position = projectionMatrix * mvPosition;
-          }
-        `,
-        fragmentShader: `
-          uniform sampler2D map;
-          uniform vec3 landColor;
-          uniform vec3 oceanColor;
-          uniform vec3 gridColor;
-          varying vec2 vUv;
-          varying vec3 vNormal;
-          varying vec3 vViewPosition;
-          void main() {
-            vec3 source = texture2D(map, vUv).rgb;
-            // Use the source map only to extract the continent shapes, never its natural colors.
-            float land = smoothstep(0.018, 0.105, source.g - source.b);
-            float latGrid = 1.0 - smoothstep(0.0, 0.012, abs(fract(vUv.y * 18.0) - 0.5));
-            float lonGrid = 1.0 - smoothstep(0.0, 0.009, abs(fract(vUv.x * 36.0) - 0.5));
-            float grid = max(latGrid, lonGrid) * 0.20;
-            vec3 color = mix(oceanColor, landColor, land * 0.94);
-            color = mix(color, gridColor, grid * (0.35 + land * 0.55));
-            vec3 n = normalize(vNormal);
-            vec3 v = normalize(vViewPosition);
-            float rim = pow(1.0 - max(dot(n, v), 0.0), 2.4);
-            color += vec3(0.24, 0.18, 0.08) * rim * 0.48;
-            float light = 0.68 + 0.32 * max(dot(n, normalize(vec3(-0.55, 0.5, 1.0))), 0.0);
-            color *= light;
-            gl_FragColor = vec4(color, 1.0);
-          }
-        `,
+      // Build a graphic globe locally: no satellite imagery, no realistic Earth texture.
+      // The equirectangular artwork is deliberately restrained, like a diplomatic atlas.
+      const mapCanvas = document.createElement('canvas');
+      mapCanvas.width = 1600;
+      mapCanvas.height = 800;
+      const ctx = mapCanvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas unavailable');
+      ctx.fillStyle = '#07080b';
+      ctx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+      // Fine cartographic grid.
+      ctx.strokeStyle = 'rgba(192, 164, 96, 0.20)';
+      ctx.lineWidth = 1;
+      for (let lon = 0; lon <= 360; lon += 15) {
+        const x = (lon / 360) * mapCanvas.width;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, mapCanvas.height); ctx.stroke();
+      }
+      for (let lat = 0; lat <= 180; lat += 15) {
+        const y = (lat / 180) * mapCanvas.height;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(mapCanvas.width, y); ctx.stroke();
+      }
+
+      // Simplified continent silhouettes, drawn as clean vector cartography rather than imagery.
+      const continents: number[][][] = [
+        [[80,170],[115,130],[170,110],[220,130],[250,165],[300,175],[330,220],[310,255],[275,270],[260,315],[225,335],[205,390],[175,420],[150,390],[140,335],[115,300],[100,250],[75,220]],
+        [[300,390],[330,405],[350,445],[365,495],[350,555],[325,610],[305,590],[290,535],[275,485],[280,440]],
+        [[410,165],[455,135],[500,145],[535,175],[565,180],[595,205],[625,195],[650,225],[630,255],[590,260],[565,285],[535,270],[510,300],[485,280],[465,250],[430,235]],
+        [[480,290],[520,305],[540,350],[555,395],[540,450],[515,505],[485,535],[460,500],[450,450],[435,405],[445,350]],
+        [[650,180],[690,160],[730,170],[765,195],[805,205],[830,235],[810,255],[780,250],[755,275],[720,255],[690,225],[660,220]],
+        [[690,310],[735,300],[770,325],[790,365],[780,405],[755,430],[725,415],[700,380],[680,345]],
+        [[860,205],[910,185],[965,190],[1005,210],[1045,205],[1090,225],[1120,255],[1105,280],[1070,285],[1040,310],[1000,300],[965,325],[930,300],[900,275],[870,250]],
+        [[930,340],[970,325],[1000,350],[1020,400],[1005,455],[980,505],[950,490],[930,445],[915,395]],
+        [[1130,225],[1170,205],[1210,220],[1240,250],[1220,280],[1180,270],[1150,250]],
+        [[1270,470],[1320,450],[1370,470],[1405,505],[1385,535],[1340,545],[1300,520]]
+      ];
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      continents.forEach((points) => {
+        ctx.beginPath();
+        points.forEach(([x, y], i) => {
+          const px = (x / 1600) * mapCanvas.width;
+          const py = (y / 800) * mapCanvas.height;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        });
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(201, 173, 104, 0.055)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(201, 173, 104, 0.78)';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
       });
+
+      // Small points give the globe a subtle global-network feel.
+      let mapSeed = 13;
+      const mapRandom = () => { mapSeed = (mapSeed * 16807) % 2147483647; return (mapSeed - 1) / 2147483646; };
+      ctx.fillStyle = 'rgba(224, 199, 133, 0.62)';
+      for (let i = 0; i < 520; i++) {
+        const x = mapRandom() * mapCanvas.width;
+        const y = mapRandom() * mapCanvas.height;
+        ctx.beginPath();
+        ctx.arc(x, y, mapRandom() > 0.94 ? 1.8 : 0.75, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const globeTexture = new THREE.CanvasTexture(mapCanvas);
+      globeTexture.colorSpace = THREE.SRGBColorSpace;
+      globeTexture.anisotropy = 4;
+      const sphereGeometry = new THREE.SphereGeometry(1.28, 96, 96);
+      const earthMaterial = new THREE.MeshBasicMaterial({ map: globeTexture, color: '#ffffff' });
       const earth = new THREE.Mesh(sphereGeometry, earthMaterial);
       group.add(earth);
-      disposables.push(sphereGeometry, earthMaterial);
-
-      loader.load(TEXTURES.earth, (texture) => {
-        if (disposed) { texture.dispose(); return; }
-        texture.colorSpace = THREE.SRGBColorSpace;
-        earthMaterial.uniforms.map.value = texture;
-        earthMaterial.needsUpdate = true;
-        disposables.push(texture);
-      }, undefined, () => setWebglFailed(true));
+      disposables.push(globeTexture, sphereGeometry, earthMaterial);
 
       // A thin monochrome atmospheric edge, not a blue realistic-planet glow.
       const atmosphereMaterial = new THREE.ShaderMaterial({
@@ -236,7 +245,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
           </div>
           <div className="mt-10 flex items-center justify-center gap-3 text-[9px] uppercase tracking-[0.22em] text-[#777a80] lg:justify-start">
             <MoveHorizontal className="h-3.5 w-3.5 text-[#d7b45b]" strokeWidth={1.5} />
-            Drag to explore
+            Drag to rotate
           </div>
         </div>
 
@@ -256,7 +265,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
             onPointerCancel={stopDrag}
             onLostPointerCapture={stopDrag}
             role="img"
-            aria-label="Interactive monochrome gold-and-black globe. Drag horizontally to rotate it."
+            aria-label="Interactive dark cartographic globe with fine gold continent outlines. Drag horizontally to rotate it."
           >
             {webglFailed && <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm text-neutral-400">The globe could not load in this browser.</div>}
           </div>
