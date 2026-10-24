@@ -817,6 +817,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
             section={section}
             testToken={testMode?.token || null}
             initialGroup={selectedGroupForShift}
+            coHeads={coHeads}
           />
         )}
 
