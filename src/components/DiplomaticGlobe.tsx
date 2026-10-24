@@ -4,8 +4,6 @@ import * as THREE from 'three';
 
 const TEXTURES = {
   earth: 'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
-  normal: 'https://threejs.org/examples/textures/planets/earth_normal_2048.jpg',
-  clouds: 'https://threejs.org/examples/textures/planets/earth_clouds_1024.png',
 };
 
 export const DiplomaticGlobe: React.FC = React.memo(() => {
@@ -21,7 +19,6 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
     let renderer: THREE.WebGLRenderer | undefined;
     let frame = 0;
     let disposed = false;
-    let clouds: THREE.Mesh | undefined;
     let group: THREE.Group | undefined;
     let resizeObserver: ResizeObserver | undefined;
     const disposables: Array<THREE.Material | THREE.BufferGeometry | THREE.Texture> = [];
@@ -41,13 +38,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       renderer.domElement.setAttribute('aria-hidden', 'true');
       host.appendChild(renderer.domElement);
 
-      scene.add(new THREE.AmbientLight(0x9fb4d0, 1.0));
-      const sun = new THREE.DirectionalLight(0xffe2ad, 2.65);
-      sun.position.set(-3, 2, 4);
-      scene.add(sun);
-      const blueRim = new THREE.DirectionalLight(0x5d9bd1, 1.05);
-      blueRim.position.set(3, -1, -3);
-      scene.add(blueRim);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
       // Quiet star field: enough depth to read as space, never a glitter effect.
       const starPositions: number[] = [];
@@ -77,8 +68,53 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       groupRef.current = group;
 
       const loader = new THREE.TextureLoader();
-      const sphereGeometry = new THREE.SphereGeometry(1.28, 80, 80);
-      const earthMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.02 });
+      const sphereGeometry = new THREE.SphereGeometry(1.28, 96, 96);
+      const earthMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          map: { value: null },
+          landColor: { value: new THREE.Color('#c9ad68') },
+          oceanColor: { value: new THREE.Color('#080a0e') },
+          gridColor: { value: new THREE.Color('#8e7848') },
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          varying vec3 vNormal;
+          varying vec3 vViewPosition;
+          void main() {
+            vUv = uv;
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            vNormal = normalize(normalMatrix * normal);
+            vViewPosition = -mvPosition.xyz;
+            gl_Position = projectionMatrix * mvPosition;
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D map;
+          uniform vec3 landColor;
+          uniform vec3 oceanColor;
+          uniform vec3 gridColor;
+          varying vec2 vUv;
+          varying vec3 vNormal;
+          varying vec3 vViewPosition;
+          void main() {
+            vec3 source = texture2D(map, vUv).rgb;
+            // Use the source map only to extract the continent shapes, never its natural colors.
+            float land = smoothstep(0.018, 0.105, source.g - source.b);
+            float latGrid = 1.0 - smoothstep(0.0, 0.012, abs(fract(vUv.y * 18.0) - 0.5));
+            float lonGrid = 1.0 - smoothstep(0.0, 0.009, abs(fract(vUv.x * 36.0) - 0.5));
+            float grid = max(latGrid, lonGrid) * 0.20;
+            vec3 color = mix(oceanColor, landColor, land * 0.94);
+            color = mix(color, gridColor, grid * (0.35 + land * 0.55));
+            vec3 n = normalize(vNormal);
+            vec3 v = normalize(vViewPosition);
+            float rim = pow(1.0 - max(dot(n, v), 0.0), 2.4);
+            color += vec3(0.24, 0.18, 0.08) * rim * 0.48;
+            float light = 0.68 + 0.32 * max(dot(n, normalize(vec3(-0.55, 0.5, 1.0))), 0.0);
+            color *= light;
+            gl_FragColor = vec4(color, 1.0);
+          }
+        `,
+      });
       const earth = new THREE.Mesh(sphereGeometry, earthMaterial);
       group.add(earth);
       disposables.push(sphereGeometry, earthMaterial);
@@ -86,34 +122,19 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       loader.load(TEXTURES.earth, (texture) => {
         if (disposed) { texture.dispose(); return; }
         texture.colorSpace = THREE.SRGBColorSpace;
-        earthMaterial.map = texture;
+        earthMaterial.uniforms.map.value = texture;
         earthMaterial.needsUpdate = true;
+        disposables.push(texture);
       }, undefined, () => setWebglFailed(true));
-      loader.load(TEXTURES.normal, (texture) => {
-        if (disposed) { texture.dispose(); return; }
-        earthMaterial.normalMap = texture;
-        earthMaterial.normalScale = new THREE.Vector2(0.22, 0.22);
-        earthMaterial.needsUpdate = true;
-      });
-      loader.load(TEXTURES.clouds, (texture) => {
-        if (disposed) { texture.dispose(); return; }
-        const cloudMaterial = new THREE.MeshStandardMaterial({
-          map: texture, transparent: true, opacity: 0.19, depthWrite: false,
-          color: 0xdce5ec, roughness: 1, blending: THREE.AdditiveBlending,
-        });
-        clouds = new THREE.Mesh(new THREE.SphereGeometry(1.295, 64, 64), cloudMaterial);
-        group?.add(clouds);
-        disposables.push(texture, cloudMaterial, clouds.geometry);
-      });
 
-      // Fine atmospheric edge, with a restrained warm reflection to echo the site's gold.
+      // A thin monochrome atmospheric edge, not a blue realistic-planet glow.
       const atmosphereMaterial = new THREE.ShaderMaterial({
-        uniforms: { rimColor: { value: new THREE.Color('#8bb8e0') }, goldColor: { value: new THREE.Color('#d7b45b') } },
+        uniforms: { rimColor: { value: new THREE.Color('#bda15d') } },
         vertexShader: `varying vec3 vNormal; varying vec3 vViewPosition; void main(){ vec4 mvPosition = modelViewMatrix * vec4(position,1.0); vNormal = normalize(normalMatrix * normal); vViewPosition = -mvPosition.xyz; gl_Position = projectionMatrix * mvPosition; }`,
-        fragmentShader: `uniform vec3 rimColor; uniform vec3 goldColor; varying vec3 vNormal; varying vec3 vViewPosition; void main(){ vec3 n=normalize(vNormal); vec3 v=normalize(vViewPosition); float rim=pow(1.0-max(dot(n,v),0.0),2.7); vec3 c=mix(rimColor,goldColor,0.24); gl_FragColor=vec4(c,rim*0.42); }`,
+        fragmentShader: `uniform vec3 rimColor; varying vec3 vNormal; varying vec3 vViewPosition; void main(){ float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vViewPosition)),0.0),2.5); gl_FragColor=vec4(rimColor,rim*0.24); }`,
         transparent: true, side: THREE.BackSide, depthWrite: false, blending: THREE.AdditiveBlending,
       });
-      const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(1.36, 64, 64), atmosphereMaterial);
+      const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(1.34, 64, 64), atmosphereMaterial);
       group.add(atmosphere);
       disposables.push(atmosphere.geometry, atmosphereMaterial);
 
@@ -150,7 +171,6 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
         if (disposed || !renderer || !group) return;
         frame = requestAnimationFrame(animate);
         if (!dragRef.current.active) group.rotation.y += 0.00055;
-        if (clouds) clouds.rotation.y += 0.00012;
         renderer.render(scene, camera);
       };
       animate();
@@ -216,7 +236,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
           </div>
           <div className="mt-10 flex items-center justify-center gap-3 text-[9px] uppercase tracking-[0.22em] text-[#777a80] lg:justify-start">
             <MoveHorizontal className="h-3.5 w-3.5 text-[#d7b45b]" strokeWidth={1.5} />
-            Drag the Earth to explore
+            Drag to explore
           </div>
         </div>
 
@@ -236,9 +256,9 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
             onPointerCancel={stopDrag}
             onLostPointerCapture={stopDrag}
             role="img"
-            aria-label="Interactive realistic Earth. Drag horizontally to rotate the planet."
+            aria-label="Interactive monochrome gold-and-black globe. Drag horizontally to rotate it."
           >
-            {webglFailed && <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm text-neutral-400">The Earth could not load in this browser.</div>}
+            {webglFailed && <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm text-neutral-400">The globe could not load in this browser.</div>}
           </div>
           <div className="pointer-events-none absolute bottom-[8%] right-[2%] z-10 hidden border-l border-[#d7b45b]/50 pl-3 text-left sm:block">
             <div className="text-[9px] uppercase tracking-[0.24em] text-[#d7b45b]">WEST MUN</div>
