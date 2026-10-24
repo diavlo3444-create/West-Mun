@@ -60,7 +60,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
-    camera.position.set(0, 0, 4.65);
+    camera.position.set(0, 0, 5.55);
     const world = new THREE.Group();
     scene.add(world);
 
@@ -80,15 +80,15 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
     const starGeometry = new THREE.BufferGeometry();
     starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
     const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({
-      color: 0xd7cba5, size: 0.025, transparent: true, opacity: 0.65, sizeAttenuation: true,
+      color: 0xb18a3c, size: 0.018, transparent: true, opacity: 0.4, sizeAttenuation: true,
     }));
     scene.add(stars);
 
-    scene.add(new THREE.AmbientLight(0x71809a, 1.05));
-    const sun = new THREE.DirectionalLight(0xfff1d1, 3.15);
+    scene.add(new THREE.AmbientLight(0x8a6a32, 0.72));
+    const sun = new THREE.DirectionalLight(0xf3d58a, 2.35);
     sun.position.set(-4.5, 2.2, 5);
     scene.add(sun);
-    const goldRim = new THREE.DirectionalLight(0xc69b42, 1.4);
+    const goldRim = new THREE.DirectionalLight(0xd4a844, 1.85);
     goldRim.position.set(4, -1, -4);
     scene.add(goldRim);
 
@@ -118,6 +118,20 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
         emissiveIntensity: 0.34,
       }),
     );
+    // Re-map the satellite imagery into a restrained gold-and-obsidian palette.
+    // Land is warm metallic gold; oceans remain deep charcoal instead of blue.
+    (earth.material as THREE.MeshPhongMaterial).onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+         float landSignal = diffuseColor.r - diffuseColor.b * 0.82;
+         float landMask = smoothstep(0.025, 0.16, landSignal);
+         float detail = clamp(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+         vec3 oceanTone = vec3(0.012, 0.010, 0.007) + vec3(0.045, 0.030, 0.012) * detail;
+         vec3 landTone = mix(vec3(0.19, 0.125, 0.045), vec3(0.78, 0.57, 0.24), smoothstep(0.10, 0.42, detail));
+         diffuseColor.rgb = mix(oceanTone, landTone, landMask);`,
+      );
+    };
     world.add(earth);
 
     const clouds = new THREE.Mesh(
@@ -125,20 +139,20 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       new THREE.MeshPhongMaterial({
         map: cloudMap,
         transparent: true,
-        opacity: 0.23,
+        opacity: 0.13,
         depthWrite: false,
         blending: THREE.NormalBlending,
-        color: 0xe5e8ed,
+        color: 0xd8b15c,
       }),
     );
     world.add(clouds);
 
-    // Thin atmospheric shell with a blue-white edge and a restrained gold rim.
+    // Thin, restrained gold atmospheric shell.
     const atmosphere = new THREE.Mesh(
       new THREE.SphereGeometry(1.31, 72, 72),
       new THREE.ShaderMaterial({
         vertexShader: `varying vec3 vNormal; varying vec3 vViewPosition; void main(){ vec4 mvPosition=modelViewMatrix*vec4(position,1.0); vNormal=normalize(normalMatrix*normal); vViewPosition=-mvPosition.xyz; gl_Position=projectionMatrix*mvPosition; }`,
-        fragmentShader: `varying vec3 vNormal; varying vec3 vViewPosition; void main(){ float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vViewPosition)),0.0),2.35); vec3 blue=vec3(0.20,0.48,0.78); vec3 gold=vec3(0.72,0.49,0.17); float edge=smoothstep(0.25,0.95,rim); gl_FragColor=vec4(mix(blue,gold,edge*0.42),rim*0.62); }`,
+        fragmentShader: `varying vec3 vNormal; varying vec3 vViewPosition; void main(){ float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vViewPosition)),0.0),2.35); vec3 gold=vec3(0.78,0.54,0.20); gl_FragColor=vec4(gold,rim*0.46); }`,
         side: THREE.BackSide,
         blending: THREE.AdditiveBlending,
         transparent: true,
@@ -255,14 +269,14 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       className="relative isolate overflow-hidden border-t border-[#d4af37]/15 bg-[#05070a] text-white"
       aria-labelledby="global-stage-title"
     >
-      <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: 'radial-gradient(ellipse at 70% 45%, rgba(37,68,104,.16), transparent 43%), radial-gradient(ellipse at 70% 62%, rgba(212,175,55,.055), transparent 38%), linear-gradient(180deg,#07090d 0%,#05070a 100%)' }} />
-      <div className="mx-auto grid min-h-[690px] max-w-[1440px] grid-cols-1 items-center gap-0 px-5 py-20 sm:px-8 lg:min-h-[780px] lg:grid-cols-[0.78fr_1.22fr] lg:px-14 lg:py-16">
+      <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: 'radial-gradient(ellipse at 70% 45%, rgba(128,88,25,.10), transparent 43%), radial-gradient(ellipse at 70% 62%, rgba(212,175,55,.045), transparent 38%), linear-gradient(180deg,#07090d 0%,#05070a 100%)' }} />
+      <div className="mx-auto grid min-h-[560px] max-w-[1320px] grid-cols-1 items-center gap-0 px-5 py-14 sm:px-8 lg:min-h-[610px] lg:grid-cols-[0.9fr_1.1fr] lg:px-14 lg:py-12">
         <div className="relative z-10 mx-auto w-full max-w-xl lg:mx-0 lg:py-12">
           <div className="mb-7 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#d4af37] sm:text-xs">
             <span className="h-px w-8 bg-[#d4af37]" />
             <span>WEST MUN · RIYADH 2027</span>
           </div>
-          <h2 id="global-stage-title" className="max-w-lg font-serif text-5xl font-light leading-[0.98] tracking-[-0.045em] text-white sm:text-6xl lg:text-[4.7rem]" style={{ fontFamily: 'var(--font-serif)' }}>
+          <h2 id="global-stage-title" className="max-w-lg font-serif text-5xl font-light leading-[0.98] tracking-[-0.045em] text-white sm:text-6xl lg:text-[4.2rem]" style={{ fontFamily: 'var(--font-serif)' }}>
             One world.<br />
             <span className="italic text-[#d4af37]">Many perspectives.</span>
           </h2>
@@ -286,11 +300,11 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
           onPointerCancel={stopDrag}
           onLostPointerCapture={stopDrag}
           role="img"
-          aria-label="Realistic interactive Earth with cloud cover, atmosphere, and a gold marker on Riyadh. Drag horizontally to rotate."
+          aria-label="Interactive antique-gold Earth with obsidian oceans and a gold marker on Riyadh. Drag horizontally to rotate."
         >
           {webglFailed && <div className="absolute inset-0 grid place-items-center text-sm text-neutral-400">Your browser could not start the 3D globe.</div>}
           <div className="pointer-events-none absolute left-5 top-6 z-10 flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-2 text-[9px] uppercase tracking-[0.2em] text-neutral-300 backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37] shadow-[0_0_10px_#d4af37]" /> Earth · Live 3D
+            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37] shadow-[0_0_10px_#d4af37]" /> GOLDEN EARTH · 2027
           </div>
           <div className="absolute bottom-8 left-5 z-10 flex items-center gap-3">
             <div className="h-9 w-px bg-gradient-to-b from-[#f3e5ab] to-transparent" />
