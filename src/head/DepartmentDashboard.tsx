@@ -8,13 +8,10 @@ import {
   ShieldAlert,
   LogOut,
   Globe,
-  Network,
   QrCode,
-  Clock3,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { WebsiteEditor } from '../admin/WebsiteEditor';
-import { ShiftManagementDashboard } from './shifts/ShiftManagementDashboard';
 import {
   DEPARTMENTS,
   canManageRegistrations,
@@ -23,7 +20,6 @@ import {
   type DepartmentKey,
   type SectionKey,
 } from './departments';
-import { RolesDashboard } from './roles/RolesDashboard';
 import { DashboardShell, type NavGroup, type NavItem } from '../dashboard/DashboardShell';
 import { Notice } from '../dashboard/ui';
 import {
@@ -41,8 +37,6 @@ import { DCCCommitteeManager } from './DCCCommitteeManager';
 import { DCCApplicationsManager } from './DCCApplicationsManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
 import { OperationsWorkspace } from './OperationsWorkspace';
-import { GroupManagementDashboard } from './groups/GroupManagementDashboard';
-import type { WmTeamGroup } from './services/operationsStore';
 import { HeadCoHeadManagement } from './HeadCoHeadManagement';
 import { WorkspaceModuleGrid, WorkspaceOverview } from './WorkspaceOverview';
 import {
@@ -135,7 +129,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (initialView === 'inquiries' && isHr) return 'inquiries';
     if (initialView === 'dcc-applications' && department === 'dcc') return 'dcc-applications';
     if (initialView === 'dcc-committees' && department === 'dcc') return 'dcc-committees';
-    if (initialView === 'roles' && rolesAccess) return 'roles';
+    if (['roles', 'shifts', 'groups'].includes(initialView || '') && operationsAccess) return 'operations';
     if (initialView === 'department') return 'department';
     if (initialView === 'registrations' && registrationAccess) return 'registrations';
     if (initialView && workspaceModules.some((module) => module.id === initialView)) return initialView;
@@ -143,7 +137,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   });
 
   const [registrations, setRegistrations] = useState<HeadRegistration[]>([]);
-  const [selectedGroupForShift, setSelectedGroupForShift] = useState<WmTeamGroup | null>(null);
   const [coHeads, setCoHeads] = useState<Array<{user_id:string;full_name:string;email:string;phone?:string|null;gender?:string|null}>>([]);
   const [coHeadsError, setCoHeadsError] = useState("");
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -527,7 +520,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
   const navigate = (id: string) => {
     if (id === 'security-website') { window.location.assign('/scanner'); return; }
-    if (['operations', 'shifts', 'groups'].includes(id) && !operationsAccess) return;
+    if (['operations', 'shifts', 'groups', 'roles'].includes(id) && !operationsAccess) return;
     if (id === 'security-website' && !securityScannerAccess) return;
     if (id === 'website-editor' && !isCmsDepartment) return;
     if (id === 'registrations' && !registrationAccess) return;
@@ -555,15 +548,12 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(registrationAccess
       ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
       : []),
-    ...(rolesAccess ? [{ id: 'roles', label: 'Roles', icon: Network }] : []),
     ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
     ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
     ...(committeeAccess ? [{ id: 'dcc-applications', label: 'Applications', icon: Users }] : []),
     ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
     ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
     ...(operationsAccess ? [{ id: 'operations', label: 'Operations studio', icon: Users }] : []),
-    ...(operationsAccess ? [{ id: 'shifts', label: 'Shifts & Roster', icon: Clock3 }] : []),
-    ...(operationsAccess ? [{ id: 'groups', label: 'Team Management', icon: Users }] : []),
     { id: 'cohead-management', label: 'Co-Head Management', icon: Users },
     { id: 'department', label: 'Assignment', icon: Building2 },
     ...(securityScannerAccess ? [{ id: 'security-website', label: 'Security Scanner', icon: QrCode }] : []),
@@ -774,16 +764,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           />
         )}
 
-        {view === 'roles' && rolesAccess && (
-          <RolesDashboard
-            coHeads={coHeads}
-            department={department}
-            section={section}
-            departmentLabel={meta.label}
-            testToken={testMode?.token || null}
-          />
-        )}
-
         {view === 'sponsors' && isPr && (
           <HeadSponsorsManager headName={headName} headEmail={headEmail} />
         )}
@@ -799,34 +779,12 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           <HeadCoHeadManagement department={department} section={section} headName={headName} />
         )}
 
-        {view === 'groups' && operationsAccess && (
-          <GroupManagementDashboard
-            department={department}
-            section={section}
-            testToken={testMode?.token || null}
-            onAssignGroupToShift={(group) => {
-              setSelectedGroupForShift(group);
-              setView('shifts');
-            }}
-          />
-        )}
-
-        {view === 'shifts' && operationsAccess && (
-          <ShiftManagementDashboard
-            department={department}
-            section={section}
-            testToken={testMode?.token || null}
-            initialGroup={selectedGroupForShift}
-            coHeads={coHeads}
-          />
-        )}
-
         {view === 'operations' && operationsAccess && (
           <OperationsWorkspace
             department={department}
             section={section}
             testToken={testMode?.token || null}
-            initialGroup={selectedGroupForShift}
+            coHeads={coHeads}
           />
         )}
 
