@@ -28,11 +28,15 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
   const [dragging, setDragging] = useState(false);
   const [webglFailed, setWebglFailed] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const visibleRef = useRef(false);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const observer = new IntersectionObserver(([entry]) => setIsVisible(entry.isIntersecting), { threshold: 0.01 });
+    const observer = new IntersectionObserver(([entry]) => {
+      visibleRef.current = entry.isIntersecting;
+      setIsVisible(entry.isIntersecting);
+    }, { threshold: 0.01 });
     observer.observe(host);
     return () => observer.disconnect();
   }, []);
@@ -196,7 +200,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
 
     const render = (now: number) => {
       raf = requestAnimationFrame(render);
-      if (!isVisible || document.hidden) { last = 0; return; }
+      if (!visibleRef.current || document.hidden) { last = 0; return; }
       const dt = last ? Math.min(0.04, (now - last) / 1000) : 0.016;
       last = now;
       if (!dragRef.current.active && !reducedMotion) world.rotation.y += dt * 0.055;
@@ -230,7 +234,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       renderer.domElement.remove();
       sceneRef.current = null;
     };
-  }, [isVisible]);
+  }, []);
 
   const startDrag = (clientX: number) => {
     if (!sceneRef.current) return;
