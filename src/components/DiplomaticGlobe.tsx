@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { RotateCcw, MoveHorizontal } from 'lucide-react';
+import { RotateCcw, MoveHorizontal, Play, Pause, Compass } from 'lucide-react';
 import * as THREE from 'three';
 
 export const DiplomaticGlobe: React.FC = React.memo(() => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<THREE.Group | null>(null);
   const dragRef = useRef({ active: false, x: 0, rotation: 0 });
+  const targetRotationRef = useRef<number | null>(null);
+  const autoRotateRef = useRef(true);
   const [dragging, setDragging] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(true);
+  const [selectedRegion, setSelectedRegion] = useState('');
   const [webglFailed, setWebglFailed] = useState(false);
 
   useEffect(() => {
@@ -214,7 +218,13 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       const animate = () => {
         if (disposed || !renderer || !group) return;
         frame = requestAnimationFrame(animate);
-        if (!dragRef.current.active) group.rotation.y += 0.00055;
+        if (!dragRef.current.active) {
+          if (targetRotationRef.current !== null) {
+            const delta = targetRotationRef.current - group.rotation.y;
+            group.rotation.y += delta * 0.055;
+            if (Math.abs(delta) < 0.001) { group.rotation.y = targetRotationRef.current; targetRotationRef.current = null; }
+          } else if (autoRotateRef.current) group.rotation.y += 0.00055;
+        }
         renderer.render(scene, camera);
       };
       animate();
@@ -236,6 +246,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
   }, []);
 
   const startDrag = (clientX: number) => {
+    targetRotationRef.current = null;
     dragRef.current = { active: true, x: clientX, rotation: groupRef.current?.rotation.y ?? 0 };
     setDragging(true);
   };
@@ -248,7 +259,21 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
     setDragging(false);
   };
   const resetGlobe = () => {
-    if (groupRef.current) groupRef.current.rotation.set(0, 0, 0);
+    targetRotationRef.current = 0;
+    setSelectedRegion('');
+  };
+
+  const toggleAutoRotate = () => {
+    const next = !autoRotate;
+    autoRotateRef.current = next;
+    setAutoRotate(next);
+  };
+
+  const focusRegion = (name: string, rotation: number) => {
+    targetRotationRef.current = rotation;
+    autoRotateRef.current = false;
+    setAutoRotate(false);
+    setSelectedRegion(name);
   };
 
   return (
@@ -311,6 +336,23 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
           <button type="button" onClick={resetGlobe} className="absolute right-2 top-[8%] z-10 inline-flex items-center gap-2 border border-white/15 bg-black/35 px-3 py-2 text-[9px] uppercase tracking-[0.16em] text-white/65 backdrop-blur-md transition-colors hover:border-[#d7b45b]/60 hover:text-[#f3e5ab]" aria-label="Reset globe rotation">
             <RotateCcw className="h-3 w-3" /> Reset view
           </button>
+          <div className="absolute right-2 top-[17%] z-10 flex items-center gap-1 border border-white/10 bg-black/45 p-1 backdrop-blur-md">
+            <button type="button" onClick={toggleAutoRotate} className="inline-flex items-center gap-2 px-2.5 py-2 text-[9px] uppercase tracking-[0.13em] text-white/70 hover:text-[#f3e5ab]" aria-label={autoRotate ? 'Pause automatic rotation' : 'Resume automatic rotation'}>
+              {autoRotate ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+              <span>{autoRotate ? 'Pause' : 'Auto rotate'}</span>
+            </button>
+          </div>
+          <div className="absolute bottom-2 left-1/2 z-10 w-[min(96%,440px)] -translate-x-1/2 border border-white/10 bg-[#08090c]/85 p-3 backdrop-blur-xl sm:bottom-[4%] sm:left-auto sm:right-2 sm:w-[210px] sm:translate-x-0">
+            <div className="mb-2 flex items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-[#d7b45b]"><Compass className="h-3 w-3" /> Explore the world</div>
+            <div className="grid grid-cols-4 gap-1 sm:grid-cols-2">
+              {[{ name: 'Americas', rotation: 1.35 }, { name: 'Europe', rotation: 0.25 }, { name: 'Africa', rotation: -0.35 }, { name: 'Asia', rotation: -1.55 }].map((region) => (
+                <button key={region.name} type="button" onClick={() => focusRegion(region.name, region.rotation)} className={'border px-2 py-2 text-[9px] uppercase tracking-[0.12em] transition-all ' + (selectedRegion === region.name ? 'border-[#d7b45b]/70 bg-[#d7b45b]/10 text-[#f3e5ab]' : 'border-white/10 text-white/55 hover:border-[#d7b45b]/40 hover:text-white')}>
+                  {region.name}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 text-[9px] leading-4 text-white/40">{selectedRegion ? 'Viewing ' + selectedRegion + ' · drag to explore nearby' : 'Choose a region or drag the globe to explore'}</div>
+          </div>
         </div>
       </div>
     </section>
