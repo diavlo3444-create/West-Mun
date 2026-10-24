@@ -51,11 +51,9 @@ export const ChairApplicationsManager: React.FC = () => {
     const next = !isOpen;
     setBusy('toggle');
     setMessage('');
-    const { error } = await supabase.from('settings').upsert({
-      key: 'chair_applications_open',
-      value: String(next),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'key' });
+    const { error } = await supabase.from('settings')
+      .update({ value: String(next), updated_at: new Date().toISOString() })
+      .eq('key', 'chair_applications_open');
     if (error) setMessage('Could not update the application window: ' + error.message);
     else {
       setIsOpen(next);
