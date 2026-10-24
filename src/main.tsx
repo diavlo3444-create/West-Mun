@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client';
+import { Analytics } from '@vercel/analytics/react';
 // Fonts are bundled with the site (no requests to Google Fonts or other third parties).
 import '@fontsource/cinzel/latin-500.css';
 import '@fontsource/cinzel/latin-600.css';
@@ -55,7 +56,12 @@ async function boot() {
   } else {
     Page = (await import('./App')).default;
   }
-  createRoot(document.getElementById('root')!).render(<Page />);
+  createRoot(document.getElementById('root')!).render(
+    <>
+      <Page />
+      <Analytics />
+    </>,
+  );
 }
 
 boot();
