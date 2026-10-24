@@ -111,7 +111,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
     [department, section, testToken]
   );
 
-  const [activeTab, setActiveTab] = useState<MainTab>('tasks');
+  const [activeTab, setActiveTab] = useState<MainTab>('hierarchy');
   const [hierarchyMode, setHierarchyMode] = useState<HierarchyViewMode>('chart');
 
   // Core Data State
@@ -542,14 +542,6 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              onClick={() => handleOpenCreateTask()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[#d4af37] bg-[#d4af37] px-3.5 py-2 text-xs font-semibold text-black transition-colors hover:bg-[#e2c258]"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Assign Role / Task</span>
-            </button>
-            <button
-              type="button"
               onClick={() => handleOpenCreatePos(null)}
               className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.15] bg-white/[0.04] px-3.5 py-2 text-xs font-semibold text-neutral-200 transition-colors hover:bg-white/[0.08] hover:text-white"
             >
@@ -631,19 +623,6 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setActiveTab('tasks')}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
-              activeTab === 'tasks'
-                ? 'bg-[#d4af37]/20 border border-[#d4af37]/50 text-[#d4af37] shadow-sm'
-                : 'text-neutral-400 hover:text-white hover:bg-white/[0.04]'
-            }`}
-          >
-            <Briefcase className="h-3.5 w-3.5" />
-            <span>Roles & Task Assignments ({tasks.length})</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('hierarchy')}
             className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
               activeTab === 'hierarchy'
@@ -656,33 +635,6 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
           </button>
         </div>
 
-        {/* Sub-toggle for Hierarchy View mode */}
-        {activeTab === 'hierarchy' && (
-          <div className="flex items-center rounded-lg border border-white/[0.1] bg-[#0c0c0f] p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setHierarchyMode('chart')}
-              className={`rounded-md px-3 py-1 text-[11px] font-mono uppercase transition-colors ${
-                hierarchyMode === 'chart'
-                  ? 'bg-[#d4af37]/20 text-[#d4af37] font-semibold'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              Org Chart
-            </button>
-            <button
-              type="button"
-              onClick={() => setHierarchyMode('list')}
-              className={`rounded-md px-3 py-1 text-[11px] font-mono uppercase transition-colors ${
-                hierarchyMode === 'list'
-                  ? 'bg-[#d4af37]/20 text-[#d4af37] font-semibold'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              List View
-            </button>
-          </div>
-        )}
       </div>
 
       {/* TAB 1: ROLES & TASK ASSIGNMENTS */}
@@ -946,27 +898,15 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
               <p className="rounded-xl border border-dashed border-white/10 bg-black/20 p-4 text-xs text-neutral-400">No EB members are assigned to this head yet. New members linked to your head account or matching this team and section will appear here automatically.</p>
             )}
           </section>
-          {hierarchyMode === 'chart' ? (
-            <OrgChartView
-              positions={positions}
-              members={members}
-              tasks={tasks}
-              onAddPosition={handleOpenCreatePos}
-              onEditPosition={handleOpenEditPos}
-              onDeletePosition={(p) => setPosDeleteTarget(p)}
-              onSelectMember={handleOpenMemberDossier}
-            />
-          ) : (
-            <OrgListView
-              positions={positions}
-              members={members}
-              tasks={tasks}
-              onAddPosition={handleOpenCreatePos}
-              onEditPosition={handleOpenEditPos}
-              onDeletePosition={(p) => setPosDeleteTarget(p)}
-              onSelectMember={handleOpenMemberDossier}
-            />
-          )}
+          <OrgChartView
+            positions={positions}
+            members={members}
+            tasks={tasks}
+            onAddPosition={handleOpenCreatePos}
+            onEditPosition={handleOpenEditPos}
+            onDeletePosition={(p) => setPosDeleteTarget(p)}
+            onSelectMember={handleOpenMemberDossier}
+          />
         </div>
       )}
 
