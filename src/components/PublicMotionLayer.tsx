@@ -37,7 +37,34 @@ export function PublicMotionLayer() {
     }, { threshold: [0.12, 0.3, 0.55], rootMargin: '-18% 0px -45% 0px' });
 
     chapterElements.forEach((section) => activeObserver.observe(section));
-    return () => activeObserver.disconnect();
+    // Lightweight one-shot reveals: no scroll handlers or layout reads, and the hero video is untouched.
+    const cardSelector = '#highlights [class*="grid"] > *, #committees [class*="grid"] > *, #schedule [class*="grid"] > *, #secretariat [class*="grid"] > *';
+    const motionTargets = Array.from(document.querySelectorAll<HTMLElement>(
+      '#highlights h2, #about h2, #committees h2, #schedule h2, #secretariat h2, #register h2, #faq h2, #contact h2, ' + cardSelector
+    ));
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion || !('IntersectionObserver' in window)) return () => activeObserver.disconnect();
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        (entry.target as HTMLElement).classList.add('wm-scroll-reveal--visible');
+        revealObserver.unobserve(entry.target);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -7% 0px' });
+
+    motionTargets.forEach((element, index) => {
+      element.classList.add('wm-scroll-reveal');
+      if (element.matches(cardSelector)) {
+        element.style.setProperty('--wm-reveal-delay', String(Math.min(index % 6, 5) * 65) + 'ms');
+      }
+      revealObserver.observe(element);
+    });
+
+    return () => {
+      activeObserver.disconnect();
+      revealObserver.disconnect();
+    };
   }, []);
 
   return (
