@@ -27,7 +27,6 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
   const dragRef = useRef({ active: false, x: 0, rotation: 0 });
   const [dragging, setDragging] = useState(false);
   const [webglFailed, setWebglFailed] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
   const visibleRef = useRef(false);
 
   useEffect(() => {
@@ -35,7 +34,6 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
     if (!host) return;
     const observer = new IntersectionObserver(([entry]) => {
       visibleRef.current = entry.isIntersecting;
-      setIsVisible(entry.isIntersecting);
     }, { threshold: 0.01 });
     observer.observe(host);
     return () => observer.disconnect();
