@@ -85,46 +85,67 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(mapCanvas.width, y); ctx.stroke();
       }
 
-      // Simplified continent silhouettes, drawn as clean vector cartography rather than imagery.
-      const continents: number[][][] = [
-        [[80,170],[115,130],[170,110],[220,130],[250,165],[300,175],[330,220],[310,255],[275,270],[260,315],[225,335],[205,390],[175,420],[150,390],[140,335],[115,300],[100,250],[75,220]],
-        [[300,390],[330,405],[350,445],[365,495],[350,555],[325,610],[305,590],[290,535],[275,485],[280,440]],
-        [[410,165],[455,135],[500,145],[535,175],[565,180],[595,205],[625,195],[650,225],[630,255],[590,260],[565,285],[535,270],[510,300],[485,280],[465,250],[430,235]],
-        [[480,290],[520,305],[540,350],[555,395],[540,450],[515,505],[485,535],[460,500],[450,450],[435,405],[445,350]],
-        [[650,180],[690,160],[730,170],[765,195],[805,205],[830,235],[810,255],[780,250],[755,275],[720,255],[690,225],[660,220]],
-        [[690,310],[735,300],[770,325],[790,365],[780,405],[755,430],[725,415],[700,380],[680,345]],
-        [[860,205],[910,185],[965,190],[1005,210],[1045,205],[1090,225],[1120,255],[1105,280],[1070,285],[1040,310],[1000,300],[965,325],[930,300],[900,275],[870,250]],
-        [[930,340],[970,325],[1000,350],[1020,400],[1005,455],[980,505],[950,490],[930,445],[915,395]],
-        [[1130,225],[1170,205],[1210,220],[1240,250],[1220,280],[1180,270],[1150,250]],
-        [[1270,470],[1320,450],[1370,470],[1405,505],[1385,535],[1340,545],[1300,520]]
-      ];
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      continents.forEach((points) => {
-        ctx.beginPath();
-        points.forEach(([x, y], i) => {
-          const px = (x / 1600) * mapCanvas.width;
-          const py = (y / 800) * mapCanvas.height;
-          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-        });
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(201, 173, 104, 0.055)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(201, 173, 104, 0.78)';
-        ctx.lineWidth = 1.6;
-        ctx.stroke();
-      });
+      // Accurate country outlines from the public geo-countries dataset.
+      // Draw GeoJSON into the equirectangular canvas so the globe keeps its dark/gold style
+      // without relying on hand-drawn continent approximations.
+      const drawGeoJson = (geojson: any) => {
+        ctx!.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+        ctx!.fillStyle = '#07080b';
+        ctx!.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
 
-      // Small points give the globe a subtle global-network feel.
-      let mapSeed = 13;
-      const mapRandom = () => { mapSeed = (mapSeed * 16807) % 2147483647; return (mapSeed - 1) / 2147483646; };
-      ctx.fillStyle = 'rgba(224, 199, 133, 0.62)';
-      for (let i = 0; i < 520; i++) {
-        const x = mapRandom() * mapCanvas.width;
-        const y = mapRandom() * mapCanvas.height;
-        ctx.beginPath();
-        ctx.arc(x, y, mapRandom() > 0.94 ? 1.8 : 0.75, 0, Math.PI * 2);
-        ctx.fill();
+        const project = (coord: number[]) => ({
+          x: ((coord[0] + 180) / 360) * mapCanvas.width,
+          y: ((90 - coord[1]) / 180) * mapCanvas.height,
+        });
+
+        const drawRing = (ring: number[][]) => {
+          if (!ring.length) return;
+          ctx!.beginPath();
+          ring.forEach((coord, i) => {
+            const p = project(coord);
+            if (i === 0) ctx!.moveTo(p.x, p.y);
+            else ctx!.lineTo(p.x, p.y);
+          });
+          ctx!.closePath();
+          ctx!.fillStyle = 'rgba(201, 173, 104, 0.055)';
+          ctx!.fill();
+          ctx!.strokeStyle = 'rgba(201, 173, 104, 0.78)';
+          ctx!.lineWidth = 1.15;
+          ctx!.stroke();
+        };
+
+        const drawPolygon = (polygon: number[][][]) => polygon.forEach(drawRing);
+        geojson.features?.forEach((feature: any) => {
+          const geometry = feature.geometry;
+          if (!geometry) return;
+          if (geometry.type === 'Polygon') drawPolygon(geometry.coordinates);
+          else if (geometry.type === 'MultiPolygon') geometry.coordinates.forEach(drawPolygon);
+        });
+
+        // Grid is layered above the map for the fine atlas treatment.
+        ctx!.strokeStyle = 'rgba(192, 164, 96, 0.20)';
+        ctx!.lineWidth = 1;
+        for (let lon = 0; lon <= 360; lon += 15) {
+          const x = (lon / 360) * mapCanvas.width;
+          ctx!.beginPath(); ctx!.moveTo(x, 0); ctx!.lineTo(x, mapCanvas.height); ctx!.stroke();
+        }
+        for (let lat = 0; lat <= 180; lat += 15) {
+          const y = (lat / 180) * mapCanvas.height;
+          ctx!.beginPath(); ctx!.moveTo(0, y); ctx!.lineTo(mapCanvas.width, y); ctx!.stroke();
+        }
+      };
+
+      // Keep a quick grid visible immediately; replace it with real country boundaries
+      // as soon as the GeoJSON loads. Failure leaves the globe functional.
+      ctx.strokeStyle = 'rgba(192, 164, 96, 0.20)';
+      ctx.lineWidth = 1;
+      for (let lon = 0; lon <= 360; lon += 15) {
+        const x = (lon / 360) * mapCanvas.width;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, mapCanvas.height); ctx.stroke();
+      }
+      for (let lat = 0; lat <= 180; lat += 15) {
+        const y = (lat / 180) * mapCanvas.height;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(mapCanvas.width, y); ctx.stroke();
       }
 
       const globeTexture = new THREE.CanvasTexture(mapCanvas);
@@ -135,6 +156,20 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       const earth = new THREE.Mesh(sphereGeometry, earthMaterial);
       group.add(earth);
       disposables.push(globeTexture, sphereGeometry, earthMaterial);
+
+      fetch('https://raw.githubusercontent.com/datasets/geo-countries/main/data/countries.geojson')
+        .then((response) => {
+          if (!response.ok) throw new Error('Country map unavailable');
+          return response.json();
+        })
+        .then((geojson) => {
+          if (disposed) return;
+          drawGeoJson(geojson);
+          globeTexture.needsUpdate = true;
+        })
+        .catch(() => {
+          // Keep the initial atlas grid rather than breaking the interactive globe.
+        });
 
       // A thin monochrome atmospheric edge, not a blue realistic-planet glow.
       const atmosphereMaterial = new THREE.ShaderMaterial({
