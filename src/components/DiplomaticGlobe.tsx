@@ -36,292 +36,68 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
       visibleRef.current = entry.isIntersecting;
     }, { threshold: 0.01 });
     observer.observe(host);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const host = canvasHostRef.current;
-    if (!host) return;
-    let renderer: THREE.WebGLRenderer;
-    try {
-      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
-    } catch {
-      setWebglFailed(true);
-      return;
-    }
-    renderer.setClearColor(0x000000, 0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth < 600 ? 1.35 : 1.7));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
-    renderer.domElement.className = 'absolute inset-0 block h-full w-full';
-    renderer.domElement.setAttribute('aria-hidden', 'true');
-    host.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
-    camera.position.set(0, 0, 5.55);
-    const world = new THREE.Group();
-    scene.add(world);
-
-    // Quiet star field: a little depth, never a noisy particle storm.
-    const starPositions = new Float32Array(950 * 3);
-    let seed = 2027;
-    const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-    for (let i = 0; i < 950; i++) {
-      const radius = 7 + random() * 18;
-      const theta = random() * Math.PI * 2;
-      const z = random() * 2 - 1;
-      const planar = Math.sqrt(1 - z * z);
-      starPositions[i * 3] = radius * planar * Math.cos(theta);
-      starPositions[i * 3 + 1] = radius * z;
-      starPositions[i * 3 + 2] = radius * planar * Math.sin(theta);
-    }
-    const starGeometry = new THREE.BufferGeometry();
-    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({
-      color: 0xb18a3c, size: 0.018, transparent: true, opacity: 0.4, sizeAttenuation: true,
-    }));
-    scene.add(stars);
-
-    scene.add(new THREE.AmbientLight(0x8a6a32, 0.72));
-    const sun = new THREE.DirectionalLight(0xf3d58a, 2.35);
-    sun.position.set(-4.5, 2.2, 5);
-    scene.add(sun);
-    const goldRim = new THREE.DirectionalLight(0xd4a844, 1.85);
-    goldRim.position.set(4, -1, -4);
-    scene.add(goldRim);
-
-    const loader = new THREE.TextureLoader();
-    loader.setCrossOrigin('anonymous');
-    const loadTexture = (url: string) => loader.load(url, undefined, undefined, () => {});
-    const earthMap = loadTexture(EARTH_TEXTURES.surface);
-    earthMap.colorSpace = THREE.SRGBColorSpace;
-    const normalMap = loadTexture(EARTH_TEXTURES.normal);
-    const specularMap = loadTexture(EARTH_TEXTURES.specular);
-    const lightsMap = loadTexture(EARTH_TEXTURES.lights);
-    lightsMap.colorSpace = THREE.SRGBColorSpace;
-    const cloudMap = loadTexture(EARTH_TEXTURES.clouds);
-    cloudMap.colorSpace = THREE.SRGBColorSpace;
-
-    const earth = new THREE.Mesh(
-      new THREE.SphereGeometry(1.25, 96, 96),
-      new THREE.MeshPhongMaterial({
-        map: earthMap,
-        normalMap,
-        normalScale: new THREE.Vector2(0.32, 0.32),
-        specularMap,
-        specular: new THREE.Color(0x68778a),
-        shininess: 14,
-        emissiveMap: lightsMap,
-        emissive: new THREE.Color(0xc49a48),
-        emissiveIntensity: 0.34,
-      }),
-    );
-    // Re-map the satellite imagery into a restrained gold-and-obsidian palette.
-    // Land is warm metallic gold; oceans remain deep charcoal instead of blue.
-    (earth.material as THREE.MeshPhongMaterial).onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-         float landSignal = diffuseColor.r - diffuseColor.b * 0.82;
-         float landMask = smoothstep(0.025, 0.16, landSignal);
-         float detail = clamp(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
-         vec3 oceanTone = vec3(0.012, 0.010, 0.007) + vec3(0.045, 0.030, 0.012) * detail;
-         vec3 landTone = mix(vec3(0.19, 0.125, 0.045), vec3(0.78, 0.57, 0.24), smoothstep(0.10, 0.42, detail));
-         diffuseColor.rgb = mix(oceanTone, landTone, landMask);`,
-      );
-    };
-    world.add(earth);
-
-    const clouds = new THREE.Mesh(
-      new THREE.SphereGeometry(1.263, 72, 72),
-      new THREE.MeshPhongMaterial({
-        map: cloudMap,
-        transparent: true,
-        opacity: 0.13,
-        depthWrite: false,
-        blending: THREE.NormalBlending,
-        color: 0xd8b15c,
-      }),
-    );
-    world.add(clouds);
-
-    // Thin, restrained gold atmospheric shell.
-    const atmosphere = new THREE.Mesh(
-      new THREE.SphereGeometry(1.31, 72, 72),
-      new THREE.ShaderMaterial({
-        vertexShader: `varying vec3 vNormal; varying vec3 vViewPosition; void main(){ vec4 mvPosition=modelViewMatrix*vec4(position,1.0); vNormal=normalize(normalMatrix*normal); vViewPosition=-mvPosition.xyz; gl_Position=projectionMatrix*mvPosition; }`,
-        fragmentShader: `varying vec3 vNormal; varying vec3 vViewPosition; void main(){ float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vViewPosition)),0.0),2.35); vec3 gold=vec3(0.78,0.54,0.20); gl_FragColor=vec4(gold,rim*0.46); }`,
-        side: THREE.BackSide,
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        depthWrite: false,
-      }),
-    );
-    world.add(atmosphere);
-
-    // Riyadh marker and a restrained route arc to Paris, used as a visual metaphor—not a claimed partnership.
-    const riyadh = surfacePoint(24.7136, 46.6753, 1.272);
-    const marker = new THREE.Group();
-    marker.position.copy(riyadh);
-    marker.lookAt(riyadh.clone().multiplyScalar(2));
-    const markerCore = new THREE.Mesh(
-      new THREE.SphereGeometry(0.022, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xffe6a0 }),
-    );
-    marker.add(markerCore);
-    const markerRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.045, 0.0035, 8, 36),
-      new THREE.MeshBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.95 }),
-    );
-    marker.add(markerRing);
-    world.add(marker);
-
-    const paris = surfacePoint(48.8566, 2.3522, 1.272);
-    const arcMid = riyadh.clone().add(paris).normalize().multiplyScalar(1.67);
-    const arc = new THREE.QuadraticBezierCurve3(riyadh, arcMid, paris);
-    const arcLine = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(arc.getPoints(64)),
-      new THREE.LineBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.52 }),
-    );
-    world.add(arcLine);
-
-    sceneRef.current = { renderer, group: world };
-    let raf = 0;
-    let last = 0;
-    let width = 1;
-    let height = 1;
-    let reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const onMotionChange = (event: MediaQueryListEvent) => { reducedMotion = event.matches; };
-    motionQuery.addEventListener('change', onMotionChange);
-
-    const resize = () => {
-      width = Math.max(1, host.clientWidth);
-      height = Math.max(1, host.clientHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, width < 600 ? 1.25 : 1.6));
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.fov = width < 600 ? 39 : 34;
-      camera.updateProjectionMatrix();
-    };
-    resize();
-    const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(host);
-
-    const render = (now: number) => {
-      raf = requestAnimationFrame(render);
-      if (!visibleRef.current || document.hidden) { last = 0; return; }
-      const dt = last ? Math.min(0.04, (now - last) / 1000) : 0.016;
-      last = now;
-      if (!dragRef.current.active && !reducedMotion) world.rotation.y += dt * 0.055;
-      clouds.rotation.y += dt * 0.012;
-
-      // Scroll gently pushes the Earth forward, then eases back—cinematic but never hijacks page scroll.
-      const rect = host.getBoundingClientRect();
-      const viewport = Math.max(1, window.innerHeight);
-      const progress = THREE.MathUtils.clamp((viewport - rect.top) / (viewport + rect.height), 0, 1);
-      const scrollScale = reducedMotion ? 1 : 0.94 + Math.sin(progress * Math.PI) * 0.075;
-      world.scale.setScalar(scrollScale);
-      world.rotation.x = THREE.MathUtils.lerp(world.rotation.x, reducedMotion ? -0.04 : -0.04 + Math.sin(progress * Math.PI) * 0.045, 0.035);
-      stars.rotation.y += reducedMotion ? 0 : dt * 0.0015;
-      renderer.render(scene, camera);
-    };
-    raf = requestAnimationFrame(render);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      resizeObserver.disconnect();
-      motionQuery.removeEventListener('change', onMotionChange);
-      scene.traverse((object) => {
-        if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Line) {
-          object.geometry.dispose();
-          const material = object.material;
-          (Array.isArray(material) ? material : [material]).forEach((entry) => entry.dispose());
-        }
-      });
-      [earthMap, normalMap, specularMap, lightsMap, cloudMap].forEach((texture) => texture.dispose());
-      renderer.dispose();
-      renderer.domElement.remove();
-      sceneRef.current = null;
-    };
-  }, []);
-
-  const startDrag = (clientX: number) => {
-    if (!sceneRef.current) return;
-    dragRef.current = { active: true, x: clientX, rotation: sceneRef.current.group.rotation.y };
-    setDragging(true);
-  };
-  const moveDrag = (clientX: number) => {
-    if (!dragRef.current.active || !sceneRef.current) return;
-    sceneRef.current.group.rotation.y = dragRef.current.rotation + (clientX - dragRef.current.x) * 0.006;
-  };
-  const stopDrag = () => { dragRef.current.active = false; setDragging(false); };
-  const resetGlobe = () => {
-    if (sceneRef.current) sceneRef.current.group.rotation.set(-0.04, 0, 0);
-  };
-
-  return (
+    return (
     <section
       ref={hostRef}
       id="global-stage"
-      className="relative isolate overflow-hidden border-t border-[#d4af37]/15 bg-[#05070a] text-white"
+      className="relative isolate overflow-hidden border-y border-[#d4af37]/15 bg-[#050505] text-white"
       aria-labelledby="global-stage-title"
     >
-      <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: 'radial-gradient(ellipse at 70% 45%, rgba(128,88,25,.10), transparent 43%), radial-gradient(ellipse at 70% 62%, rgba(212,175,55,.045), transparent 38%), linear-gradient(180deg,#07090d 0%,#05070a 100%)' }} />
-      <div className="mx-auto grid min-h-[560px] max-w-[1320px] grid-cols-1 items-center gap-0 px-5 py-14 sm:px-8 lg:min-h-[610px] lg:grid-cols-[0.9fr_1.1fr] lg:px-14 lg:py-12">
-        <div className="relative z-10 mx-auto w-full max-w-xl lg:mx-0 lg:py-12">
-          <div className="mb-7 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#d4af37] sm:text-xs">
-            <span className="h-px w-8 bg-[#d4af37]" />
-            <span>WEST MUN · RIYADH 2027</span>
-          </div>
-          <h2 id="global-stage-title" className="max-w-lg font-serif text-5xl font-light leading-[0.98] tracking-[-0.045em] text-white sm:text-6xl lg:text-[4.2rem]" style={{ fontFamily: 'var(--font-serif)' }}>
-            One world.<br />
-            <span className="italic text-[#d4af37]">Many perspectives.</span>
-          </h2>
-          <p className="mt-7 max-w-md text-sm leading-7 text-neutral-400 sm:text-base sm:leading-8">
-            Diplomacy begins when we look beyond our own horizon. At WEST MUN, ideas cross borders, perspectives meet, and tomorrow’s solutions begin with a conversation.
-          </p>
-          <div className="mt-9 flex flex-wrap items-center gap-5">
-            <a href="#about" className="group inline-flex items-center gap-3 border-b border-[#d4af37]/50 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#f3e5ab] transition-colors hover:border-[#f3e5ab]">
-              Discover WEST MUN <ArrowDownRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 group-hover:translate-y-1" />
-            </a>
-            <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-neutral-600"><Globe2 className="h-3.5 w-3.5" /> Drag to explore</span>
-          </div>
+      <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: 'radial-gradient(ellipse at 50% 52%, rgba(132,91,24,.13), transparent 38%), linear-gradient(180deg,#050505 0%,#080807 52%,#050505 100%)' }} />
+      <div className="mx-auto flex min-h-[660px] max-w-[1240px] flex-col items-center px-5 pb-12 pt-16 text-center sm:px-8 sm:pt-20">
+        <div className="mb-5 flex items-center justify-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[#d4af37] sm:text-[11px]">
+          <span className="h-px w-7 bg-[#d4af37]/70" />
+          WEST MUN · RIYADH 2027
+          <span className="h-px w-7 bg-[#d4af37]/70" />
         </div>
+        <h2 id="global-stage-title" className="font-serif text-4xl font-light leading-none tracking-[-0.045em] text-white sm:text-5xl lg:text-6xl" style={{ fontFamily: 'var(--font-serif)' }}>
+          A world of <span className="italic text-[#d4af37]">perspectives.</span>
+        </h2>
+        <p className="mt-4 max-w-xl text-sm leading-6 text-neutral-400 sm:text-base">
+          One planet. Different nations. A shared future.
+        </p>
 
         <div
           ref={canvasHostRef}
-          className={`relative -mx-3 mt-3 h-[390px] touch-pan-y sm:mx-0 sm:h-[510px] lg:mt-0 lg:h-[680px] ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`relative mt-2 h-[330px] w-full max-w-[660px] touch-pan-y sm:h-[390px] lg:h-[440px] ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
           onPointerDown={(e) => { if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId); startDrag(e.clientX); }}
           onPointerMove={(e) => moveDrag(e.clientX)}
           onPointerUp={stopDrag}
           onPointerCancel={stopDrag}
           onLostPointerCapture={stopDrag}
           role="img"
-          aria-label="Interactive antique-gold Earth with obsidian oceans and a gold marker on Riyadh. Drag horizontally to rotate."
+          aria-label="Interactive realistic Earth with gold-toned continents and a marker at Riyadh. Drag horizontally to rotate."
         >
           {webglFailed && <div className="absolute inset-0 grid place-items-center text-sm text-neutral-400">Your browser could not start the 3D globe.</div>}
-          <div className="pointer-events-none absolute left-5 top-6 z-10 flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-2 text-[9px] uppercase tracking-[0.2em] text-neutral-300 backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37] shadow-[0_0_10px_#d4af37]" /> GOLDEN EARTH · 2027
+          <div className="pointer-events-none absolute left-1/2 top-5 z-10 -translate-x-1/2 whitespace-nowrap text-[9px] uppercase tracking-[0.24em] text-neutral-500">
+            Interactive Earth <span className="mx-2 text-[#d4af37]/60">/</span> Drag to rotate
           </div>
-          <div className="absolute bottom-8 left-5 z-10 flex items-center gap-3">
-            <div className="h-9 w-px bg-gradient-to-b from-[#f3e5ab] to-transparent" />
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#f3e5ab]">Riyadh, Saudi Arabia</div>
-              <div className="mt-1 text-[9px] tracking-[0.12em] text-neutral-500">24.7136° N · 46.6753° E</div>
-            </div>
+          <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#e5c16c]">Riyadh, Saudi Arabia</div>
+            <div className="mt-1 text-[9px] tracking-[0.12em] text-neutral-500">24.7136° N · 46.6753° E</div>
           </div>
-          <button type="button" onClick={(e) => { e.stopPropagation(); resetGlobe(); }} className="absolute right-5 top-6 z-10 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 text-[9px] uppercase tracking-[0.16em] text-neutral-300 backdrop-blur-sm transition-colors hover:border-[#d4af37]/50 hover:text-[#f3e5ab]" aria-label="Reset globe rotation">
-            <RotateCcw className="h-3 w-3" /> Reset view
+          <button type="button" onClick={(e) => { e.stopPropagation(); resetGlobe(); }} className="absolute right-3 top-5 z-10 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-3 py-2 text-[9px] uppercase tracking-[0.16em] text-neutral-400 backdrop-blur-sm transition-colors hover:border-[#d4af37]/50 hover:text-[#f3e5ab]" aria-label="Reset globe rotation">
+            <RotateCcw className="h-3 w-3" /> Reset
           </button>
-          <div className="pointer-events-none absolute bottom-8 right-5 z-10 hidden items-center gap-2 text-[9px] uppercase tracking-[0.18em] text-neutral-600 sm:flex">
-            <span className="h-px w-6 bg-[#d4af37]/35" /> A global stage, hosted in Riyadh
+        </div>
+
+        <div className="mt-1 grid w-full max-w-2xl grid-cols-3 divide-x divide-[#d4af37]/20 border-y border-[#d4af37]/20 py-5">
+          <div className="px-2">
+            <div className="font-serif text-2xl font-light text-[#e2bd63] sm:text-3xl">7</div>
+            <div className="mt-1 text-[9px] uppercase tracking-[0.18em] text-neutral-500 sm:text-[10px]">Continents</div>
+          </div>
+          <div className="px-2">
+            <div className="font-serif text-2xl font-light text-[#e2bd63] sm:text-3xl">195</div>
+            <div className="mt-1 text-[9px] uppercase tracking-[0.18em] text-neutral-500 sm:text-[10px]">Countries*</div>
+          </div>
+          <div className="px-2">
+            <div className="font-serif text-2xl font-light text-[#e2bd63] sm:text-3xl">1</div>
+            <div className="mt-1 text-[9px] uppercase tracking-[0.18em] text-neutral-500 sm:text-[10px]">Shared planet</div>
           </div>
         </div>
+        <p className="mt-3 text-[9px] tracking-wide text-neutral-600">*Commonly counted as 193 UN member states and 2 UN observer states.</p>
       </div>
-      <div className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[#d4af37]/25 to-transparent" />
+      <div className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[#d4af37]/30 to-transparent" />
     </section>
   );
 });
