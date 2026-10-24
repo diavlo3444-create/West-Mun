@@ -42,6 +42,7 @@ function project(lat: number, lon: number, rotation: number, radius: number) {
 export const DiplomaticGlobe: React.FC = React.memo(() => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLElement>(null);
+  const canvasHostRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef({ active: false, x: 0, rotation: 0 });
@@ -64,7 +65,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const host = hostRef.current;
+    const host = canvasHostRef.current;
     const ctx = canvas?.getContext('2d', { alpha: true });
     if (!canvas || !host || !ctx) return;
     let raf = 0;
@@ -238,6 +239,7 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
         </div>
 
         <div
+          ref={canvasHostRef}
           className={`relative -mx-3 mt-3 h-[390px] touch-pan-y sm:mx-0 sm:h-[510px] lg:mt-0 lg:h-[680px] ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
           onPointerDown={(e) => { if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId); startDrag(e.clientX); }}
           onPointerMove={(e) => moveDrag(e.clientX)}
