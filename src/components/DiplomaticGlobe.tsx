@@ -1,222 +1,259 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowDownRight, Globe2 } from 'lucide-react';
+import { ArrowDownRight, Globe2, RotateCcw } from 'lucide-react';
+import * as THREE from 'three';
 
-type Point = { lat: number; lon: number; size?: number; city?: string };
+const EARTH_TEXTURES = {
+  surface: 'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+  normal: 'https://threejs.org/examples/textures/planets/earth_normal_2048.jpg',
+  specular: 'https://threejs.org/examples/textures/planets/earth_specular_2048.jpg',
+  clouds: 'https://threejs.org/examples/textures/planets/earth_clouds_1024.png',
+  lights: 'https://threejs.org/examples/textures/planets/earth_lights_2048.png',
+};
 
-// Deliberately lightweight geographic landmarks: no map tiles, external requests, or WebGL dependency.
-const LAND_POINTS: Point[] = [
-  ...Array.from({ length: 15 }, (_, i) => ({ lat: 70 - i * 8, lon: -165 + i * 3.7 })),
-  ...Array.from({ length: 13 }, (_, i) => ({ lat: 60 - i * 7, lon: -130 + i * 3.1 })),
-  ...Array.from({ length: 11 }, (_, i) => ({ lat: 52 - i * 8, lon: -95 + i * 2.7 })),
-  ...Array.from({ length: 10 }, (_, i) => ({ lat: 48 - i * 8, lon: -65 + i * 2.1 })),
-  ...Array.from({ length: 16 }, (_, i) => ({ lat: 65 - i * 7.3, lon: 5 + i * 3.8 })),
-  ...Array.from({ length: 12 }, (_, i) => ({ lat: 50 - i * 8, lon: 25 + i * 3.2 })),
-  ...Array.from({ length: 13 }, (_, i) => ({ lat: 25 - i * 7, lon: 5 + i * 2.6 })),
-  ...Array.from({ length: 11 }, (_, i) => ({ lat: 20 - i * 7, lon: 30 + i * 2.3 })),
-  ...Array.from({ length: 17 }, (_, i) => ({ lat: 55 - i * 5.5, lon: 75 + i * 4.5 })),
-  ...Array.from({ length: 14 }, (_, i) => ({ lat: 35 - i * 4.2, lon: 110 + i * 3.6 })),
-  ...Array.from({ length: 11 }, (_, i) => ({ lat: 10 - i * 5, lon: 120 + i * 2.4 })),
-  ...Array.from({ length: 12 }, (_, i) => ({ lat: -10 - i * 6, lon: 135 + i * 2.2 })),
-  ...Array.from({ length: 12 }, (_, i) => ({ lat: -5 - i * 6.5, lon: -75 + i * 2.4 })),
-  ...Array.from({ length: 10 }, (_, i) => ({ lat: -15 - i * 7, lon: -65 + i * 2.2 })),
-  ...Array.from({ length: 8 }, (_, i) => ({ lat: -20 - i * 6, lon: -50 + i * 1.8 })),
-  ...Array.from({ length: 7 }, (_, i) => ({ lat: -25 - i * 4.5, lon: 15 + i * 2.8 })),
-  ...Array.from({ length: 7 }, (_, i) => ({ lat: -25 - i * 4.5, lon: 30 + i * 2.3 })),
-  { lat: 24.7, lon: 46.7, size: 4, city: 'RIYADH' },
-  { lat: 51.5, lon: -0.1, size: 2.4 },
-  { lat: 40.7, lon: -74, size: 2.4 },
-  { lat: 48.8, lon: 2.3, size: 2.4 },
-  { lat: 35.7, lon: 139.7, size: 2.4 },
-  { lat: 1.3, lon: 103.8, size: 2.4 },
-];
-
-function project(lat: number, lon: number, rotation: number, radius: number) {
-  const phi = (lat * Math.PI) / 180;
-  const lambda = ((lon + rotation) * Math.PI) / 180;
-  const x = Math.cos(phi) * Math.sin(lambda);
-  const y = Math.sin(phi);
-  const z = Math.cos(phi) * Math.cos(lambda);
-  return { x: x * radius, y: -y * radius, z };
+function surfacePoint(lat: number, lon: number, radius: number) {
+  const phi = THREE.MathUtils.degToRad(90 - lat);
+  const theta = THREE.MathUtils.degToRad(lon + 180);
+  return new THREE.Vector3(
+    -radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.sin(theta),
+  );
 }
 
 export const DiplomaticGlobe: React.FC = React.memo(() => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLElement>(null);
   const canvasHostRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [dragging, setDragging] = useState(false);
+  const sceneRef = useRef<{ renderer: THREE.WebGLRenderer; group: THREE.Group } | null>(null);
   const dragRef = useRef({ active: false, x: 0, rotation: 0 });
-  const rotationRef = useRef(18);
-  const motionRef = useRef({ reduced: false, paused: false });
+  const [dragging, setDragging] = useState(false);
+  const [webglFailed, setWebglFailed] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    motionRef.current.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const host = hostRef.current;
     if (!host) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      setIsVisible(entry.isIntersecting);
-      motionRef.current.paused = !entry.isIntersecting || document.hidden;
-    }, { threshold: 0.05 });
+    const observer = new IntersectionObserver(([entry]) => setIsVisible(entry.isIntersecting), { threshold: 0.01 });
     observer.observe(host);
-    const onVisibility = () => { motionRef.current.paused = document.hidden; };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => { observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility); };
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
     const host = canvasHostRef.current;
-    const ctx = canvas?.getContext('2d', { alpha: true });
-    if (!canvas || !host || !ctx) return;
+    if (!host) return;
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
+    } catch {
+      setWebglFailed(true);
+      return;
+    }
+    renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth < 600 ? 1.35 : 1.7));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    renderer.domElement.className = 'absolute inset-0 block h-full w-full';
+    renderer.domElement.setAttribute('aria-hidden', 'true');
+    host.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
+    camera.position.set(0, 0, 4.65);
+    const world = new THREE.Group();
+    scene.add(world);
+
+    // Quiet star field: a little depth, never a noisy particle storm.
+    const starPositions = new Float32Array(950 * 3);
+    let seed = 2027;
+    const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    for (let i = 0; i < 950; i++) {
+      const radius = 7 + random() * 18;
+      const theta = random() * Math.PI * 2;
+      const z = random() * 2 - 1;
+      const planar = Math.sqrt(1 - z * z);
+      starPositions[i * 3] = radius * planar * Math.cos(theta);
+      starPositions[i * 3 + 1] = radius * z;
+      starPositions[i * 3 + 2] = radius * planar * Math.sin(theta);
+    }
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({
+      color: 0xd7cba5, size: 0.025, transparent: true, opacity: 0.65, sizeAttenuation: true,
+    }));
+    scene.add(stars);
+
+    scene.add(new THREE.AmbientLight(0x71809a, 1.05));
+    const sun = new THREE.DirectionalLight(0xfff1d1, 3.15);
+    sun.position.set(-4.5, 2.2, 5);
+    scene.add(sun);
+    const goldRim = new THREE.DirectionalLight(0xc69b42, 1.4);
+    goldRim.position.set(4, -1, -4);
+    scene.add(goldRim);
+
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+    const loadTexture = (url: string) => loader.load(url, undefined, undefined, () => {});
+    const earthMap = loadTexture(EARTH_TEXTURES.surface);
+    earthMap.colorSpace = THREE.SRGBColorSpace;
+    const normalMap = loadTexture(EARTH_TEXTURES.normal);
+    const specularMap = loadTexture(EARTH_TEXTURES.specular);
+    const lightsMap = loadTexture(EARTH_TEXTURES.lights);
+    lightsMap.colorSpace = THREE.SRGBColorSpace;
+    const cloudMap = loadTexture(EARTH_TEXTURES.clouds);
+    cloudMap.colorSpace = THREE.SRGBColorSpace;
+
+    const earth = new THREE.Mesh(
+      new THREE.SphereGeometry(1.25, 96, 96),
+      new THREE.MeshPhongMaterial({
+        map: earthMap,
+        normalMap,
+        normalScale: new THREE.Vector2(0.32, 0.32),
+        specularMap,
+        specular: new THREE.Color(0x68778a),
+        shininess: 14,
+        emissiveMap: lightsMap,
+        emissive: new THREE.Color(0xc49a48),
+        emissiveIntensity: 0.34,
+      }),
+    );
+    world.add(earth);
+
+    const clouds = new THREE.Mesh(
+      new THREE.SphereGeometry(1.263, 72, 72),
+      new THREE.MeshPhongMaterial({
+        map: cloudMap,
+        transparent: true,
+        opacity: 0.23,
+        depthWrite: false,
+        blending: THREE.NormalBlending,
+        color: 0xe5e8ed,
+      }),
+    );
+    world.add(clouds);
+
+    // Thin atmospheric shell with a blue-white edge and a restrained gold rim.
+    const atmosphere = new THREE.Mesh(
+      new THREE.SphereGeometry(1.31, 72, 72),
+      new THREE.ShaderMaterial({
+        vertexShader: `varying vec3 vNormal; varying vec3 vViewPosition; void main(){ vec4 mvPosition=modelViewMatrix*vec4(position,1.0); vNormal=normalize(normalMatrix*normal); vViewPosition=-mvPosition.xyz; gl_Position=projectionMatrix*mvPosition; }`,
+        fragmentShader: `varying vec3 vNormal; varying vec3 vViewPosition; void main(){ float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vViewPosition)),0.0),2.35); vec3 blue=vec3(0.20,0.48,0.78); vec3 gold=vec3(0.72,0.49,0.17); float edge=smoothstep(0.25,0.95,rim); gl_FragColor=vec4(mix(blue,gold,edge*0.42),rim*0.62); }`,
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+      }),
+    );
+    world.add(atmosphere);
+
+    // Riyadh marker and a restrained route arc to Paris, used as a visual metaphor—not a claimed partnership.
+    const riyadh = surfacePoint(24.7136, 46.6753, 1.272);
+    const marker = new THREE.Group();
+    marker.position.copy(riyadh);
+    marker.lookAt(riyadh.clone().multiplyScalar(2));
+    const markerCore = new THREE.Mesh(
+      new THREE.SphereGeometry(0.022, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffe6a0 }),
+    );
+    marker.add(markerCore);
+    const markerRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.045, 0.0035, 8, 36),
+      new THREE.MeshBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.95 }),
+    );
+    marker.add(markerRing);
+    world.add(marker);
+
+    const paris = surfacePoint(48.8566, 2.3522, 1.272);
+    const arcMid = riyadh.clone().add(paris).normalize().multiplyScalar(1.67);
+    const arc = new THREE.QuadraticBezierCurve3(riyadh, arcMid, paris);
+    const arcLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(arc.getPoints(64)),
+      new THREE.LineBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.52 }),
+    );
+    world.add(arcLine);
+
+    sceneRef.current = { renderer, group: world };
     let raf = 0;
-    let width = 0;
-    let height = 0;
-    let dpr = 1;
     let last = 0;
+    let width = 1;
+    let height = 1;
+    let reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onMotionChange = (event: MediaQueryListEvent) => { reducedMotion = event.matches; };
+    motionQuery.addEventListener('change', onMotionChange);
 
     const resize = () => {
-      const rect = host.getBoundingClientRect();
-      width = Math.max(1, rect.width);
-      height = Math.max(1, rect.height);
-      dpr = Math.min(window.devicePixelRatio || 1, width < 600 ? 1.35 : 1.7);
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
-      canvas.style.width = width + 'px';
-      canvas.style.height = height + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      width = Math.max(1, host.clientWidth);
+      height = Math.max(1, host.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, width < 600 ? 1.25 : 1.6));
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.fov = width < 600 ? 39 : 34;
+      camera.updateProjectionMatrix();
     };
     resize();
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(host);
 
-    const draw = (now: number) => {
-      raf = requestAnimationFrame(draw);
-      if (motionRef.current.paused || !isVisible) return;
-      const dt = last ? Math.min(32, now - last) : 16;
+    const render = (now: number) => {
+      raf = requestAnimationFrame(render);
+      if (!isVisible || document.hidden) { last = 0; return; }
+      const dt = last ? Math.min(0.04, (now - last) / 1000) : 0.016;
       last = now;
-      if (!dragRef.current.active && !motionRef.current.reduced) rotationRef.current += dt * 0.0038;
-      ctx.clearRect(0, 0, width, height);
+      if (!dragRef.current.active && !reducedMotion) world.rotation.y += dt * 0.055;
+      clouds.rotation.y += dt * 0.012;
 
-      const compact = width < 600;
-      const radius = Math.min(width * (compact ? 0.38 : 0.28), height * 0.43, compact ? 205 : 285);
-      const cx = width * (compact ? 0.5 : 0.57);
-      const cy = height * (compact ? 0.46 : 0.49);
-      const rot = rotationRef.current;
-      const gradient = ctx.createRadialGradient(cx - radius * 0.35, cy - radius * 0.38, radius * 0.05, cx, cy, radius * 1.25);
-      gradient.addColorStop(0, 'rgba(42,39,29,0.82)');
-      gradient.addColorStop(0.6, 'rgba(15,15,16,0.95)');
-      gradient.addColorStop(1, 'rgba(4,4,5,0.98)');
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fillStyle = gradient;
-      ctx.fill();
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.clip();
+      // Scroll gently pushes the Earth forward, then eases back—cinematic but never hijacks page scroll.
+      const rect = host.getBoundingClientRect();
+      const viewport = Math.max(1, window.innerHeight);
+      const progress = THREE.MathUtils.clamp((viewport - rect.top) / (viewport + rect.height), 0, 1);
+      const scrollScale = reducedMotion ? 1 : 0.94 + Math.sin(progress * Math.PI) * 0.075;
+      world.scale.setScalar(scrollScale);
+      world.rotation.x = THREE.MathUtils.lerp(world.rotation.x, reducedMotion ? -0.04 : -0.04 + Math.sin(progress * Math.PI) * 0.045, 0.035);
+      stars.rotation.y += reducedMotion ? 0 : dt * 0.0015;
+      renderer.render(scene, camera);
+    };
+    raf = requestAnimationFrame(render);
 
-      // Fine latitude / longitude lines, kept quiet so the gold geography carries the focus.
-      ctx.lineWidth = 0.65;
-      for (let lat = -60; lat <= 60; lat += 30) {
-        ctx.beginPath();
-        for (let step = 0; step <= 90; step++) {
-          const lon = -180 + step * 4;
-          const p = project(lat, lon, rot, radius);
-          const x = cx + p.x;
-          const y = cy + p.y;
-          if (step === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = lat === 0 ? 'rgba(212,175,55,0.16)' : 'rgba(220,210,180,0.10)';
-        ctx.stroke();
-      }
-      for (let lon = -150; lon <= 180; lon += 30) {
-        ctx.beginPath();
-        for (let step = 0; step <= 36; step++) {
-          const lat = -90 + step * 5;
-          const p = project(lat, lon, rot, radius);
-          if (step === 0) ctx.moveTo(cx + p.x, cy + p.y); else ctx.lineTo(cx + p.x, cy + p.y);
-        }
-        ctx.strokeStyle = 'rgba(220,210,180,0.095)';
-        ctx.stroke();
-      }
-
-      // Land lights and diplomatic city nodes appear only on the visible hemisphere.
-      LAND_POINTS.forEach((point) => {
-        const p = project(point.lat, point.lon, rot, radius);
-        if (p.z < 0.04) return;
-        const x = cx + p.x;
-        const y = cy + p.y;
-        const isRiyadh = point.city === 'RIYADH';
-        const r = point.size || 1.35;
-        ctx.beginPath();
-        ctx.arc(x, y, isRiyadh ? r * 3.4 : r, 0, Math.PI * 2);
-        ctx.fillStyle = isRiyadh ? 'rgba(212,175,55,0.14)' : 'rgba(212,175,55,0.42)';
-        ctx.fill();
-        if (isRiyadh) {
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-          ctx.fillStyle = '#f5e5a5';
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(x, y, r * 2.6, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(243,229,171,0.72)';
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
-          ctx.font = '600 10px "Plus Jakarta Sans", sans-serif';
-          ctx.fillStyle = '#f3e5ab';
-          ctx.fillText('RIYADH', x + 11, y - 9);
+    return () => {
+      cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
+      motionQuery.removeEventListener('change', onMotionChange);
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Line) {
+          object.geometry.dispose();
+          const material = object.material;
+          (Array.isArray(material) ? material : [material]).forEach((entry) => entry.dispose());
         }
       });
-
-      // A single great-circle style arc links the host city to the wider world.
-      const origin = project(24.7, 46.7, rot, radius);
-      if (origin.z > 0) {
-        const target = project(48.8, 2.3, rot, radius);
-        if (target.z > 0) {
-          ctx.beginPath();
-          ctx.moveTo(cx + origin.x, cy + origin.y);
-          ctx.quadraticCurveTo(cx + radius * 0.12, cy - radius * 0.72, cx + target.x, cy + target.y);
-          ctx.strokeStyle = 'rgba(212,175,55,0.46)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-
-      // Rim light and restrained orbital hairline.
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(212,175,55,0.34)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, radius * 1.28, radius * 0.25, -0.22, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(212,175,55,0.17)';
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
+      [earthMap, normalMap, specularMap, lightsMap, cloudMap].forEach((texture) => texture.dispose());
+      renderer.dispose();
+      renderer.domElement.remove();
+      sceneRef.current = null;
     };
-    raf = requestAnimationFrame(draw);
-    return () => { cancelAnimationFrame(raf); resizeObserver.disconnect(); };
   }, [isVisible]);
 
   const startDrag = (clientX: number) => {
-    dragRef.current = { active: true, x: clientX, rotation: rotationRef.current };
+    if (!sceneRef.current) return;
+    dragRef.current = { active: true, x: clientX, rotation: sceneRef.current.group.rotation.y };
     setDragging(true);
   };
   const moveDrag = (clientX: number) => {
-    if (!dragRef.current.active) return;
-    rotationRef.current = dragRef.current.rotation + (clientX - dragRef.current.x) * 0.42;
+    if (!dragRef.current.active || !sceneRef.current) return;
+    sceneRef.current.group.rotation.y = dragRef.current.rotation + (clientX - dragRef.current.x) * 0.006;
   };
   const stopDrag = () => { dragRef.current.active = false; setDragging(false); };
+  const resetGlobe = () => {
+    if (sceneRef.current) sceneRef.current.group.rotation.set(-0.04, 0, 0);
+  };
 
   return (
     <section
       ref={hostRef}
       id="global-stage"
-      className="relative isolate overflow-hidden border-t border-[#d4af37]/15 bg-[#070707] text-white"
+      className="relative isolate overflow-hidden border-t border-[#d4af37]/15 bg-[#05070a] text-white"
       aria-labelledby="global-stage-title"
     >
-      <div className="absolute inset-0 -z-10 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 68% 48%, rgba(212,175,55,.075), transparent 42%), linear-gradient(180deg,#080808 0%,#070707 100%)' }} />
+      <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: 'radial-gradient(ellipse at 70% 45%, rgba(37,68,104,.16), transparent 43%), radial-gradient(ellipse at 70% 62%, rgba(212,175,55,.055), transparent 38%), linear-gradient(180deg,#07090d 0%,#05070a 100%)' }} />
       <div className="mx-auto grid min-h-[690px] max-w-[1440px] grid-cols-1 items-center gap-0 px-5 py-20 sm:px-8 lg:min-h-[780px] lg:grid-cols-[0.78fr_1.22fr] lg:px-14 lg:py-16">
         <div className="relative z-10 mx-auto w-full max-w-xl lg:mx-0 lg:py-12">
           <div className="mb-7 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#d4af37] sm:text-xs">
@@ -247,11 +284,24 @@ export const DiplomaticGlobe: React.FC = React.memo(() => {
           onPointerCancel={stopDrag}
           onLostPointerCapture={stopDrag}
           role="img"
-          aria-label="Interactive gold globe centred on Riyadh, Saudi Arabia. Drag horizontally to rotate."
+          aria-label="Realistic interactive Earth with cloud cover, atmosphere, and a gold marker on Riyadh. Drag horizontally to rotate."
         >
-          <canvas ref={canvasRef} className="absolute inset-0 block" aria-hidden="true" />
-          <div className="pointer-events-none absolute bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap text-[9px] uppercase tracking-[0.24em] text-neutral-600 sm:bottom-9">
-            <span className="h-px w-7 bg-[#d4af37]/35" /> A global stage, hosted in Riyadh <span className="h-px w-7 bg-[#d4af37]/35" />
+          {webglFailed && <div className="absolute inset-0 grid place-items-center text-sm text-neutral-400">Your browser could not start the 3D globe.</div>}
+          <div className="pointer-events-none absolute left-5 top-6 z-10 flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-2 text-[9px] uppercase tracking-[0.2em] text-neutral-300 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37] shadow-[0_0_10px_#d4af37]" /> Earth · Live 3D
+          </div>
+          <div className="absolute bottom-8 left-5 z-10 flex items-center gap-3">
+            <div className="h-9 w-px bg-gradient-to-b from-[#f3e5ab] to-transparent" />
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#f3e5ab]">Riyadh, Saudi Arabia</div>
+              <div className="mt-1 text-[9px] tracking-[0.12em] text-neutral-500">24.7136° N · 46.6753° E</div>
+            </div>
+          </div>
+          <button type="button" onClick={(e) => { e.stopPropagation(); resetGlobe(); }} className="absolute right-5 top-6 z-10 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 text-[9px] uppercase tracking-[0.16em] text-neutral-300 backdrop-blur-sm transition-colors hover:border-[#d4af37]/50 hover:text-[#f3e5ab]" aria-label="Reset globe rotation">
+            <RotateCcw className="h-3 w-3" /> Reset view
+          </button>
+          <div className="pointer-events-none absolute bottom-8 right-5 z-10 hidden items-center gap-2 text-[9px] uppercase tracking-[0.18em] text-neutral-600 sm:flex">
+            <span className="h-px w-6 bg-[#d4af37]/35" /> A global stage, hosted in Riyadh
           </div>
         </div>
       </div>
