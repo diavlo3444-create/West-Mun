@@ -117,6 +117,9 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   // department permissions; it remains a separate, explicitly authorized session.
   const operationsAccess = ['media_press', 'security', 'volunteers'].includes(department);
   const securityScannerAccess = department === 'security';
+  // Only these departments retain workspace features. All other heads get
+  // access to their personal QR pass only.
+  const qrPassOnly = !['media_press', 'security', 'volunteers', 'dcc', 'pr', 'hr'].includes(department);
   const workspaceModules = useMemo(() => getWorkspaceModules(department), [department]);
 
   const isModuleView = useCallback(
@@ -125,6 +128,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   );
 
   const [view, setView] = useState<HeadView>(() => {
+    if (qrPassOnly) return 'qr-pass';
     if (initialView === 'sponsors' && isPr) return 'sponsors';
     if (initialView === 'inquiries' && isHr) return 'inquiries';
     if (initialView === 'dcc-applications' && department === 'dcc') return 'dcc-applications';
@@ -296,8 +300,13 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   }, [department, section, teamValues, registrationAccess, testMode?.token]);
 
   const loadDepartmentData = useCallback(async () => {
+    if (qrPassOnly) {
+      setLoading(false);
+      setRecordsLoading(false);
+      return;
+    }
     await Promise.all([loadRegistrationData(), loadWorkspaceRecords()]);
-  }, [loadRegistrationData, loadWorkspaceRecords]);
+  }, [qrPassOnly, loadRegistrationData, loadWorkspaceRecords]);
 
   useEffect(() => {
     loadDepartmentData();
@@ -305,7 +314,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
   useEffect(() => {
     let active = true;
-    if (!supabase) return;
+    if (qrPassOnly || !supabase) return;
     supabase.functions.invoke("wm-eb-access", { body: { action: "list_my_coheads", department, section: section || null } })
       .then(({ data, error }) => {
         if (!active) return;
@@ -315,7 +324,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       })
       .catch(() => { if (active) setCoHeadsError("Co-Head list unavailable."); });
     return () => { active = false; };
-  }, [department, section]);
+  }, [department, section, qrPassOnly]);
 
   useEffect(() => {
     document.title = `WEST MUN 2027 — ${meta.label} Dashboard`;
@@ -519,6 +528,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   };
 
   const navigate = (id: string) => {
+    if (qrPassOnly) {
+      if (id === 'qr-pass') window.location.assign('/pass');
+      return;
+    }
     if (id === 'security-website') { window.location.assign('/scanner'); return; }
     if (['operations', 'shifts', 'groups', 'roles'].includes(id) && !operationsAccess) return;
     if (id === 'security-website' && !securityScannerAccess) return;
@@ -532,7 +545,9 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     setView(id);
   };
 
-  const workspaceNavItems: NavItem[] = [
+  const workspaceNavItems: NavItem[] = qrPassOnly
+    ? [{ id: 'qr-pass', label: 'QR Pass', icon: QrCode }]
+    : [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     ...workspaceModules.map((module) => ({
       id: module.id,
@@ -559,15 +574,19 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     ...(securityScannerAccess ? [{ id: 'security-website', label: 'Security Scanner', icon: QrCode }] : []),
   ];
 
-  const navGroups: NavGroup[] = [
-    { label: 'Department workspace', items: workspaceNavItems },
-    { label: 'Operations', items: operationsNavItems },
-  ];
+  const navGroups: NavGroup[] = qrPassOnly
+    ? [{ label: 'Access', items: workspaceNavItems }]
+    : [
+        { label: 'Department workspace', items: workspaceNavItems },
+        { label: 'Operations', items: operationsNavItems },
+      ];
 
   const activeModule = getWorkspaceModule(department, view);
 
   const viewLabel =
-    view === 'overview'
+    view === 'qr-pass'
+      ? 'QR Pass'
+      : view === 'overview'
       ? 'Overview'
       : view === 'shifts'
         ? 'Shifts & Roster'
@@ -662,7 +681,22 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       )}
 
       <div key={view} className="wm-page-in space-y-5">
-        {loadError && registrationAccess && (
+        {qrPassOnly && view === 'qr-pass' && (
+          <section className="mx-auto max-w-2xl rounded-2xl border border-[#d4af37]/25 bg-gradient-to-b from-[#17150f] to-[#0b0b0c] p-6 text-center shadow-xl sm:p-9">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/10 text-[#d4af37]">
+              <QrCode className="h-7 w-7" aria-hidden="true" />
+            </div>
+            <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.24em] text-[#d4af37]">WEST MUN 2027</p>
+            <h1 className="mt-2 text-2xl font-semibold text-white">Your official QR pass</h1>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-neutral-400">
+              Your head account has access to the official QR pass only. Open your pass to display your unique code at the venue.
+            </p>
+            <button type="button" onClick={() => window.location.assign('/pass')} className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-[#d4af37] px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110">
+              <QrCode className="h-4 w-4" aria-hidden="true" /> Open QR Pass
+            </button>
+          </section>
+        )}
+        {!qrPassOnly && loadError && registrationAccess && (
           <Notice tone="error" title="Registrations could not be loaded">
             {loadError}{' '}
             <button
