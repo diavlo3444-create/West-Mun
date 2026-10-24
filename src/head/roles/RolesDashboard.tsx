@@ -598,23 +598,7 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
             <p className="mt-1 text-[10px] text-neutral-500">Department leadership</p>
           </div>
 
-          <div className="rounded-lg border border-white/[0.06] bg-black/40 p-3">
-            <span className="block text-[10px] font-mono uppercase tracking-wider text-amber-400">
-              Active Tasks
-            </span>
-            <p className="mt-1 font-serif text-lg font-bold text-amber-300">
-              {metrics.activeTasksCount}
-            </p>
-          </div>
 
-          <div className="rounded-lg border border-white/[0.06] bg-black/40 p-3">
-            <span className="block text-[10px] font-mono uppercase tracking-wider text-neutral-400">
-              Completed Tasks
-            </span>
-            <p className="mt-1 font-serif text-lg font-bold text-neutral-300">
-              {metrics.completedTasksCount}
-            </p>
-          </div>
         </div>
       </div>
 
@@ -867,37 +851,6 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
       {/* TAB 2: ORGANIZATIONAL HIERARCHY */}
       {activeTab === 'hierarchy' && (
         <div className="space-y-4">
-          <section className="rounded-2xl border border-[#d4af37]/35 bg-gradient-to-br from-[#d4af37]/[0.10] via-neutral-950 to-neutral-950 p-4 sm:p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#d4af37]">Department Leadership</p>
-                <h3 className="mt-1 text-base font-semibold text-white">Your EB Team Members</h3>
-                <p className="mt-1 text-xs text-neutral-400">Registered EB team members assigned to this head are shown here. Approved conference team registrations will appear in the member directory as they are accepted.</p>
-              </div>
-              <span className="rounded-full border border-[#d4af37]/30 bg-[#d4af37]/10 px-3 py-1 text-xs font-semibold text-[#f3e5ab]">{coHeads.length}</span>
-            </div>
-            {coHeads.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {coHeads.map((member) => (
-                  <div key={member.user_id} className="rounded-xl border border-white/10 bg-black/25 p-3">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d4af37]/35 bg-[#d4af37]/10 text-xs font-bold text-[#f3e5ab]">
-                        {(member.full_name || "E").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">{member.full_name || "EB Member"}</p>
-                        <p className="mt-1 text-[10px] uppercase tracking-wide text-[#d4af37]">{(member.account_role || "EB Member").replace(/_/g, " ")}{member.team ? ` · ${member.team}` : ""}{member.section ? ` · ${member.section}` : ""}</p>
-                        <p className="mt-1 break-all text-xs text-neutral-400">{member.email}</p>
-                        {member.phone && <p className="mt-1 text-xs text-neutral-500">{member.phone}</p>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-xl border border-dashed border-white/10 bg-black/20 p-4 text-xs text-neutral-400">No EB members are assigned to this head yet. New members linked to your head account or matching this team and section will appear here automatically.</p>
-            )}
-          </section>
           <OrgChartView
             positions={positions}
             members={members}
