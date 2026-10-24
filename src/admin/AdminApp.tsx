@@ -22,6 +22,7 @@ import {
   UserRoundCog,
   QrCode,
   Crown,
+  GraduationCap,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '../lib/supabase';
@@ -31,6 +32,7 @@ import { SettingsManager } from './SettingsManager';
 import { InquiriesManager } from './InquiriesManager';
 import { DashboardOverview } from './DashboardOverview';
 import { RegistrationsManager } from './RegistrationsManager';
+import { ChairApplicationsManager } from './ChairApplicationsManager';
 import { TeamManagement } from './TeamManagement';
 import { StatisticsReports } from './StatisticsReports';
 import { SuperAdminManager } from './SuperAdminManager';
@@ -48,6 +50,7 @@ const IDLE_MS = 30 * 60 * 1000; // Sign out after 30 minutes of inactivity
 export type NavigationPage =
   | 'dashboard'
   | 'registrations'
+  | 'chair-applications'
   | 'heads'
   | 'executive-board'
   | 'teams'
@@ -555,6 +558,7 @@ export default function AdminApp() {
       items: [
         { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
         { id: 'registrations', label: 'Registrations', icon: Users, badge: pendingCount },
+        { id: 'chair-applications', label: 'Chair Applications', icon: GraduationCap },
         { id: 'executive-board', label: 'Executive Board', icon: Crown },
         { id: 'heads', label: 'Heads', icon: UserRoundCog },
         { id: 'teams', label: 'Departments', icon: Layers },
@@ -639,6 +643,8 @@ export default function AdminApp() {
             userName={displayName}
           />
         )}
+
+        {page === 'chair-applications' && <ChairApplicationsManager />}
 
         {page === 'registrations' && (
           <RegistrationsManager
