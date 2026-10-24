@@ -602,25 +602,6 @@ export const RolesDashboard: React.FC<RolesDashboardProps> = ({
         </div>
       </div>
 
-      {/* Main Tabs Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('hierarchy')}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
-              activeTab === 'hierarchy'
-                ? 'bg-[#d4af37]/20 border border-[#d4af37]/50 text-[#d4af37] shadow-sm'
-                : 'text-neutral-400 hover:text-white hover:bg-white/[0.04]'
-            }`}
-          >
-            <Network className="h-3.5 w-3.5" />
-            <span>Organizational Hierarchy ({positions.length + coHeads.length})</span>
-          </button>
-        </div>
-
-      </div>
-
       {/* TAB 1: ROLES & TASK ASSIGNMENTS */}
       {activeTab === 'tasks' && (
         <div className="space-y-4">
