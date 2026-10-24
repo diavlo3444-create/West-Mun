@@ -1497,3 +1497,24 @@ body:has(#hero) #faq h2 + p {
     line-height: 1.7;
   }
 }
+
+
+/* Cinematic public-page reveals: animate opacity/transform only, never layout. */
+.wm-scroll-reveal {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition: opacity 680ms cubic-bezier(0.2, 0.7, 0.2, 1), transform 680ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--wm-reveal-delay, 0ms);
+}
+.wm-scroll-reveal.wm-scroll-reveal--visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wm-scroll-reveal,
+  .wm-scroll-reveal.wm-scroll-reveal--visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
