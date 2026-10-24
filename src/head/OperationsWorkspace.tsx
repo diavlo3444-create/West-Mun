@@ -5,6 +5,7 @@ import { TeamDeploymentPlanner } from './TeamDeploymentPlanner';
 import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import { ShiftManagementDashboard } from './shifts/ShiftManagementDashboard';
 import { GroupManagementDashboard } from './groups/GroupManagementDashboard';
+import { RolesDashboard } from './roles/RolesDashboard';
 import {
   assignPersonToShift, createDepartmentPerson, createDepartmentShift, deleteDepartmentPerson,
   listDepartmentPeople, listDepartmentShifts, setRegistrationWindowStatus, listRegistrationWindows,
@@ -17,14 +18,15 @@ type Props = {
   section?: SectionKey | null;
   testToken?: string | null;
   initialGroup?: WmTeamGroup | null;
+  coHeads?: Array<{ user_id: string; full_name: string; email: string; account_role?: string | null; team?: string | null; section?: string | null; phone?: string | null; gender?: string | null }>;
 };
-type Tab = 'people' | 'groups' | 'shifts' | 'registrations' | 'deployment';
+type Tab = 'people' | 'roles' | 'groups' | 'shifts' | 'registrations' | 'deployment';
 const field = 'w-full rounded-md border border-white/10 bg-[#111115] px-3 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#d4af37] focus:outline-none';
 const button = 'inline-flex items-center justify-center gap-2 rounded-md border border-[#d4af37]/40 bg-[#d4af37]/10 px-3 py-2 text-xs font-semibold text-[#f1d98c] hover:bg-[#d4af37]/20 disabled:opacity-50';
 const panel = 'rounded-lg border border-white/10 bg-[#111115]/90 p-4';
 const label = 'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-neutral-400';
 
-export const OperationsWorkspace: React.FC<Props> = ({ department, section, testToken, initialGroup }) => {
+export const OperationsWorkspace: React.FC<Props> = ({ department, section, testToken, initialGroup, coHeads = [] }) => {
   const [tab, setTab] = useState<Tab>(initialGroup ? 'shifts' : 'people');
   const [people, setPeople] = useState<WmPerson[]>([]);
   const [shifts, setShifts] = useState<WmShift[]>([]);
@@ -109,6 +111,7 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'people', label: 'Custom roles & people', icon: <Users size={15}/> },
+    { id: 'roles', label: 'Role assignments', icon: <BriefcaseBusiness size={15}/> },
     { id: 'groups', label: 'Team groups', icon: <Users size={15}/> },
     { id: 'shifts', label: 'Shifts & coverage', icon: <Clock3 size={15}/> },
     ...(['media_press', 'security', 'volunteers'].includes(department) ? [{ id: 'deployment' as Tab, label: 'Team deployment', icon: <Users size={15}/> }] : []),
@@ -162,6 +165,8 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
         </article>)}
       </div>
     </div>}
+
+    {tab === 'roles' && <RolesDashboard department={department} section={section} departmentLabel={department === 'media_press' ? 'Media & Press' : department === 'security' ? 'Security' : department === 'volunteers' ? 'Volunteers' : department.replace(/_/g, ' ')} testToken={effectiveTestToken} coHeads={coHeads} />}
 
     {tab === 'groups' && (
       <GroupManagementDashboard
