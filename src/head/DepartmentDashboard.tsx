@@ -134,6 +134,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (initialView === 'dcc-applications' && department === 'dcc') return 'dcc-applications';
     if (initialView === 'dcc-committees' && department === 'dcc') return 'dcc-committees';
     if (['roles', 'shifts', 'groups'].includes(initialView || '') && operationsAccess) return 'operations';
+    // The three operational department heads land directly in their only workspace.
+    if (operationsAccess) return 'operations';
     if (initialView === 'department') return 'department';
     if (initialView === 'registrations' && registrationAccess) return 'registrations';
     if (initialView && workspaceModules.some((module) => module.id === initialView)) return initialView;
@@ -532,6 +534,9 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       if (id === 'qr-pass') window.location.assign('/pass');
       return;
     }
+    // Media, Security, and Volunteers heads are limited to role/hierarchy,
+    // team groups, and shift scheduling inside Operations Studio.
+    if (operationsAccess && id !== 'operations') return;
     if (id === 'security-website') { window.location.assign('/scanner'); return; }
     if (['operations', 'shifts', 'groups', 'roles'].includes(id) && !operationsAccess) return;
     if (id === 'security-website' && !securityScannerAccess) return;
@@ -559,27 +564,30 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   const isCmsDepartment =
     department === 'design' || department === 'marketing' || department === 'pr' || department === 'it';
 
-  const operationsNavItems: NavItem[] = [
-    ...(registrationAccess
-      ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
-      : []),
-    ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
-    ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
-    ...(committeeAccess ? [{ id: 'dcc-applications', label: 'Applications', icon: Users }] : []),
-    ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
-    ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
-    ...(operationsAccess ? [{ id: 'operations', label: 'Operations studio', icon: Users }] : []),
-    { id: 'cohead-management', label: 'Co-Head Management', icon: Users },
-    { id: 'department', label: 'Assignment', icon: Building2 },
-    ...(securityScannerAccess ? [{ id: 'security-website', label: 'Security Scanner', icon: QrCode }] : []),
-  ];
+  const operationsNavItems: NavItem[] = operationsAccess
+    ? [{ id: 'operations', label: 'Team roles & shifts', icon: Users }]
+    : [
+        ...(registrationAccess
+          ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
+          : []),
+        ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
+        ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
+        ...(committeeAccess ? [{ id: 'dcc-applications', label: 'Applications', icon: Users }] : []),
+        ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
+        ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
+        { id: 'cohead-management', label: 'Co-Head Management', icon: Users },
+        { id: 'department', label: 'Assignment', icon: Building2 },
+        ...(securityScannerAccess ? [{ id: 'security-website', label: 'Security Scanner', icon: QrCode }] : []),
+      ];
 
   const navGroups: NavGroup[] = qrPassOnly
     ? [{ label: 'Access', items: workspaceNavItems }]
-    : [
-        { label: 'Department workspace', items: workspaceNavItems },
-        { label: 'Operations', items: operationsNavItems },
-      ];
+    : operationsAccess
+      ? [{ label: 'Team operations', items: operationsNavItems }]
+      : [
+          { label: 'Department workspace', items: workspaceNavItems },
+          { label: 'Operations', items: operationsNavItems },
+        ];
 
   const activeModule = getWorkspaceModule(department, view);
 
