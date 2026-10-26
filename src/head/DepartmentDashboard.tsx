@@ -538,9 +538,9 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       if (id === 'qr-pass') window.location.assign('/pass');
       return;
     }
-    // Media, Security, and Volunteers heads are limited to role/hierarchy,
-    // team groups, and shift scheduling inside Operations Studio.
-    if (operationsAccess && id !== 'operations') return;
+    // Operational heads retain their own department registrations alongside
+    // the restricted team roles/groups/shifts workspace.
+    if (operationsAccess && id !== 'operations' && id !== 'registrations') return;
     if (id === 'security-website') { window.location.assign('/scanner'); return; }
     if (['operations', 'shifts', 'groups', 'roles'].includes(id) && !operationsAccess) return;
     if (id === 'security-website' && !securityScannerAccess) return;
@@ -570,6 +570,9 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
   const operationsNavItems: NavItem[] = operationsAccess
     ? [
+        ...(registrationAccess
+          ? [{ id: 'registrations', label: 'Registrations', icon: Users, badge: stats.pending }]
+          : []),
         { id: 'operations', label: 'Team roles & shifts', icon: Users },
         { id: 'groups', label: 'Team groups', icon: Users },
       ]
