@@ -1089,6 +1089,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                             <ApplicantEmailLink
                               applicantName={item.full_name}
                               applicantEmail={item.email}
+                              registrationId={item._type === 'team' ? item.id : undefined}
                               type={item._type}
                               department={item._teamId}
                               section={item.section}
@@ -1182,6 +1183,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                           <ApplicantEmailLink
                             applicantName={item.full_name}
                             applicantEmail={item.email}
+                              registrationId={item._type === 'team' ? item.id : undefined}
                             type={item._type}
                             department={item._teamId}
                             section={item.section}
@@ -1271,6 +1273,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
               <ApplicantEmailLink
                 applicantName={activeItem.full_name}
                 applicantEmail={activeItem.email}
+                registrationId={activeItem._type === 'team' ? activeItem.id : undefined}
                 type={activeItem._type}
                 department={activeItem._teamId}
                 section={activeItem.section}
@@ -1355,6 +1358,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
               <ApplicantEmailLink
                 applicantName={activeItem.full_name}
                 applicantEmail={activeItem.email}
+                registrationId={activeItem._type === 'team' ? activeItem.id : undefined}
                 type={activeItem._type}
                 department={activeItem._teamId}
                 section={activeItem.section}
@@ -1380,6 +1384,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                       <ApplicantEmailLink
                         applicantName={activeItem.full_name}
                         applicantEmail={activeItem.email}
+                registrationId={activeItem._type === 'team' ? activeItem.id : undefined}
                         type={activeItem._type}
                         department={activeItem._teamId}
                         section={activeItem.section}
