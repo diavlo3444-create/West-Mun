@@ -36,7 +36,6 @@ import { HeadInquiriesManager } from './HeadInquiriesManager';
 import { DCCCommitteeManager } from './DCCCommitteeManager';
 import { DCCApplicationsManager } from './DCCApplicationsManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
-import { OperationsWorkspace } from './OperationsWorkspace';
 import { GroupManagementDashboard } from './groups/GroupManagementDashboard';
 import { ShiftManagementDashboard } from './shifts/ShiftManagementDashboard';
 import type { WmTeamGroup } from './services/operationsStore';
