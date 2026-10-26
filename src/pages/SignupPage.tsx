@@ -17,14 +17,13 @@ export default function SignupPage() {
     if (!supabase) return setNotice({ type: "error", text: "The signup service is temporarily unavailable." });
     if (!token) return setNotice({ type: "error", text: "This signup link is missing its invitation token. Ask your section head for a new link." });
     const normalizedName = fullName.trim().replace(/\s+/g, " ");
-    if (normalizedName.split(" ").length < 2 || normalizedName.length < 5) return setNotice({ type: "error", text: "Enter your full real name, including at least your first and last name." });
     if (password.length < 12) return setNotice({ type: "error", text: "Use a password with at least 12 characters." });
     if (password !== confirmPassword) return setNotice({ type: "error", text: "The passwords do not match." });
 
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("team-signup", {
-        body: { action: "signup", token, fullName: normalizedName, email: email.trim().toLowerCase(), password },
+        body: { action: "signup", token, email: email.trim().toLowerCase(), password },
       });
       if (error || !data?.success) {
         let message = data?.error || error?.message || "Could not create your account.";
@@ -58,15 +57,15 @@ export default function SignupPage() {
           </div>
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#d4af37]">WEST MUN 2027 · Team Access</p>
           <h1 className="mt-2 font-serif text-3xl text-white">Create your account</h1>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-400">Enter your full real name exactly as it appears on your accepted application, and use the same email address. This private invitation can only be used once.</p>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">Use the same email address you used on your accepted application. Your private invitation can only be used once.</p>
 
           {!token && <div className="mt-5 rounded-md border border-amber-500/30 bg-amber-950/20 p-3 text-sm text-amber-200">Invitation token missing. Ask your section head to generate a new signup link.</div>}
 
           <form onSubmit={submit} className="mt-6 space-y-4">
             <div>
-              <label htmlFor="signup-full-name" className="mb-1.5 block text-xs font-medium text-neutral-300">Full real name</label>
-              <input id="signup-full-name" type="text" autoComplete="name" required minLength={5} maxLength={120} value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={busy || !token} className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-3 text-sm text-white outline-none transition focus:border-[#d4af37]/70 disabled:opacity-50" placeholder="First and last name" />
-              <p className="mt-1 text-[11px] text-neutral-500">Your name must match the name on your accepted application.</p>
+              <label htmlFor="signup-full-name" className="mb-1.5 block text-xs font-medium text-neutral-300">Name (optional)</label>
+              <input id="signup-full-name" type="text" autoComplete="name" maxLength={120} value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={busy || !token} className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-3 text-sm text-white outline-none transition focus:border-[#d4af37]/70 disabled:opacity-50" placeholder="First and last name" />
+              <p className="mt-1 text-[11px] text-neutral-500">Optional. Your accepted application remains the source of your team name.</p>
             </div>
             <div>
               <label htmlFor="signup-email" className="mb-1.5 block text-xs font-medium text-neutral-300">Application email</label>
