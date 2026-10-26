@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Network, Users, Clock3 } from 'lucide-react';
+import { Users, Clock3 } from 'lucide-react';
 import type { DepartmentKey, SectionKey } from './departments';
 import { ShiftManagementDashboard } from './shifts/ShiftManagementDashboard';
 import { GroupManagementDashboard } from './groups/GroupManagementDashboard';
-import { RolesDashboard } from './roles/RolesDashboard';
 import type { WmTeamGroup } from './services/operationsStore';
 
 type Props = {
@@ -14,16 +13,15 @@ type Props = {
   coHeads?: Array<{ user_id: string; full_name: string; email: string; account_role?: string | null; team?: string | null; section?: string | null; phone?: string | null; gender?: string | null }>;
 };
 
-type Tab = 'hierarchy' | 'groups' | 'shifts';
+type Tab = 'groups' | 'shifts';
 
 const tabs: { id: Tab; label: string; description: string; icon: React.ReactNode }[] = [
-  { id: 'hierarchy', label: 'Hierarchy', description: 'Create positions and assign team members.', icon: <Network size={17} /> },
-  { id: 'groups', label: 'Team groups', description: 'Organize people into working groups.', icon: <Users size={17} /> },
+  { id: 'groups', label: 'Sections / Roles', description: 'Create custom roles and assign team members.', icon: <Users size={17} /> },
   { id: 'shifts', label: 'Shifts', description: 'Schedule coverage and assign shifts.', icon: <Clock3 size={17} /> },
 ];
 
 export const OperationsWorkspace: React.FC<Props> = ({ department, section, testToken, initialGroup, coHeads = [] }) => {
-  const [tab, setTab] = useState<Tab>(initialGroup ? 'shifts' : 'hierarchy');
+  const [tab, setTab] = useState<Tab>(initialGroup ? 'shifts' : 'groups');
   const [selectedGroupForShift, setSelectedGroupForShift] = useState<WmTeamGroup | null>(initialGroup || null);
   const departmentLabel = department === 'media_press' ? 'Media & Press' : department === 'security' ? 'Security' : department === 'volunteers' ? 'Volunteers' : department.replace(/_/g, ' ');
 
@@ -42,9 +40,9 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
           {department === 'media_press' ? 'Media & Press' : departmentLabel} Workspace
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-400">
-          Everything you need, in three places. Build your team hierarchy, organize groups, and manage shifts.
+          Create custom sections/roles, assign team members, and manage shifts.
         </p>
-        <nav aria-label="Team operations" className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <nav aria-label="Team operations" className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {tabs.map((item) => {
             const active = tab === item.id;
             return (
@@ -65,16 +63,6 @@ export const OperationsWorkspace: React.FC<Props> = ({ department, section, test
           })}
         </nav>
       </header>
-
-      {tab === 'hierarchy' && (
-        <RolesDashboard
-          department={department}
-          section={section}
-          departmentLabel={departmentLabel}
-          testToken={testToken || null}
-          coHeads={coHeads}
-        />
-      )}
 
       {tab === 'groups' && (
         <GroupManagementDashboard
