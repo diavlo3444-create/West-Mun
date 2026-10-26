@@ -467,59 +467,41 @@ export async function handleCreateHeadAccount(
       let invitationLink: string | undefined;
 
       if (isInvite) {
-        // 1. Generate invitation link via Supabase Auth Admin API
-        const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'invite',
-          email: cleanEmail,
-          options: {
-            redirectTo: `${origin}/head?type=invite`,
+        // IMPORTANT: generateLink() only creates an action URL; it does not send an email.
+        // Use inviteUserByEmail() so Supabase Auth actually submits the invitation email.
+        const { data: invData, error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+          cleanEmail,
+          {
             data: {
               full_name: cleanName,
               department: cleanDept,
               section: cleanSec,
             },
-          },
-        });
+            redirectTo: `${origin}/head?type=invite`,
+          }
+        );
 
-        if (!linkErr && linkData?.user) {
-          authUser = linkData.user;
-          invitationLink = linkData.properties?.action_link;
-        } else if (linkErr && linkErr.message?.toLowerCase().includes('already')) {
-          // If user already exists in auth.users, find their UID and generate a password recovery link
-          const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        if (!invErr && invData?.user) {
+          authUser = invData.user;
+        } else if (invErr && invErr.message?.toLowerCase().includes('already')) {
+          // Existing accounts need a recovery email, not a generated link that nobody receives.
+          const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+          if (listErr) throw new Error(`Could not verify existing account: ${listErr.message}`);
+
           const existing = listData?.users?.find(
             (u) => u.email?.toLowerCase().trim() === cleanEmail
           );
-          if (existing) {
-            authUser = existing;
-            const { data: recData } = await supabaseAdmin.auth.admin.generateLink({
-              type: 'recovery',
-              email: cleanEmail,
-              options: {
-                redirectTo: `${origin}/head?type=recovery`,
-              },
-            });
-            invitationLink = recData?.properties?.action_link;
-          } else {
-            throw new Error(linkErr.message);
+          if (!existing) throw new Error(invErr.message);
+
+          authUser = existing;
+          const { error: recoveryErr } = await supabaseAdmin.auth.resetPasswordForEmail(cleanEmail, {
+            redirectTo: `${origin}/head?type=recovery`,
+          });
+          if (recoveryErr) {
+            throw new Error(`Account exists, but the recovery email could not be submitted: ${recoveryErr.message}`);
           }
         } else {
-          // Fallback to direct inviteUserByEmail
-          const { data: invData, error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-            cleanEmail,
-            {
-              data: {
-                full_name: cleanName,
-                department: cleanDept,
-                section: cleanSec,
-              },
-              redirectTo: `${origin}/head?type=invite`,
-            }
-          );
-          if (invErr) {
-            throw new Error(invErr.message || 'Failed to send Supabase Auth invitation email.');
-          }
-          authUser = invData?.user;
+          throw new Error(invErr?.message || 'Failed to submit the Supabase Auth invitation email.');
         }
       } else {
         // Direct password provisioning in Supabase Auth
@@ -617,7 +599,7 @@ export async function handleCreateHeadAccount(
         body: {
           success: true,
           message: isInvite
-            ? `Department head account for ${cleanName} provisioned in Supabase Auth with invitation link.`
+            ? `Department head account for ${cleanName} provisioned; the invitation or recovery email was submitted to Supabase Auth.`
             : `Department head account for ${cleanName} (${cleanDept}${cleanSec ? ` - ${cleanSec.toUpperCase()}` : ''}) was successfully provisioned in Supabase Auth.`,
           head: {
             id: userId,
