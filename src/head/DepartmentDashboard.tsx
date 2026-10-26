@@ -136,9 +136,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (initialView === 'inquiries' && isHr) return 'inquiries';
     if (initialView === 'dcc-applications' && department === 'dcc') return 'dcc-applications';
     if (initialView === 'dcc-committees' && department === 'dcc') return 'dcc-committees';
-    if (['roles', 'shifts', 'groups'].includes(initialView || '') && operationsAccess) return 'operations';
-    // The three operational department heads land directly in their only workspace.
-    if (operationsAccess) return 'operations';
+    if (['roles', 'groups'].includes(initialView || '') && operationsAccess) return 'groups';
+    if (initialView === 'shifts' && operationsAccess) return 'shifts';
+    // Operational heads land directly in custom sections/roles.
+    if (operationsAccess) return 'groups';
     if (initialView === 'department') return 'department';
     if (initialView === 'registrations' && registrationAccess) return 'registrations';
     if (initialView && workspaceModules.some((module) => module.id === initialView)) return initialView;
@@ -538,9 +539,9 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       if (id === 'qr-pass') window.location.assign('/pass');
       return;
     }
-    // Operational heads retain their own department registrations alongside
-    // the restricted team roles/groups/shifts workspace.
-    if (operationsAccess && id !== 'operations' && id !== 'registrations') return;
+    // Operational heads retain registrations plus exactly two team tools:
+    // custom sections/roles and shifts.
+    if (operationsAccess && !['registrations', 'groups', 'shifts'].includes(id)) return;
     if (id === 'security-website') { window.location.assign('/scanner'); return; }
     if (['operations', 'shifts', 'groups', 'roles'].includes(id) && !operationsAccess) return;
     if (id === 'security-website' && !securityScannerAccess) return;
@@ -573,8 +574,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         ...(registrationAccess
           ? [{ id: 'registrations', label: 'Registrations', icon: Users, badge: stats.pending }]
           : []),
-        { id: 'operations', label: 'Team roles & shifts', icon: Users },
-        { id: 'groups', label: 'Team groups', icon: Users },
+        { id: 'groups', label: 'Sections / Roles', icon: Users },
+        { id: 'shifts', label: 'Shifts', icon: Building2 },
       ]
     : [
         ...(registrationAccess
@@ -609,7 +610,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       : view === 'shifts'
         ? 'Shifts & Roster'
       : view === 'groups'
-        ? 'Custom Team Groups'
+        ? 'Sections / Roles'
       : view === 'website-editor'
         ? 'Website CMS'
         : view === 'registrations'
@@ -852,14 +853,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           />
         )}
 
-        {view === 'operations' && operationsAccess && (
-          <OperationsWorkspace
-            department={department}
-            section={section}
-            testToken={testMode?.token || null}
-            coHeads={coHeads}
-          />
-        )}
+
 
         {view === 'website-editor' && isCmsDepartment && (
           <WebsiteEditor authorName={displayName} authorEmail={headEmail} />
