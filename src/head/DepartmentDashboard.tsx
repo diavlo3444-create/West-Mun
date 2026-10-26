@@ -37,6 +37,9 @@ import { DCCCommitteeManager } from './DCCCommitteeManager';
 import { DCCApplicationsManager } from './DCCApplicationsManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
 import { OperationsWorkspace } from './OperationsWorkspace';
+import { GroupManagementDashboard } from './groups/GroupManagementDashboard';
+import { ShiftManagementDashboard } from './shifts/ShiftManagementDashboard';
+import type { WmTeamGroup } from './services/operationsStore';
 import { HeadCoHeadManagement } from './HeadCoHeadManagement';
 import { WorkspaceModuleGrid, WorkspaceOverview } from './WorkspaceOverview';
 import {
@@ -143,6 +146,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
   });
 
   const [registrations, setRegistrations] = useState<HeadRegistration[]>([]);
+  const [selectedGroupForShift, setSelectedGroupForShift] = useState<WmTeamGroup | null>(null);
   const [coHeads, setCoHeads] = useState<Array<{user_id:string;full_name:string;email:string;phone?:string|null;gender?:string|null}>>([]);
   const [coHeadsError, setCoHeadsError] = useState("");
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -565,7 +569,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     department === 'design' || department === 'marketing' || department === 'pr' || department === 'it';
 
   const operationsNavItems: NavItem[] = operationsAccess
-    ? [{ id: 'operations', label: 'Team roles & shifts', icon: Users }]
+    ? [
+        { id: 'operations', label: 'Team roles & shifts', icon: Users },
+        { id: 'groups', label: 'Team groups', icon: Users },
+      ]
     : [
         ...(registrationAccess
           ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
@@ -599,7 +606,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       : view === 'shifts'
         ? 'Shifts & Roster'
       : view === 'groups'
-        ? 'Team Management'
+        ? 'Custom Team Groups'
       : view === 'website-editor'
         ? 'Website CMS'
         : view === 'registrations'
@@ -819,6 +826,27 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
         {view === 'cohead-management' && (
           <HeadCoHeadManagement department={department} section={section} headName={headName} />
+        )}
+
+        {view === 'groups' && operationsAccess && (
+          <GroupManagementDashboard
+            department={department}
+            section={section}
+            testToken={testMode?.token || null}
+            onAssignGroupToShift={(group) => {
+              setSelectedGroupForShift(group);
+              setView('shifts');
+            }}
+          />
+        )}
+
+        {view === 'shifts' && operationsAccess && (
+          <ShiftManagementDashboard
+            department={department}
+            section={section}
+            testToken={testMode?.token || null}
+            initialGroup={selectedGroupForShift}
+          />
         )}
 
         {view === 'operations' && operationsAccess && (

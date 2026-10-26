@@ -118,6 +118,7 @@ export const ApplicantEmailLink: React.FC<ApplicantEmailLinkProps> = ({
       // Open synchronously so the browser does not block the Gmail tab while the invite is generated.
       const composeWindow = window.open('about:blank', '_blank');
       try {
+        if (!supabase) throw new Error('Database client is not configured.');
         const { data, error } = await supabase.functions.invoke('team-signup', {
           body: { action: 'create', registrationId },
         });

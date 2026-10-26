@@ -18,7 +18,7 @@ type Tab = 'hierarchy' | 'groups' | 'shifts';
 
 const tabs: { id: Tab; label: string; description: string; icon: React.ReactNode }[] = [
   { id: 'hierarchy', label: 'Hierarchy', description: 'Create positions and assign team members.', icon: <Network size={17} /> },
-  { id: 'groups', label: 'Groups', description: 'Organize people into working groups.', icon: <Users size={17} /> },
+  { id: 'groups', label: 'Team groups', description: 'Organize people into working groups.', icon: <Users size={17} /> },
   { id: 'shifts', label: 'Shifts', description: 'Schedule coverage and assign shifts.', icon: <Clock3 size={17} /> },
 ];
 
