@@ -2960,7 +2960,7 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
         const shiftId = body?.shiftId || body?.shift_id;
         if (supabaseAdmin) {
           try {
-            const { data, error } = await supabaseAdmin.from("wm_shift_assignments").select("*, person:wm_people(*)").eq("shift_id", shiftId);
+            const { data, error } = await supabaseAdmin.from("wm_shift_assignments").select("*").eq("shift_id", shiftId);
             if (!error && data) {
               return { statusCode: 200, body: { success: true, data } };
             }
