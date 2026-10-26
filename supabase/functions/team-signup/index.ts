@@ -40,7 +40,7 @@ const acceptanceMessage = (app: { full_name: string; team: string; section: stri
   const assignment = app.section
     ? `${app.section} section of the ${teamLabel(app.team)} team`
     : `${teamLabel(app.team)} team`;
-  return `Hi ${firstName}, congratulations! Your application to WEST MUN 2027 has been accepted for the ${assignment}. Create your team account using this private signup link: ${signupUrl} Please use the same email you applied with. This link remains valid until it is used or revoked.`;
+  return `Hi ${firstName},\n\nCongratulations! Your application to WEST MUN 2027 has been accepted for the ${assignment}.\n\n**Next step: create your team account**\n1. Open your private signup link: ${signupUrl}\n2. Sign up using the exact same email address you used in your application.\n3. Enter your full name as it appears on your application and create your password.\n\nThis invitation is personal to you and remains valid until it is used or revoked. Please do not share it.\n\nIf you have any trouble signing up, reply to this email for help.\n\nBest regards,\nWEST MUN 2027 Secretariat`;
 };
 
 Deno.serve(async (req: Request) => {
