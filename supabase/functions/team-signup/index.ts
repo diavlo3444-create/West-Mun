@@ -166,13 +166,9 @@ Deno.serve(async (req: Request) => {
         normalizedEmail(app.email) !== email || app.team !== invite.team || app.section !== invite.section) {
       return json({ error: "This application is no longer eligible for signup. Contact the WEST MUN admin team." }, 409);
     }
-    const fullName = suppliedFullName || app.full_name;
-    if (suppliedFullName && (fullName.length < 5 || fullName.length > 120 || fullName.split(" ").filter(Boolean).length < 2)) {
-      return json({ error: "Enter your full real name, including at least your first and last name." }, 400);
-    }
-    if (normalizedFullName(fullName) !== normalizedFullName(app.full_name)) {
-      return json({ error: "Enter the same full real name shown on your accepted WEST MUN application. If it needs correcting, contact an admin before signing up." }, 403);
-    }
+    // The invitation email is the identity check. Keep the accepted application name for the team account;
+    // a name typed into the signup form must not block an otherwise valid email-matched invitation.
+    const fullName = app.full_name;
 
     const now = new Date();
     if (invite.claimed_at && new Date(invite.claimed_at).getTime() < now.getTime() - 10 * 60 * 1000) {
