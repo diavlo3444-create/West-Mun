@@ -62,7 +62,19 @@ Deno.serve(async (req: Request) => {
   const department = head?.department ?? pass?.team ?? (typeof meta.wm_team === "string" ? meta.wm_team : null);
   const section = head?.section ?? pass?.section ?? (typeof meta.wm_section === "string" ? meta.wm_section : null);
   const requestedFullName = clean(body.fullName);
-  const fullName = clean(userMeta.full_name) || clean(head?.head_name) || clean(pass?.full_name) || requestedFullName;
+  let applicationFullName = "";
+  // For invited team members, recover the canonical name from their accepted application.
+  // The registration ID comes from server-controlled app metadata, and email must match.
+  if (!clean(userMeta.full_name) && typeof meta.wm_registration_id === "string" && clean(actor.email)) {
+    const application = await db.from("team_registrations")
+      .select("full_name,email,status")
+      .eq("id", meta.wm_registration_id)
+      .eq("email", clean(actor.email).toLowerCase())
+      .eq("status", "accepted")
+      .maybeSingle();
+    if (!application.error && application.data) applicationFullName = clean(application.data.full_name);
+  }
+  const fullName = clean(userMeta.full_name) || clean(head?.head_name) || clean(pass?.full_name) || applicationFullName || requestedFullName;
   const accountRole = isAdmin ? "admin" : head ? "head" : (clean(pass?.account_role) || (typeof meta.wm_eb_role === "string" ? meta.wm_eb_role : "") || (typeof meta.wm_role === "string" ? meta.wm_role : "team_member"));
   // Co-head permissions can be represented in auth metadata OR the official QR-pass row.
   // Do not let a department_heads row (which labels the role as "head") hide the EB co-head role.
@@ -99,7 +111,7 @@ Deno.serve(async (req: Request) => {
     if (fullName.length < 5 || fullName.length > 120 || fullName.split(/\s+/).filter(Boolean).length < 2) {
       return json({ error: "Your WEST MUN account needs your full real name before a QR pass can be issued. Contact an admin." }, 409);
     }
-    if (!clean(userMeta.full_name) && !clean(head?.head_name) && requestedFullName) {
+    if (!clean(userMeta.full_name) && !clean(head?.head_name) && fullName) {
       const metadataUpdate = await db.auth.admin.updateUserById(actor.id, {
         user_metadata: { ...userMeta, full_name: fullName },
       });
