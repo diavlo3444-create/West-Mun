@@ -10,11 +10,12 @@ const teamMeta: Record<string, { title: string; route: string }> = {
 
 export default function TeamMemberPortal() {
   const route = window.location.pathname.replace(/\/$/, "") || "/";
-  const requestedTeam = route === "/security" ? "security" : route === "/media" ? "media" : "volunteers";
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [team, setTeam] = useState("");
   const [section, setSection] = useState<string | null>(null);
+  const isTeamHub = route === "/team-members";
+  const requestedTeam = route === "/security" ? "security" : route === "/media" ? "media" : route === "/volunteer" ? "volunteers" : "";
 
   useEffect(() => {
     let live = true;
@@ -25,9 +26,11 @@ export default function TeamMemberPortal() {
       const actualTeam = typeof meta?.wm_team === "string" ? meta.wm_team : "";
       const role = meta?.wm_role;
       if (!live) return;
-      if (!error && data.user && role === "team_member" && actualTeam === requestedTeam) {
+      const validTeam = ["security", "media", "media_press", "volunteers", "volunteer"].includes(actualTeam);
+      const normalizedTeam = actualTeam === "media_press" ? "media" : actualTeam === "volunteer" ? "volunteers" : actualTeam;
+      if (!error && data.user && role === "team_member" && validTeam && (isTeamHub || normalizedTeam === requestedTeam)) {
         setAuthorized(true);
-        setTeam(actualTeam);
+        setTeam(normalizedTeam);
         setSection(typeof meta?.wm_section === "string" ? meta.wm_section : null);
       } else {
         setAuthorized(false);
@@ -36,7 +39,7 @@ export default function TeamMemberPortal() {
     };
     void check();
     return () => { live = false; };
-  }, [requestedTeam]);
+  }, [requestedTeam, isTeamHub]);
 
   const info = teamMeta[team || requestedTeam] || teamMeta.volunteers;
   return (
@@ -46,7 +49,7 @@ export default function TeamMemberPortal() {
           <a href="/" className="flex items-center gap-2 text-xs text-neutral-400 transition hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> WEST MUN website</a>
           <div className="flex items-center gap-3">
             <a href="/pass" className="rounded-md border border-[#d4af37]/35 px-3 py-2 text-xs font-medium text-[#e6cc78] hover:bg-[#d4af37]/10">My QR Pass</a>
-            {requestedTeam === "security" && <a href="/scanner" className="rounded-md bg-[#d4af37] px-3 py-2 text-xs font-semibold text-black">Open Scanner</a>}
+            {team === "security" && <a href="/scanner" className="rounded-md bg-[#d4af37] px-3 py-2 text-xs font-semibold text-black">Open Scanner</a>}
           </div>
         </header>
         {loading ? (
@@ -65,8 +68,8 @@ export default function TeamMemberPortal() {
               <div className="relative flex flex-wrap items-start justify-between gap-5">
                 <div>
                   <div className="flex items-center gap-2 text-[#d4af37]"><ShieldCheck className="h-4 w-4" /><span className="font-mono text-[10px] uppercase tracking-[0.2em]">WEST MUN 2027</span></div>
-                  <h1 className="mt-3 font-serif text-3xl sm:text-4xl">{info.title}</h1>
-                  <p className="mt-2 text-sm text-neutral-400">{section ? `${section.charAt(0).toUpperCase() + section.slice(1)} Section` : "Authorized team member"}</p>
+                  <h1 className="mt-3 font-serif text-3xl sm:text-4xl">Team Members</h1>
+                  <p className="mt-2 text-sm text-neutral-400">{info.title}{section ? ` · ${section.charAt(0).toUpperCase() + section.slice(1)} Section` : ""}</p>
                 </div>
                 <span className="rounded-full border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-emerald-300">Access verified</span>
               </div>
@@ -82,10 +85,13 @@ export default function TeamMemberPortal() {
               <div className="absolute inset-0 flex items-center justify-center bg-black/35 p-5">
                 <div className="max-w-sm rounded-xl border border-[#d4af37]/25 bg-[#0a0a0b]/95 p-7 text-center shadow-2xl backdrop-blur-md">
                   <LockKeyhole className="mx-auto h-7 w-7 text-[#d4af37]" />
-                  <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.22em] text-[#d4af37]">Workspace status</p>
-                  <h2 className="mt-2 font-serif text-2xl">Under Development</h2>
-                  <p className="mt-2 text-sm leading-relaxed text-neutral-400">Your team workspace is reserved and your access is verified. Tools and assignments will appear here when the workspace launches.</p>
-                  <span className="mt-5 inline-flex rounded-full border border-white/10 px-3 py-1 font-mono text-[9px] uppercase tracking-wider text-neutral-500">Coming soon</span>
+                  <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.22em] text-[#d4af37]">Team member access</p>
+                  <h2 className="mt-2 font-serif text-2xl">Your team, your access</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-400">This is the dedicated Team Members area, separate from the Executive Board portal. Use your official QR pass for event access{team === "security" ? " and the Security scanner for authorized check-ins" : ""}.</p>
+                  <div className="mt-5 flex flex-wrap justify-center gap-2">
+                    <a href="/pass" className="rounded-md bg-[#d4af37] px-4 py-2.5 text-xs font-semibold text-black">Open my QR pass</a>
+                    {team === "security" && <a href="/scanner" className="rounded-md border border-[#d4af37]/35 px-4 py-2.5 text-xs font-medium text-[#e6cc78]">Security scanner</a>}
+                  </div>
                 </div>
               </div>
             </section>
