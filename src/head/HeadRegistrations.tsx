@@ -711,15 +711,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
               <button type="button" onClick={closeModal} className={btnSecondary} disabled={saving}>
                 Close
               </button>
-              <button
-                type="button"
-                onClick={() => persist(draftStatus)}
-                className={btnPrimary}
-                disabled={saving || adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected'}
-              >
-                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-                Save adjudication
-              </button>
+
             </>
           ) : undefined
         }
@@ -1002,94 +994,28 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
             <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-[#d4af37]/85">
-                    Head recommendation
+                  <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-[#d4af37]/85">Head recommendation</p>
+                  <p className="mt-1 text-[11px] text-neutral-300">
+                    {draftStatus === 'accepted' ? 'Recommendation submitted: approve this applicant.' : draftStatus === 'rejected' ? 'Recommendation submitted: reject this applicant.' : 'No recommendation submitted yet.'}
                   </p>
-                  <p className="mt-0.5 text-[10.5px] text-neutral-400">
-                    Submit a recommendation for the Secretariat. This does not change the final application status.
-                  </p>
+                  <p className="mt-1 text-[10.5px] text-neutral-500">The Secretariat still makes the final decision.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction('approve')}
-                    disabled={saving || adminDecision !== 'pending'}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/25 bg-emerald-400/[0.07] px-2.5 py-1.5 text-[10.5px] font-medium text-emerald-300 transition-colors hover:bg-emerald-400/[0.13] disabled:opacity-40"
-                  >
-                    <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => void persist('accepted')} disabled={saving || adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected'} className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/25 bg-emerald-400/[0.07] px-3 py-2 text-[11px] font-medium text-emerald-300 transition-colors hover:bg-emerald-400/[0.13] disabled:opacity-40">
+                    {saving && draftStatus === 'accepted' ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
                     Recommend approval
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction('reject')}
-                    disabled={saving || adminDecision !== 'pending'}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-rose-400/25 bg-rose-400/[0.06] px-2.5 py-1.5 text-[10.5px] font-medium text-rose-300 transition-colors hover:bg-rose-400/[0.12] disabled:opacity-40"
-                  >
-                    <XCircle className="h-3 w-3" aria-hidden="true" />
+                  <button type="button" onClick={() => void persist('rejected')} disabled={saving || adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected'} className="inline-flex items-center gap-1.5 rounded-md border border-rose-400/25 bg-rose-400/[0.06] px-3 py-2 text-[11px] font-medium text-rose-300 transition-colors hover:bg-rose-400/[0.12] disabled:opacity-40">
+                    {saving && draftStatus === 'rejected' ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <XCircle className="h-3.5 w-3.5" aria-hidden="true" />}
                     Recommend rejection
                   </button>
                 </div>
               </div>
-
-              {pendingAction && (
-                <div
-                  className={`mt-3 rounded-md border p-3 ${
-                    pendingAction === 'approve'
-                      ? 'border-emerald-400/20 bg-emerald-400/[0.04]'
-                      : 'border-rose-400/20 bg-rose-400/[0.04]'
-                  }`}
-                  role="alertdialog"
-                  aria-label="Confirm adjudication"
-                >
-                  <div className="flex items-start gap-2.5">
-                    <AlertTriangle
-                      className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
-                        pendingAction === 'approve' ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
-                      aria-hidden="true"
-                    />
-                    <div>
-                      <p className="text-[11.5px] font-medium text-neutral-100">
-                        {pendingAction === 'approve'
-                          ? `Recommend approval for ${activeItem.full_name}?`
-                          : `Recommend rejection for ${activeItem.full_name}?`}
-                      </p>
-                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-neutral-400">
-                        This sends your recommendation to the Secretariat. The application remains pending until an admin makes the final decision.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPendingAction(null)}
-                      className={btnGhost}
-                      disabled={saving}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      autoFocus
-                      onClick={() => persist(pendingAction === 'approve' ? 'accepted' : 'rejected')}
-                      disabled={saving}
-                      className={btnPrimary}
-                    >
-                      {saving && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
-                      {pendingAction === 'approve' ? 'Submit recommendation' : 'Submit recommendation'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {(adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected') && (
-                <Notice tone="info" title="Secretariat decision recorded">
-                  This application already has a final admin decision. Your recommendation can no longer be changed.
-                </Notice>
+                <Notice tone="info" title="Secretariat decision recorded">This application already has a final admin decision. The recommendation is locked.</Notice>
               )}
-
               {activeItem.status === 'accepted' && activeItem.admin_finalized_at && (
-                <div className="rounded-md border border-[#d4af37]/20 bg-[#d4af37]/[0.035] p-4">
+                <div className="mt-4 rounded-md border border-[#d4af37]/20 bg-[#d4af37]/[0.035] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-[#d4af37]"><Link2 className="h-3.5 w-3.5" /> Manual signup link</p>
@@ -1113,39 +1039,6 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                   )}
                 </div>
               )}
-
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="head-detail-status" className={labelCls}>
-                    Head recommendation
-                  </label>
-                  <select
-                    id="head-detail-status"
-                    className={selectCls}
-                    disabled={adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected'}
-                    value={draftStatus}
-                    onChange={(event) => setDraftStatus(event.target.value)}
-                  >
-                    <option value="received">No recommendation</option>
-                    <option value="accepted">Recommend approval</option>
-                    <option value="rejected">Recommend rejection</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="head-detail-notes" className={labelCls}>
-                    Recommendation notes
-                  </label>
-                  <textarea
-                    id="head-detail-notes"
-                    rows={2}
-                    className={inputCls}
-                    disabled={adminDecision !== 'pending'}
-                    placeholder="Recommendation notes for the Secretariat…"
-                    value={draftNotes}
-                    onChange={(event) => setDraftNotes(event.target.value)}
-                  />
-                </div>
-              </div>
             </div>
           </div>
         )}
