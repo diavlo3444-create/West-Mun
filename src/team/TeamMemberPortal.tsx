@@ -202,7 +202,7 @@ export default function TeamMemberPortal() {
             supabase
               .from("wm_eb_shift_assignments")
               .select("id, shift_id, user_id, member_email, role_title, department, section, status, notes")
-              .eq("user_id", user.id)
+              .or(`user_id.eq.${user.id},member_email.ilike.${user.email || ""}`)
               .neq("status", "absent"),
             registrationId && !resolvedName
               ? supabase
