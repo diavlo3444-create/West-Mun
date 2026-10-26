@@ -269,12 +269,18 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
 
   const createSignupLink = async (target: UnifiedRegistration | null = activeItem) => {
     if (!supabase || !target || target._type !== 'team' || target.status !== 'accepted' || !target.admin_finalized_at || !target.admin_finalized_by || signupBusy) return;
+    const rawTarget = target as UnifiedRegistration & { registration_id?: string; registrationId?: string; application_id?: string };
+    const registrationId = rawTarget.id || rawTarget.registration_id || rawTarget.registrationId || rawTarget.application_id;
+    if (!registrationId || !/^[0-9a-f-]{36}$/i.test(String(registrationId))) {
+      setSignupNotice('This accepted application is missing its database registration ID. Refresh the registrations list, reopen the applicant directly from the list, and try again. If it persists, the dashboard record mapping needs repair.');
+      return;
+    }
     setSignupBusy(true);
     setSignupNotice(null);
     setSignupUrl(null);
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('team-signup', {
-        body: { action: 'create', registrationId: target.id },
+        body: { action: 'create', registrationId },
       });
       if (invokeError || !data?.success || typeof data.signupUrl !== 'string') {
         let message = data?.error || invokeError?.message || 'Could not create a signup link.';
@@ -313,7 +319,12 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   };
 
   const openItem = (item: UnifiedRegistration) => {
-    setActiveItem(item);
+    // Dashboard deep-links and older cached records may use a legacy ID field.
+    // Normalize it once so all admin actions use the actual team_registrations PK.
+    const rawItem = item as UnifiedRegistration & { registration_id?: string; registrationId?: string; application_id?: string };
+    const normalizedId = rawItem.id || rawItem.registration_id || rawItem.registrationId || rawItem.application_id;
+    const normalizedItem = { ...item, id: normalizedId } as UnifiedRegistration;
+    setActiveItem(normalizedItem);
     setDraftStatus(item.status || 'received');
     setDraftNotes(item.admin_notes || '');
     setModalNotice(null);
