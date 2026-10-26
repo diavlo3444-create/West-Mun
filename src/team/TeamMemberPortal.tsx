@@ -165,7 +165,7 @@ export default function TeamMemberPortal() {
               .map((m: any) => {
                 const title = typeof m.role_title === "string" ? m.role_title.trim() : "";
                 const groupName = groupNames.get(m.group_id);
-                if (!title || title.toLowerCase() === "team member") return "";
+                if (!title || title.toLowerCase() === "team member") return groupName || "";
                 return groupName ? `${title} · ${groupName}` : title;
               })
               .filter((value: string) => Boolean(value));
