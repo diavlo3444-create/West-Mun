@@ -230,6 +230,13 @@ Deno.serve(async (req: Request) => {
         }
         previousAppMetadata = { ...existingMeta };
         const linked = await db.auth.admin.updateUserById(existingUser.id, {
+          // The email-matched accepted application is the trusted source of the member's name.
+          // Keep existing metadata, but sync the accepted name so QR pass issuance works for
+          // applicants who already had a Supabase account before accepting the invitation.
+          user_metadata: {
+            ...((existingUser.user_metadata ?? {}) as Record<string, unknown>),
+            full_name: fullName,
+          },
           app_metadata: {
             ...existingMeta,
             wm_role: "team_member",
