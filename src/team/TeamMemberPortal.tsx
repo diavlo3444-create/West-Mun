@@ -14,10 +14,8 @@ import {
   Sparkles,
   LogOut,
   ChevronRight,
-  Radio,
-  Building2,
-  CheckCircle2,
   AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { TeamWelcomeIntro } from "./TeamWelcomeIntro";
@@ -72,6 +70,8 @@ function timeLabel(value: string | null) {
     minute: "2-digit",
   }).format(date);
 }
+
+const cinematicEase = [0.16, 1, 0.3, 1] as const;
 
 export default function TeamMemberPortal() {
   const route = window.location.pathname.replace(/\/$/, "") || "/";
@@ -293,7 +293,7 @@ export default function TeamMemberPortal() {
         }`}
       >
         {/* Subtle Ambient Vignette Header Glow */}
-        <div className="pointer-events-none absolute top-0 left-0 right-0 h-96 bg-[radial-gradient(ellipse_at_top,_rgba(212,175,55,0.06)_0%,_transparent_70%)]" />
+        <div className="pointer-events-none absolute top-0 left-0 right-0 h-96 bg-[radial-gradient(ellipse_at_top,_rgba(212,175,55,0.05)_0%,_transparent_70%)]" />
 
         <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:py-10 space-y-8 sm:space-y-10">
           {/* Top Bar Navigation */}
@@ -317,7 +317,7 @@ export default function TeamMemberPortal() {
               <button
                 type="button"
                 onClick={handleReplayIntro}
-                className="flex items-center gap-1.5 border border-[#d4af37]/30 bg-[#d4af37]/[0.06] px-3 py-1.5 text-xs font-medium text-[#f5d47a] hover:border-[#d4af37]/70 hover:bg-[#d4af37]/15 transition-colors"
+                className="flex items-center gap-1.5 border border-[#d4af37]/30 bg-[#d4af37]/[0.06] px-3 py-1.5 text-xs font-medium text-[#f5d47a] hover:border-[#d4af37]/70 hover:bg-[#d4af37]/15 transition-colors focus:outline-none focus:ring-1 focus:ring-[#d4af37]"
                 title="Replay cinematic conference introduction"
               >
                 <Sparkles className="h-3.5 w-3.5 text-[#d4af37]" />
@@ -328,7 +328,7 @@ export default function TeamMemberPortal() {
               {team === "security" && (
                 <a
                   href="/scanner"
-                  className="flex items-center gap-2 bg-[#d4af37] px-3.5 py-1.5 text-xs font-semibold text-black hover:bg-[#e5c158] transition-all shadow-[0_0_15px_rgba(212,175,55,0.2)]"
+                  className="flex items-center gap-2 bg-[#d4af37] px-3.5 py-1.5 text-xs font-semibold text-black hover:bg-[#e5c158] transition-all shadow-[0_0_15px_rgba(212,175,55,0.2)] focus:outline-none focus:ring-2 focus:ring-[#d4af37]"
                   title="Launch official QR badge scanner"
                 >
                   <ScanLine className="h-3.5 w-3.5" />
@@ -368,7 +368,7 @@ export default function TeamMemberPortal() {
             </div>
           ) : !authorized ? (
             <div className="mx-auto mt-16 max-w-md border border-rose-500/30 bg-[#0e0e13] p-8 text-center space-y-4">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-rose-500/30 bg-rose-950/20 text-rose-300">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center border border-rose-500/30 bg-rose-950/20 text-rose-300">
                 <LockKeyhole className="h-6 w-6" />
               </div>
               <h1 className="font-serif text-2xl text-white">Team Access Required</h1>
@@ -385,7 +385,12 @@ export default function TeamMemberPortal() {
               </div>
             </div>
           ) : (
-            <div className="space-y-8 sm:space-y-10">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: cinematicEase }}
+              className="space-y-8 sm:space-y-10"
+            >
               {/* 1. HERO: ANIMATED TEAM IDENTITY */}
               <section className="relative overflow-hidden border border-[#d4af37]/30 bg-[#0a0a0e] p-6 sm:p-8 lg:p-10">
                 {/* Thin top gold highlight */}
@@ -783,7 +788,7 @@ export default function TeamMemberPortal() {
                   </div>
                 )}
               </section>
-            </div>
+            </motion.div>
           )}
         </div>
       </main>
