@@ -181,46 +181,121 @@ export default function TeamMemberPortal() {
           // Keep the invitation metadata fallback if the roster is not readable.
         }
 
-        // Query shifts and name lookup
-        if (registrationId) {
-          try {
-            const [assignmentsRes, regRes] = await Promise.all([
-              supabase
-                .from("wm_team_assignments")
-                .select("id, assignment_title, station, starts_at, ends_at, reporting_to, status, notes")
-                .eq("registration_id", registrationId)
-                .order("starts_at", { ascending: true, nullsFirst: false }),
-              !resolvedName
-                ? supabase
-                    .from("team_registrations")
-                    .select("full_name")
-                    .eq("id", registrationId)
-                    .maybeSingle()
-                : Promise.resolve({ data: null, error: null }),
-            ]);
+        // Query every supported shift system. The Operations Studio writes to
+        // wm_shifts / wm_shift_assignments, while older Operations pages use
+        // wm_eb_shifts / wm_eb_shift_assignments. The previous portal only read
+        // wm_team_assignments, so shifts created in either Operations UI were invisible.
+        try {
+          const [legacyRes, modernAssignmentsRes, ebAssignmentsRes, regRes] = await Promise.all([
+            registrationId
+              ? supabase
+                  .from("wm_team_assignments")
+                  .select("id, assignment_title, station, starts_at, ends_at, reporting_to, status, notes")
+                  .eq("registration_id", registrationId)
+                  .order("starts_at", { ascending: true, nullsFirst: false })
+              : Promise.resolve({ data: [], error: null }),
+            supabase
+              .from("wm_shift_assignments")
+              .select("id, shift_id, station, responsibility, notes, status, assignee_email, assignee_name")
+              .ilike("assignee_email", user.email || "")
+              .neq("status", "cancelled"),
+            supabase
+              .from("wm_eb_shift_assignments")
+              .select("id, shift_id, user_id, member_email, role_title, department, section, status, notes")
+              .eq("user_id", user.id)
+              .neq("status", "absent"),
+            registrationId && !resolvedName
+              ? supabase
+                  .from("team_registrations")
+                  .select("full_name")
+                  .eq("id", registrationId)
+                  .maybeSingle()
+              : Promise.resolve({ data: null, error: null }),
+          ]);
 
-            if (!live) return;
+          if (!live) return;
+          if (regRes.data?.full_name && !resolvedName) resolvedName = regRes.data.full_name;
 
-            if (regRes.data?.full_name && !resolvedName) {
-              resolvedName = regRes.data.full_name;
-            }
-
-            if (assignmentsRes.error) {
-              setShiftError(
-                "Your shifts could not load right now. Please try again later or contact your section head."
-              );
-            } else {
-              const rows = (assignmentsRes.data || []) as TeamAssignment[];
-              setShifts(rows);
-              if (!metadataRole && !groupAssignedRoleFound && rows.length) {
-                setRoleTitle(rows.find((item) => item.assignment_title)?.assignment_title || "");
-              }
-            }
-          } catch (e) {
-            if (live) setShiftError("Network communication error loading assigned shifts.");
+          const rows: TeamAssignment[] = [
+            ...((legacyRes.data || []) as TeamAssignment[]),
+          ];
+          const modernAssignmentRows = modernAssignmentsRes.data || [];
+          const modernShiftIds = [...new Set(modernAssignmentRows.map((a: any) => a.shift_id).filter(Boolean))];
+          if (modernShiftIds.length) {
+            const { data: modernShifts, error: modernShiftsError } = await supabase
+              .from("wm_shifts")
+              .select("id, title, location, starts_at, ends_at, status, description")
+              .in("id", modernShiftIds);
+            if (modernShiftsError) throw modernShiftsError;
+            const shiftMap = new Map((modernShifts || []).map((s: any) => [s.id, s]));
+            modernAssignmentRows.forEach((a: any) => {
+              const shift: any = shiftMap.get(a.shift_id);
+              if (!shift) return;
+              rows.push({
+                id: a.id,
+                assignment_title: a.responsibility?.trim() || shift.title || "Conference Shift Duty",
+                station: a.station?.trim() || shift.location || null,
+                starts_at: shift.starts_at || null,
+                ends_at: shift.ends_at || null,
+                reporting_to: null,
+                status: a.status || shift.status || null,
+                notes: a.notes?.trim() || shift.description || null,
+              });
+            });
           }
-        } else {
-          setShiftError("Your account is missing its team assignment link. Please contact your section head.");
+
+          const ebAssignmentRows = ebAssignmentsRes.data || [];
+          const ebShiftIds = [...new Set(ebAssignmentRows.map((a: any) => a.shift_id).filter(Boolean))];
+          if (ebShiftIds.length) {
+            const { data: ebShifts, error: ebShiftsError } = await supabase
+              .from("wm_eb_shifts")
+              .select("id, station_name, location, starts_at, ends_at, supervisor_name, responsibilities, handover_notes, status")
+              .in("id", ebShiftIds);
+            if (ebShiftsError) throw ebShiftsError;
+            const shiftMap = new Map((ebShifts || []).map((s: any) => [s.id, s]));
+            ebAssignmentRows.forEach((a: any) => {
+              const shift: any = shiftMap.get(a.shift_id);
+              if (!shift) return;
+              rows.push({
+                id: a.id,
+                assignment_title: shift.station_name || a.role_title || "Conference Shift Duty",
+                station: shift.location || shift.station_name || null,
+                starts_at: shift.starts_at || null,
+                ends_at: shift.ends_at || null,
+                reporting_to: shift.supervisor_name || null,
+                status: a.status || shift.status || null,
+                notes: a.notes?.trim() || [shift.responsibilities, shift.handover_notes].filter(Boolean).join("\\n") || null,
+              });
+            });
+          }
+
+          // Deduplicate if a migration or legacy record exposes the same assignment twice.
+          const uniqueRows = [...new Map(rows.map((row) => [row.id, row])).values()]
+            .sort((a, b) => {
+              if (!a.starts_at) return 1;
+              if (!b.starts_at) return -1;
+              return new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
+            });
+          setShifts(uniqueRows);
+
+          if (!metadataRole && !groupAssignedRoleFound && uniqueRows.length) {
+            setRoleTitle(uniqueRows.find((item) => item.assignment_title)?.assignment_title || "");
+          }
+
+          const lookupErrors = [
+            legacyRes.error,
+            modernAssignmentsRes.error,
+            ebAssignmentsRes.error,
+          ].filter(Boolean);
+          if (uniqueRows.length === 0 && lookupErrors.length === 3) {
+            setShiftError(
+              "Your shifts could not load because the portal cannot read the shift roster. Please contact your section head."
+            );
+          }
+        } catch {
+          if (live) {
+            setShiftError("Your shifts could not load right now. Please contact your section head.");
+          }
         }
 
         // Secondary fallback for full name if still empty: check wm_qr_passes
