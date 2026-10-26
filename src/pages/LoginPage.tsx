@@ -26,7 +26,7 @@ export default function LoginPage() {
       }
       if (meta?.wm_role === "team_member") {
         const team = meta.wm_team;
-        window.location.replace(team === "security" ? "/security" : team === "media" ? "/media" : team === "volunteers" ? "/volunteer" : "/");
+        window.location.replace(["security", "media", "media_press", "volunteers", "volunteer"].includes(String(team)) ? "/team-members" : "/login");
         return;
       }
       const admin = await supabase.from("admins").select("user_id").eq("user_id", data.user.id).maybeSingle();
