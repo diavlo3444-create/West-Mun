@@ -219,42 +219,52 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
   };
 
   const persist = async (targetStatus: string) => {
-    if (!activeItem) return;
+    if (!activeItem || saving) return;
     setSaving(true);
     setModalNotice(null);
-    const result = await onSave(activeItem.id, targetStatus, draftNotes.trim());
-    setSaving(false);
 
-    if (!result.ok) {
+    try {
+      const result = await onSave(activeItem.id, targetStatus, draftNotes.trim());
+      if (!result.ok) {
+        setModalNotice({
+          type: 'error',
+          text: result.error || 'The recommendation could not be saved. Check your access and try again.',
+        });
+        return;
+      }
+
+      setDraftStatus(targetStatus);
+      setActiveItem((prev) =>
+        prev ? {
+          ...prev,
+          head_decision: targetStatus === 'accepted' ? 'approved' : targetStatus === 'rejected' ? 'rejected' : null,
+          head_notes: draftNotes.trim(),
+        } : null,
+      );
+      setPendingAction(null);
+      setModalNotice({
+        type: 'success',
+        text: targetStatus === 'received'
+          ? 'Your pending recommendation was cleared. The Secretariat still controls the final application status.'
+          : 'Recommendation submitted successfully. The Secretariat can now review it; the application status has not changed.',
+      });
+      setAdminDecision('pending');
+      setToast({
+        message: targetStatus === 'received'
+          ? `Recommendation cleared for ${activeItem.full_name}.`
+          : `Recommendation submitted for ${activeItem.full_name}.`,
+        tone: 'success',
+      });
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unexpected error while submitting the recommendation.';
       setModalNotice({
         type: 'error',
-        text: result.error || 'The decision could not be saved. Check your access and try again.',
+        text: `Recommendation was not submitted: ${message}`,
       });
-      return;
+    } finally {
+      setSaving(false);
     }
-
-    setDraftStatus(targetStatus);
-    setActiveItem((prev) =>
-      prev ? {
-        ...prev,
-        head_decision: targetStatus === 'accepted' ? 'approved' : targetStatus === 'rejected' ? 'rejected' : null,
-        head_notes: draftNotes.trim(),
-      } : null,
-    );
-    setPendingAction(null);
-    setModalNotice({
-      type: 'success',
-      text: targetStatus === 'received'
-        ? 'Your pending recommendation was cleared. The Secretariat still controls the final application status.'
-        : 'Your recommendation was submitted for Secretariat review. The final application status has not changed.',
-    });
-    setAdminDecision('pending');
-    setToast({
-      message: targetStatus === 'received'
-        ? `Recommendation cleared for ${activeItem.full_name}.`
-        : `Recommendation submitted for ${activeItem.full_name}; Secretariat approval is still required.`,
-      tone: 'success',
-    });
   };
 
   const createSignupLink = async (target: HeadRegistration | null = activeItem) => {
