@@ -13,6 +13,7 @@ import {
   XCircle,
   HelpCircle,
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import {
   ApplicantEmailContext,
   EmailTemplateType,
@@ -22,6 +23,8 @@ import {
 } from '../lib/applicantEmail';
 
 export interface ApplicantEmailLinkProps extends ApplicantEmailContext {
+  /** Database ID required to create a private invite for an accepted team applicant. */
+  registrationId?: string;
   className?: string;
   iconClassName?: string;
   showIcon?: boolean;
@@ -33,6 +36,7 @@ export interface ApplicantEmailLinkProps extends ApplicantEmailContext {
 export const ApplicantEmailLink: React.FC<ApplicantEmailLinkProps> = ({
   applicantName,
   applicantEmail,
+  registrationId,
   type,
   department,
   section,
@@ -100,9 +104,42 @@ export const ApplicantEmailLink: React.FC<ApplicantEmailLinkProps> = ({
     };
   }, [menuOpen]);
 
-  const handlePrimaryClick = (e: React.MouseEvent) => {
+  const handlePrimaryClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // The accepted team email must carry the one-time invitation, not a protected dashboard URL.
+    if (currentTemplate.id === 'approved' && type === 'team') {
+      if (!registrationId) {
+        window.alert('This application is missing its registration ID. Refresh the registrations page and try again.');
+        return;
+      }
+
+      // Open synchronously so the browser does not block the Gmail tab while the invite is generated.
+      const composeWindow = window.open('about:blank', '_blank');
+      try {
+        const { data, error } = await supabase.functions.invoke('team-signup', {
+          body: { action: 'create', registrationId },
+        });
+        if (error || !data?.success || typeof data?.signupUrl !== 'string') {
+          composeWindow?.close();
+          window.alert(data?.error || error?.message || 'Could not generate the private signup link. Confirm an admin has finalized the approval, then retry.');
+          return;
+        }
+
+        const body = typeof data.message === 'string'
+          ? data.message
+          : `Hello ${applicantName || 'Applicant'},\n\nCongratulations! Your application to join WEST MUN 2027 has been approved.\n\nCreate your account using this private invitation (it is tied to your application email):\n${data.signupUrl}\n\nWEST MUN 2027 Secretariat`;
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cleanEmail)}&su=${encodeURIComponent(currentTemplate.subject)}&body=${encodeURIComponent(body)}`;
+        if (composeWindow) composeWindow.location.href = gmailUrl;
+        else window.location.href = gmailUrl;
+      } catch {
+        composeWindow?.close();
+        window.alert('Could not generate the private signup link. Please try again.');
+      }
+      return;
+    }
+
     openGmailCompose(ctx, currentTemplate.id);
   };
 
