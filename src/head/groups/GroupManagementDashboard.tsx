@@ -131,14 +131,14 @@ export const GroupManagementDashboard: React.FC<GroupManagementDashboardProps> =
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[.22em] text-[#d4af37]">
-              WEST MUN 2027 · Operations Team Groups
+              WEST MUN 2027 · Team Sections & Roles
             </span>
           </div>
           <h1 className="mt-1 font-serif text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Custom Team Groups
+            Sections / Roles
           </h1>
           <p className="mt-1 text-xs text-neutral-400 max-w-2xl">
-            Create reusable custom groups of team members (e.g. Bathroom Cleaners, Hallway Team, VIP Support, Registration Desk)
+            Create sections/roles such as Bathroom Cleaners, Hallway Team, VIP Support, or Registration Desk, then assign team members to each
             and deploy an entire group to shifts with a single click.
           </p>
         </div>
@@ -162,7 +162,7 @@ export const GroupManagementDashboard: React.FC<GroupManagementDashboardProps> =
             }}
             className="inline-flex items-center gap-2 rounded-xl border border-[#d4af37] bg-gradient-to-r from-[#d4af37] to-[#b89628] px-4 py-2 text-xs font-bold text-black shadow-[0_0_18px_rgba(212,175,55,0.25)] hover:brightness-110 transition-all"
           >
-            <Plus size={15} /> Create Group
+            <Plus size={15} /> Create Section / Role
           </button>
         </div>
       </div>
@@ -191,7 +191,7 @@ export const GroupManagementDashboard: React.FC<GroupManagementDashboardProps> =
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-white/10 bg-[#0e0e14] p-3.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-            Total Custom Groups
+            Total Sections / Roles
           </span>
           <div className="mt-1 font-serif text-2xl font-bold text-white">{groups.length}</div>
         </div>
@@ -235,10 +235,10 @@ export const GroupManagementDashboard: React.FC<GroupManagementDashboardProps> =
       {filteredGroups.length === 0 ? (
         <div className="rounded-xl border border-white/10 bg-[#0e0e14] py-16 text-center">
           <Users size={36} className="mx-auto text-neutral-600 mb-3" />
-          <h4 className="text-base font-semibold text-white">No custom groups found</h4>
+          <h4 className="text-base font-semibold text-white">No sections / roles found</h4>
           <p className="mt-1 text-xs text-neutral-400 max-w-sm mx-auto">
             {groups.length === 0
-              ? 'Create custom groups like "Bathroom Cleaners" or "VIP Escorts" to assign entire teams to shifts with one click.'
+              ? 'Create sections/roles like "Bathroom Cleaners" or "VIP Support", then assign the appropriate team members.'
               : 'Try clearing your search query to see your saved groups.'}
           </p>
           <button
@@ -249,7 +249,7 @@ export const GroupManagementDashboard: React.FC<GroupManagementDashboardProps> =
             }}
             className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#d4af37] bg-[#d4af37] px-4 py-2 text-xs font-bold text-black hover:brightness-110 shadow-lg"
           >
-            Create Your First Group
+            Create Your First Section / Role
           </button>
         </div>
       ) : (
