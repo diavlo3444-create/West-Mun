@@ -2869,33 +2869,25 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
       case "list_shifts": {
         const dept = body?.department;
         const sec = body?.section;
-        if (supabaseAdmin) {
-          try {
-            let query = supabaseAdmin.from("wm_shifts").select("*, assignments:wm_shift_assignments(id)");
-            if (dept) query = query.eq("department", dept);
-            if (sec) query = query.eq("section", sec);
-            const { data, error } = await query.order("starts_at", { ascending: true });
-            if (!error && data) {
-              const mapped2 = data.map((sh) => ({
-                ...sh,
-                assigned_count: Array.isArray(sh.assignments) ? sh.assignments.length : 0
-              }));
-              return { statusCode: 200, body: { success: true, data: mapped2 } };
-            }
-          } catch {
-          }
+        if (!supabaseAdmin) {
+          return { statusCode: 503, body: { success: false, error: "Persistent database is unavailable; shifts cannot be loaded." } };
         }
-        let shifts = Array.from(memoryStore.shifts.values());
-        if (dept) shifts = shifts.filter((s) => s.department === dept);
-        if (sec) shifts = shifts.filter((s) => s.section === sec);
-        shifts.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-        const mapped = shifts.map((sh) => {
-          const count = Array.from(memoryStore.shiftAssignments.values()).filter(
-            (a) => a.shift_id === sh.id && a.status !== "cancelled"
-          ).length;
-          return { ...sh, assigned_count: count };
-        });
-        return { statusCode: 200, body: { success: true, data: mapped } };
+        try {
+          let query = supabaseAdmin.from("wm_shifts").select("*, assignments:wm_shift_assignments(id)");
+          if (dept) query = query.eq("department", dept);
+          if (sec) query = query.eq("section", sec);
+          const { data, error } = await query.order("starts_at", { ascending: true });
+          if (error) {
+            return { statusCode: 500, body: { success: false, error: "Could not load shifts from the database: " + error.message } };
+          }
+          const mapped = (data || []).map((sh) => ({
+            ...sh,
+            assigned_count: Array.isArray(sh.assignments) ? sh.assignments.length : 0
+          }));
+          return { statusCode: 200, body: { success: true, data: mapped } };
+        } catch (err) {
+          return { statusCode: 500, body: { success: false, error: "Could not load shifts from the database: " + (err instanceof Error ? err.message : String(err)) } };
+        }
       }
       case "create_shift": {
         const payload = {
@@ -2910,20 +2902,24 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
           capacity: Number(body?.capacity ?? 4),
           status: body?.status || "open",
           created_by: callerId,
-          created_at: (/* @__PURE__ */ new Date()).toISOString(),
-          updated_at: (/* @__PURE__ */ new Date()).toISOString()
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
-        if (supabaseAdmin) {
-          try {
-            const { data, error } = await supabaseAdmin.from("wm_shifts").insert(payload).select().single();
-            if (!error && data) {
-              return { statusCode: 200, body: { success: true, data: { ...data, assigned_count: 0 } } };
-            }
-          } catch {
-          }
+        if (!supabaseAdmin) {
+          return { statusCode: 503, body: { success: false, error: "Persistent database is unavailable; shift was not saved." } };
         }
-        memoryStore.shifts.set(payload.id, payload);
-        return { statusCode: 200, body: { success: true, data: { ...payload, assigned_count: 0 } } };
+        try {
+          const { data, error } = await supabaseAdmin.from("wm_shifts").insert(payload).select().single();
+          if (error) {
+            return { statusCode: 500, body: { success: false, error: "Could not save shift to the database: " + error.message } };
+          }
+          if (!data) {
+            return { statusCode: 500, body: { success: false, error: "The database did not return the saved shift." } };
+          }
+          return { statusCode: 200, body: { success: true, data: { ...data, assigned_count: 0 } } };
+        } catch (err) {
+          return { statusCode: 500, body: { success: false, error: "Could not save shift to the database: " + (err instanceof Error ? err.message : String(err)) } };
+        }
       }
       case "update_shift": {
         const id = body?.id;
@@ -3019,42 +3015,39 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
       case "batch_assign_shifts": {
         const shiftId = body?.shift_id;
         const incoming = Array.isArray(body?.assignments) ? body.assignments : [];
-        const savedAssignments = [];
-        for (const item of incoming) {
-          const payload = {
-            id: item.id || crypto3.randomUUID(),
-            shift_id: shiftId,
-            person_id: item.person_id || null,
-            member_id: item.member_id || null,
-            role_type: item.role_type || "team_member",
-            responsibility: String(item.responsibility || "").trim(),
-            station: String(item.station || "").trim(),
-            notes: String(item.notes || "").trim(),
-            is_supervisor: Boolean(item.is_supervisor),
-            assignee_name: String(item.assignee_name || "").trim(),
-            assignee_email: String(item.assignee_email || "").trim(),
-            status: item.status || "assigned",
-            assigned_by: callerId,
-            created_at: (/* @__PURE__ */ new Date()).toISOString(),
-            updated_at: (/* @__PURE__ */ new Date()).toISOString()
-          };
-          if (supabaseAdmin) {
-            try {
-              const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payload).select("*, person:wm_people(*)").single();
-              if (!error && data) {
-                savedAssignments.push(data);
-                continue;
-              }
-            } catch {
-            }
-          }
-          memoryStore.shiftAssignments.set(payload.id, payload);
-          savedAssignments.push({
-            ...payload,
-            person: payload.person_id ? memoryStore.people.get(payload.person_id) || null : null
-          });
+        if (!supabaseAdmin) {
+          return { statusCode: 503, body: { success: false, error: "Persistent database is unavailable; staff assignments were not saved." } };
         }
-        return { statusCode: 200, body: { success: true, data: savedAssignments } };
+        const now = new Date().toISOString();
+        const payloads = incoming.map((item) => ({
+          id: item.id || crypto3.randomUUID(),
+          shift_id: shiftId,
+          person_id: item.person_id || null,
+          member_id: item.member_id || null,
+          role_type: item.role_type || "team_member",
+          responsibility: String(item.responsibility || "").trim(),
+          station: String(item.station || "").trim(),
+          notes: String(item.notes || "").trim(),
+          is_supervisor: Boolean(item.is_supervisor),
+          assignee_name: String(item.assignee_name || "").trim(),
+          assignee_email: String(item.assignee_email || "").trim(),
+          status: item.status || "assigned",
+          assigned_by: callerId,
+          created_at: now,
+          updated_at: now
+        }));
+        if (payloads.length === 0) {
+          return { statusCode: 200, body: { success: true, data: [] } };
+        }
+        try {
+          const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payloads).select("*, person:wm_people(*)");
+          if (error) {
+            return { statusCode: 500, body: { success: false, error: "Could not save staff assignments: " + error.message } };
+          }
+          return { statusCode: 200, body: { success: true, data: data || [] } };
+        } catch (err) {
+          return { statusCode: 500, body: { success: false, error: "Could not save staff assignments: " + (err instanceof Error ? err.message : String(err)) } };
+        }
       }
       case "duplicate_shift": {
         const origId = body?.shift_id;
