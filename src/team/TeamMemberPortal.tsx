@@ -147,6 +147,7 @@ export default function TeamMemberPortal() {
 
         // Read the custom role(s) assigned by the department head in Sections / Roles.
         // These are stored on the member's group roster, not necessarily in auth metadata.
+        let groupAssignedRoleFound = false;
         try {
           const { data: memberships, error: membershipError } = await supabase
             .from("wm_team_group_members")
@@ -170,6 +171,7 @@ export default function TeamMemberPortal() {
               .filter((value: string) => Boolean(value));
             const uniqueRoles = [...new Set(roles)];
             if (live && uniqueRoles.length) {
+              groupAssignedRoleFound = true;
               setAssignedRoles(uniqueRoles);
               // The head-assigned operational role takes precedence over the default signup role.
               setRoleTitle(uniqueRoles[0].split(" · ")[0]);
@@ -210,7 +212,7 @@ export default function TeamMemberPortal() {
             } else {
               const rows = (assignmentsRes.data || []) as TeamAssignment[];
               setShifts(rows);
-              if (!metadataRole && !assignedRoles.length && rows.length) {
+              if (!metadataRole && !groupAssignedRoleFound && rows.length) {
                 setRoleTitle(rows.find((item) => item.assignment_title)?.assignment_title || "");
               }
             }
