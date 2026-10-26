@@ -465,6 +465,7 @@ export const HeadOverview: React.FC<HeadOverviewProps> = ({
                       <ApplicantEmailLink
                         applicantName={record.full_name}
                         applicantEmail={record.email}
+                        registrationId={record.id}
                         type="team"
                         department={meta.key}
                         section={record.section || section}
