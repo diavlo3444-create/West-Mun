@@ -560,6 +560,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                             <ApplicantEmailLink
                               applicantName={record.full_name}
                               applicantEmail={record.email}
+                              registrationId={record.id}
                               type="team"
                               department={department}
                               section={record.section || section}
@@ -636,6 +637,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                           <ApplicantEmailLink
                             applicantName={record.full_name}
                             applicantEmail={record.email}
+                            registrationId={record.id}
                             type="team"
                             department={department}
                             section={record.section || section}
@@ -703,6 +705,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
               <ApplicantEmailLink
                 applicantName={activeItem.full_name}
                 applicantEmail={activeItem.email}
+                registrationId={activeItem.id}
                 type="team"
                 department={department}
                 section={activeItem.section || section}
@@ -764,6 +767,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
               <ApplicantEmailLink
                 applicantName={activeItem.full_name}
                 applicantEmail={activeItem.email}
+                registrationId={activeItem.id}
                 type="team"
                 department={department}
                 section={activeItem.section || section}
@@ -789,6 +793,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                       <ApplicantEmailLink
                         applicantName={activeItem.full_name}
                         applicantEmail={activeItem.email}
+                        registrationId={activeItem.id}
                         type="team"
                         department={department}
                         section={activeItem.section || section}
