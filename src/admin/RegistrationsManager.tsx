@@ -154,6 +154,7 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
   const [signupMessage, setSignupMessage] = useState<string | null>(null);
   const [headRecommendation, setHeadRecommendation] = useState<{ head_decision: string; head_notes: string; admin_decision: string } | null>(null);
+  const [headRecommendationError, setHeadRecommendationError] = useState<string | null>(null);
   const [bulkSignupBusy, setBulkSignupBusy] = useState(false);
   const [bulkSignupLinks, setBulkSignupLinks] = useState<Array<{ signupUrl: string; message: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>>([]);
   const [bulkSignupNotice, setBulkSignupNotice] = useState<string | null>(null);
@@ -240,12 +241,29 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
   React.useEffect(() => {
     let current = true;
     setHeadRecommendation(null);
+    setHeadRecommendationError(null);
     if (!supabase || !activeItem || activeItem._type !== 'team') return () => { current = false; };
     void supabase.from('wm_staffing_decisions')
       .select('head_decision,head_notes,admin_decision')
       .eq('registration_id', activeItem.id)
       .maybeSingle()
-      .then(({ data }) => { if (current && data) setHeadRecommendation(data as any); });
+      .then(({ data, error }) => {
+        if (!current) return;
+        if (error) {
+          console.error('[WEST MUN] Could not load head recommendation:', error);
+          setHeadRecommendationError(
+            /row-level security|permission denied|policy/i.test(error.message || '')
+              ? 'The recommendation could not be read because of database permissions. Apply the staffing-decisions admin-read SQL migration in Supabase.'
+              : error.message || 'Could not load the head recommendation. Refresh and try again.',
+          );
+          return;
+        }
+        if (data) setHeadRecommendation(data as any);
+      })
+      .catch((error: unknown) => {
+        if (!current) return;
+        setHeadRecommendationError(error instanceof Error ? error.message : 'Could not load the head recommendation.');
+      });
     return () => { current = false; };
   }, [activeItem?.id, activeItem?._type]);
 
@@ -1634,12 +1652,14 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
                 {headRecommendation ? (
                   <>
                     <p className="mt-1 text-[11.5px] text-neutral-200">
-                      {headRecommendation.head_decision === 'approved' ? 'Recommends approval' : 'Recommends rejection'}
+                      {headRecommendation.head_decision === 'approved' ? 'Recommends approval' : headRecommendation.head_decision === 'rejected' ? 'Recommends rejection' : 'Recommendation submitted'}
                       <span className="mx-2 text-neutral-600">·</span>
                       Secretariat: {headRecommendation.admin_decision === 'approved' ? 'Approved' : headRecommendation.admin_decision === 'rejected' ? 'Rejected' : 'Pending final decision'}
                     </p>
                     {headRecommendation.head_notes && <p className="mt-2 whitespace-pre-wrap text-[11px] leading-relaxed text-neutral-400">{headRecommendation.head_notes}</p>}
                   </>
+                ) : headRecommendationError ? (
+                  <p role="alert" className="mt-1 text-[11px] leading-relaxed text-amber-300">{headRecommendationError}</p>
                 ) : (
                   <p className="mt-1 text-[11px] text-neutral-400">No head recommendation has been submitted. You can still make the final decision yourself.</p>
                 )}
