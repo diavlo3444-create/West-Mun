@@ -2993,7 +2993,7 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
         };
         if (supabaseAdmin) {
           try {
-            const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payload).select("*, person:wm_people(*)").single();
+            const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payload).select("*").single();
             if (!error && data) {
               return { statusCode: 200, body: { success: true, data } };
             }
@@ -3040,7 +3040,7 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
           return { statusCode: 200, body: { success: true, data: [] } };
         }
         try {
-          const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payloads).select("*, person:wm_people(*)");
+          const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payloads).select("*");
           if (error) {
             return { statusCode: 500, body: { success: false, error: "Could not save staff assignments: " + error.message } };
           }
