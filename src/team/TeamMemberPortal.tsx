@@ -83,6 +83,7 @@ export default function TeamMemberPortal() {
   const [team, setTeam] = useState("");
   const [section, setSection] = useState<string | null>(null);
   const [roleTitle, setRoleTitle] = useState("");
+  const [assignedRoles, setAssignedRoles] = useState<string[]>([]);
   const [shifts, setShifts] = useState<TeamAssignment[]>([]);
   const [shiftError, setShiftError] = useState("");
   const [showIntro, setShowIntro] = useState(false);
@@ -139,10 +140,44 @@ export default function TeamMemberPortal() {
 
         // Resolve member's real name with robust fallbacks
         let resolvedName = typeof userMeta?.full_name === "string" ? userMeta.full_name.trim() : "";
-        const metadataRole = typeof meta?.wm_role_title === "string" ? meta.wm_role_title : "";
+        const metadataRole = typeof meta?.wm_role_title === "string" ? meta.wm_role_title.trim() : "";
         setRoleTitle(metadataRole);
 
         const registrationId = typeof meta?.wm_registration_id === "string" ? meta.wm_registration_id : "";
+
+        // Read the custom role(s) assigned by the department head in Sections / Roles.
+        // These are stored on the member's group roster, not necessarily in auth metadata.
+        try {
+          const { data: memberships, error: membershipError } = await supabase
+            .from("wm_team_group_members")
+            .select("role_title, group_id")
+            .ilike("member_email", user.email || "")
+            .order("created_at", { ascending: false });
+
+          if (!membershipError && memberships?.length) {
+            const groupIds = [...new Set(memberships.map((m: any) => m.group_id).filter(Boolean))];
+            const { data: groups } = groupIds.length
+              ? await supabase.from("wm_team_groups").select("id, name").in("id", groupIds)
+              : { data: [] as any[] };
+            const groupNames = new Map((groups || []).map((g: any) => [g.id, g.name]));
+            const roles = memberships
+              .map((m: any) => {
+                const title = typeof m.role_title === "string" ? m.role_title.trim() : "";
+                const groupName = groupNames.get(m.group_id);
+                if (!title || title.toLowerCase() === "team member") return "";
+                return groupName ? `${title} · ${groupName}` : title;
+              })
+              .filter((value: string) => Boolean(value));
+            const uniqueRoles = [...new Set(roles)];
+            if (live && uniqueRoles.length) {
+              setAssignedRoles(uniqueRoles);
+              // The head-assigned operational role takes precedence over the default signup role.
+              setRoleTitle(uniqueRoles[0].split(" · ")[0]);
+            }
+          }
+        } catch {
+          // Keep the invitation metadata fallback if the roster is not readable.
+        }
 
         // Query shifts and name lookup
         if (registrationId) {
@@ -175,7 +210,7 @@ export default function TeamMemberPortal() {
             } else {
               const rows = (assignmentsRes.data || []) as TeamAssignment[];
               setShifts(rows);
-              if (!metadataRole && rows.length) {
+              if (!metadataRole && !assignedRoles.length && rows.length) {
                 setRoleTitle(rows.find((item) => item.assignment_title)?.assignment_title || "");
               }
             }
@@ -508,6 +543,15 @@ export default function TeamMemberPortal() {
                         <p className="mt-1 font-serif text-xl sm:text-2xl text-white">
                           {roleTitle || defaultRoleLabel}
                         </p>
+                        {assignedRoles.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2" aria-label="All assigned roles">
+                            {assignedRoles.map((role) => (
+                              <span key={role} className="border border-[#d4af37]/25 bg-[#d4af37]/[0.07] px-2.5 py-1 text-xs text-[#f5d47a]">
+                                {role}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
