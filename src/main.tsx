@@ -37,7 +37,7 @@ async function boot() {
     Page = (await import('./pages/SignupPage')).default;
   } else if (path === '/login') {
     Page = (await import('./pages/LoginPage')).default;
-  } else if (path === '/volunteer' || path === '/media' || path === '/security') {
+  } else if (path === '/team-members' || path === '/volunteer' || path === '/media' || path === '/security') {
     Page = (await import('./team/TeamMemberPortal')).default;
   } else if (path === '/pass') {
     Page = (await import('./pages/PassPage')).default;
