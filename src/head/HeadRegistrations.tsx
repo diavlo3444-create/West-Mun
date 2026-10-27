@@ -180,7 +180,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
         }
 
         if (statusTab === 'accepted-secretariat') {
-          if (record.status !== 'accepted' || !record.admin_finalized_at) return false;
+          if (record.status !== 'accepted') return false;
         } else if (statusTab === 'pending') {
           if (record.status !== 'received' && record.status !== 'under_review') return false;
         } else if (statusTab === 'approved') {
@@ -228,7 +228,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       if (!result.ok) {
         setModalNotice({
           type: 'error',
-          text: result.error || 'The recommendation could not be saved. Check your access and try again.',
+          text: result.error || 'The application decision could not be saved. Check your access and try again.',
         });
         return;
       }
@@ -237,6 +237,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       setActiveItem((prev) =>
         prev ? {
           ...prev,
+          status: targetStatus,
           head_decision: targetStatus === 'accepted' ? 'approved' : targetStatus === 'rejected' ? 'rejected' : null,
           head_notes: draftNotes.trim(),
         } : null,
@@ -245,14 +246,14 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       setModalNotice({
         type: 'success',
         text: targetStatus === 'received'
-          ? 'Your pending recommendation was cleared. The Secretariat still controls the final application status.'
-          : 'Recommendation submitted successfully. The Secretariat can now review it; the application status has not changed.',
+          ? 'Application status reset to received.'
+          : 'Application decision saved. The applicant’s status has been updated.',
       });
       setAdminDecision('pending');
       setToast({
         message: targetStatus === 'received'
-          ? `Recommendation cleared for ${activeItem.full_name}.`
-          : `Recommendation submitted for ${activeItem.full_name}.`,
+          ? `Application status reset for ${activeItem.full_name}.`
+          : `Decision saved for ${activeItem.full_name}.`,
         tone: 'success',
       });
       onRefresh();
@@ -260,7 +261,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       const message = error instanceof Error ? error.message : 'Unexpected error while submitting the recommendation.';
       setModalNotice({
         type: 'error',
-        text: `Recommendation was not submitted: ${message}`,
+        text: `Application decision was not saved: ${message}`,
       });
     } finally {
       setSaving(false);
@@ -268,7 +269,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
   };
 
   const createSignupLink = async (target: HeadRegistration | null = activeItem) => {
-    if (!supabase || !target || target.status !== 'accepted' || !target.admin_finalized_at || !target.admin_finalized_by || signupBusy) return;
+    if (!supabase || !target || target.status !== 'accepted' || signupBusy) return;
     setSignupBusy(true);
     setSignupUrl(null);
     setSignupMessage(null);
@@ -298,7 +299,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
   };
 
   const bulkSignupCandidates = filtered.filter((record) =>
-    record.status === 'accepted' && Boolean(record.admin_finalized_at) && Boolean(record.admin_finalized_by)
+    record.status === 'accepted'
   );
 
   const generateBulkSignupLinks = async () => {
@@ -389,7 +390,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       <PageHeader
         eyebrow="Candidate registry"
         title="Applications"
-        description={`Review candidates for ${departmentLabel}${section ? ` · ${section} division` : ''}. Use “Accepted by Secretariat” to see candidates with a recorded final decision.`}
+        description={`Review candidates for ${departmentLabel}${section ? ` · ${section} division` : ''}. Use “Accepted” to see candidates accepted by your department.`}
         actions={
           <>
             <button type="button" onClick={onRefresh} className={btnSecondary} disabled={loading}>
@@ -420,7 +421,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
             { value: 'all', label: 'All', count: counts.all },
             { value: 'pending', label: 'Pending', count: counts.pending },
             { value: 'approved', label: 'Accepted (all)', count: counts.approved },
-            { value: 'accepted-secretariat', label: 'Accepted by Secretariat', count: counts.acceptedSecretariat },
+            { value: 'accepted-secretariat', label: 'Admin-finalized', count: counts.acceptedSecretariat },
             { value: 'waitlisted', label: 'Waitlisted', count: counts.waitlisted },
             { value: 'rejected', label: 'Rejected', count: counts.rejected },
           ]}
@@ -600,7 +601,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                             <Eye className="h-3 w-3" aria-hidden="true" />
                             Review
                           </button>
-                          {record.status === 'accepted' && record.admin_finalized_at && record.admin_finalized_by && (
+                          {record.status === 'accepted' && (
                             <button
                               type="button"
                               onClick={() => { openItem(record); void createSignupLink(record); }}
@@ -1009,32 +1010,32 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
             <div className="rounded-md border border-white/[0.07] bg-white/[0.012] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-[#d4af37]/85">Head recommendation</p>
+                  <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-[#d4af37]/85">Department decision</p>
                   <p className="mt-1 text-[11px] text-neutral-300">
-                    {draftStatus === 'accepted' ? 'Recommendation submitted: approve this applicant.' : draftStatus === 'rejected' ? 'Recommendation submitted: reject this applicant.' : 'No recommendation submitted yet.'}
+                    {draftStatus === 'accepted' ? 'You have accepted this applicant.' : draftStatus === 'rejected' ? 'You have rejected this applicant.' : 'No decision recorded yet.'}
                   </p>
-                  <p className="mt-1 text-[10.5px] text-neutral-500">The Secretariat still makes the final decision.</p>
+                  <p className="mt-1 text-[10.5px] text-neutral-500">Your department can make the final decision for applications in its assigned scope.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => void persist('accepted')} disabled={saving || adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected'} className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/25 bg-emerald-400/[0.07] px-3 py-2 text-[11px] font-medium text-emerald-300 transition-colors hover:bg-emerald-400/[0.13] disabled:opacity-40">
                     {saving && draftStatus === 'accepted' ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
-                    Recommend approval
+                    Accept applicant
                   </button>
                   <button type="button" onClick={() => void persist('rejected')} disabled={saving || adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected'} className="inline-flex items-center gap-1.5 rounded-md border border-rose-400/25 bg-rose-400/[0.06] px-3 py-2 text-[11px] font-medium text-rose-300 transition-colors hover:bg-rose-400/[0.12] disabled:opacity-40">
                     {saving && draftStatus === 'rejected' ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <XCircle className="h-3.5 w-3.5" aria-hidden="true" />}
-                    Recommend rejection
+                    Reject applicant
                   </button>
                 </div>
               </div>
               {(adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected') && (
-                <Notice tone="info" title="Secretariat decision recorded">This application already has a final admin decision. The recommendation is locked.</Notice>
+                <Notice tone="info" title="Secretariat decision recorded">This application already has a final decision. The decision controls are locked.</Notice>
               )}
-              {activeItem.status === 'accepted' && activeItem.admin_finalized_at && (
+              {activeItem.status === 'accepted' && (
                 <div className="mt-4 rounded-md border border-[#d4af37]/20 bg-[#d4af37]/[0.035] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-[#d4af37]"><Link2 className="h-3.5 w-3.5" /> Manual signup link</p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">This applicant has been accepted by the Secretariat. Generate a one-time link and send it manually; this website will not send emails.</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">This applicant has been accepted. Generate a one-time signup link and send it manually; this website will not send emails.</p>
                     </div>
                     <button type="button" onClick={() => void createSignupLink()} disabled={signupBusy} className={btnPrimary}>
                       {signupBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
