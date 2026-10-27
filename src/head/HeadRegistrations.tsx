@@ -123,7 +123,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
 
   const openItem = (record: HeadRegistration) => {
     setActiveItem(record);
-    setDraftStatus('received');
+    setDraftStatus(record.status || 'received');
     setDraftNotes('');
     setModalNotice(null);
     setPendingAction(null);
@@ -258,7 +258,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       });
       onRefresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unexpected error while submitting the recommendation.';
+      const message = error instanceof Error ? error.message : 'Unexpected error while saving the application decision.';
       setModalNotice({
         type: 'error',
         text: `Application decision was not saved: ${message}`,
