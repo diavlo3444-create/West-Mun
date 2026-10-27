@@ -411,82 +411,20 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     const headUser = userData.user;
     if (userError || !headUser) return { ok: false, error: 'Your Supabase session is missing. Sign in again.' };
 
-    // Heads submit recommendations only. The Secretariat remains responsible for
-    // the final team_registrations.status decision.
-    if (status !== 'accepted' && status !== 'rejected') {
-      const cleared = await supabase.from('wm_staffing_decisions').delete()
-        .eq('registration_id', id)
-        .eq('head_user_id', headUser.id)
-        .eq('admin_decision', 'pending');
-      if (cleared.error) return { ok: false, error: explainAccessError(cleared.error) };
-      return { ok: true };
+    // Department heads make the final decision for applications in their own team/section.
+    if (!['accepted', 'rejected', 'waitlisted', 'under_review', 'received'].includes(status)) {
+      return { ok: false, error: 'Unsupported application status.' };
     }
-
     const applicationTeam = String(record.team || department);
-    // Canonicalize legacy/display labels before the decision is checked by RLS.
     const normalizedTeam = applicationTeam.toLowerCase().replace(/[^a-z]/g, '');
-    const decisionDepartment = normalizedTeam.includes('media') || normalizedTeam === 'press'
-      ? 'media_press'
-      : normalizedTeam.includes('volunteer')
-        ? 'volunteers'
-        : normalizedTeam.includes('security') || normalizedTeam.includes('protocol')
-          ? 'security'
-          : department;
-    // A section-scoped head must use their assigned section, never trust a
-    // possibly stale section value from a cached application row.
-    if (section && record.section && String(record.section).toLowerCase() !== String(section).toLowerCase()) {
-      return { ok: false, error: `This application belongs to the ${record.section} section, but your head account is assigned to ${section}. Refresh the list or ask the Secretariat to correct the assignment.` };
-    }
-    const decisionSection = section || record.section || 'general';
-    // Check for an existing recommendation before writing. Blind upsert can
-    // attempt an UPDATE that RLS correctly blocks after Secretariat finalization.
-    const { data: existingDecision, error: existingError } = await supabase
-      .from('wm_staffing_decisions')
-      .select('id,head_user_id,admin_decision')
-      .eq('registration_id', id)
-      .maybeSingle();
-
-    if (existingError) {
-      return { ok: false, error: explainAccessError(existingError) };
-    }
-    if (existingDecision && existingDecision.admin_decision !== 'pending') {
-      return { ok: false, error: 'The Secretariat has already finalized this application. Heads cannot change the recommendation after a final decision.' };
-    }
-    if (existingDecision && existingDecision.head_user_id !== headUser.id) {
-      return { ok: false, error: 'A recommendation already exists under another head. Ask the Secretariat to review it instead of overwriting another head’s decision.' };
-    }
-    if (['accepted', 'rejected', 'withdrawn'].includes(String(record.status || ''))) {
-      return { ok: false, error: 'This application is already finalized or withdrawn and cannot receive a new head recommendation.' };
-    }
-
-    const payload = {
-      registration_id: id,
-      department: decisionDepartment,
-      section: decisionSection,
-      role_title: decisionDepartment === 'security' ? 'Security Team' :
-        decisionDepartment === 'media_press' ? 'Media & Press Team' : 'Conference Volunteers',
-      head_decision: status === 'accepted' ? 'approved' : 'rejected',
-      head_notes: notes,
-      head_user_id: headUser.id,
-      head_submitted_at: new Date().toISOString(),
-      admin_decision: 'pending',
-      admin_notes: '',
-      admin_user_id: null,
-      admin_reviewed_at: null,
-      updated_at: new Date().toISOString(),
-    };
-
-    const decision = existingDecision
-      ? await supabase.from('wm_staffing_decisions').update(payload).eq('registration_id', id).eq('head_user_id', headUser.id).eq('admin_decision', 'pending')
-      : await supabase.from('wm_staffing_decisions').insert(payload);
-
-    if (decision.error) {
-      const rawMessage = String(decision.error.message || '');
-      const message = /row-level security|permission denied|policy/i.test(rawMessage)
-        ? `Supabase rejected the recommendation for ${decisionDepartment}/${decisionSection}. Confirm the head account is assigned to this department and section, and that the application is still pending review (not accepted, rejected, or withdrawn). Database detail: ${rawMessage}`
-        : explainAccessError(decision.error);
-      return { ok: false, error: message };
-    }
+    const decisionDepartment = normalizedTeam.includes('media') || normalizedTeam === 'press' ? 'media_press' : normalizedTeam.includes('volunteer') ? 'volunteers' : normalizedTeam.includes('security') || normalizedTeam.includes('protocol') ? 'security' : department;
+    if (section && record.section && String(record.section).toLowerCase() !== String(section).toLowerCase()) return { ok: false, error: 'This application belongs to another section. Refresh the list or ask the Secretariat to correct the assignment.' };
+    const normalizedHeadDepartment = String(department || '').toLowerCase();
+    const permittedDepartment = normalizedHeadDepartment === decisionDepartment || (normalizedHeadDepartment === 'media' && decisionDepartment === 'media_press') || (normalizedHeadDepartment === 'media_press' && decisionDepartment === 'media');
+    if (!permittedDepartment) return { ok: false, error: 'This application is outside your assigned department.' };
+    const update = await supabase.from('team_registrations').update({ status, admin_notes: notes, updated_at: new Date().toISOString() }).eq('id', id).select('id,status').maybeSingle();
+    if (update.error) return { ok: false, error: explainAccessError(update.error) };
+    if (!update.data) return { ok: false, error: 'The application was not updated. Confirm it is still assigned to your department and section.' };
     return { ok: true };
   };
 
