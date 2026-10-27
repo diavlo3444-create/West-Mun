@@ -380,6 +380,21 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       return { ok: false, error: 'Registration management is not authorized for this department.' };
     }
 
+    // Optimistically update the head's visible applicant list immediately.
+    // If the database rejects the decision, restore the previous status.
+    const previousRecord = registrations.find((item) => item.id === id);
+    if (previousRecord) {
+      setRegistrations((current) => current.map((item) =>
+        item.id === id ? { ...item, status, admin_notes: notes, updated_at: new Date().toISOString() } : item
+      ));
+    }
+    const rollbackOptimisticStatus = () => {
+      if (!previousRecord) return;
+      setRegistrations((current) => current.map((item) =>
+        item.id === id ? previousRecord : item
+      ));
+    };
+
     // Super IT test sessions have no Supabase Auth session; use the privileged,
     // audit-logged server endpoint instead.
     if (testMode?.token) {
@@ -396,35 +411,59 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         if (resp.ok && data?.success) {
           return { ok: true };
         }
+        rollbackOptimisticStatus();
         return { ok: false, error: data?.error || 'Test update failed.' };
       } catch (err: unknown) {
+        rollbackOptimisticStatus();
         const msg = err instanceof Error ? err.message : 'Network error.';
         return { ok: false, error: msg };
       }
     }
 
-    if (!supabase) return { ok: false, error: 'Supabase is not configured.' };
+    if (!supabase) {
+      rollbackOptimisticStatus();
+      return { ok: false, error: 'Supabase is not configured.' };
+    }
 
-    const record = registrations.find((item) => item.id === id);
-    if (!record) return { ok: false, error: 'Application not found in this department.' };
+    const record = previousRecord;
+    if (!record) {
+      rollbackOptimisticStatus();
+      return { ok: false, error: 'Application not found in this department.' };
+    }
     const { data: userData, error: userError } = await supabase.auth.getUser();
     const headUser = userData.user;
-    if (userError || !headUser) return { ok: false, error: 'Your Supabase session is missing. Sign in again.' };
+    if (userError || !headUser) {
+      rollbackOptimisticStatus();
+      return { ok: false, error: 'Your Supabase session is missing. Sign in again.' };
+    }
 
     // Department heads make the final decision for applications in their own team/section.
     if (!['accepted', 'rejected', 'waitlisted', 'under_review', 'received'].includes(status)) {
+      rollbackOptimisticStatus();
       return { ok: false, error: 'Unsupported application status.' };
     }
     const applicationTeam = String(record.team || department);
     const normalizedTeam = applicationTeam.toLowerCase().replace(/[^a-z]/g, '');
     const decisionDepartment = normalizedTeam.includes('media') || normalizedTeam === 'press' ? 'media_press' : normalizedTeam.includes('volunteer') ? 'volunteers' : normalizedTeam.includes('security') || normalizedTeam.includes('protocol') ? 'security' : department;
-    if (section && record.section && String(record.section).toLowerCase() !== String(section).toLowerCase()) return { ok: false, error: 'This application belongs to another section. Refresh the list or ask the Secretariat to correct the assignment.' };
+    if (section && record.section && String(record.section).toLowerCase() !== String(section).toLowerCase()) {
+      rollbackOptimisticStatus();
+      return { ok: false, error: 'This application belongs to another section. Refresh the list or ask the Secretariat to correct the assignment.' };
+    }
     const normalizedHeadDepartment = String(department || '').toLowerCase();
     const permittedDepartment = normalizedHeadDepartment === decisionDepartment || (normalizedHeadDepartment === 'media' && decisionDepartment === 'media_press') || (normalizedHeadDepartment === 'media_press' && decisionDepartment === 'media');
-    if (!permittedDepartment) return { ok: false, error: 'This application is outside your assigned department.' };
+    if (!permittedDepartment) {
+      rollbackOptimisticStatus();
+      return { ok: false, error: 'This application is outside your assigned department.' };
+    }
     const update = await supabase.from('team_registrations').update({ status, admin_notes: notes, updated_at: new Date().toISOString() }).eq('id', id).select('id,status').maybeSingle();
-    if (update.error) return { ok: false, error: explainAccessError(update.error) };
-    if (!update.data) return { ok: false, error: 'The application was not updated. Confirm it is still assigned to your department and section.' };
+    if (update.error) {
+      rollbackOptimisticStatus();
+      return { ok: false, error: explainAccessError(update.error) };
+    }
+    if (!update.data) {
+      rollbackOptimisticStatus();
+      return { ok: false, error: 'The application was not updated. Confirm it is still assigned to your department and section.' };
+    }
     return { ok: true };
   };
 
