@@ -76,21 +76,22 @@ Deno.serve(async (req: Request) => {
       const applicationResult = await db.from("team_registrations").select("id,full_name,email,team,section,status,admin_finalized_at,admin_finalized_by").eq("id", registrationId).maybeSingle();
       if (applicationResult.error || !applicationResult.data) return json({ error: "Application not found." }, 404);
       const app = applicationResult.data;
-      if (app.status !== "accepted" || !app.admin_finalized_at || !app.admin_finalized_by) return json({ error: "Only applications finally approved by an admin can receive signup links. For older approvals, open the application in Admin and save its Accepted status once." }, 409);
+      if (app.status !== "accepted") return json({ error: "Only accepted applications can receive signup links." }, 409);
       const permitted = headResult.data.some((h) => {
         const teamMatches = h.department === app.team ||
-          (h.department === "media_press" && (app.team === "media" || app.team === "media_press"));
+          (h.department === "media_press" && (app.team === "media" || app.team === "media_press")) ||
+          (h.department === "media" && app.team === "media_press");
         const sectionMatches = !h.section || h.section === app.section;
         return teamMatches && sectionMatches;
       });
-      if (!isAdmin.data && !permitted) return json({ error: "You cannot create a link for this team or section." }, 403);
+      if (!permitted) return json({ error: "You cannot create a link for this team or section." }, 403);
       return await issueInvite(db, actorId, app, SITE_URL);
     }
     const registrationId = typeof body.registrationId === "string" ? body.registrationId : "";
     if (!/^[0-9a-f-]{36}$/i.test(registrationId)) return json({ error: "A valid application is required." }, 400);
     const applicationResult = await db.from("team_registrations").select("id,full_name,email,team,section,status,admin_finalized_at,admin_finalized_by").eq("id", registrationId).maybeSingle();
     if (applicationResult.error || !applicationResult.data) return json({ error: "Application not found." }, 404);
-    if (applicationResult.data.status !== "accepted" || !applicationResult.data.admin_finalized_at || !applicationResult.data.admin_finalized_by) return json({ error: "Only applications finally approved by an admin can receive signup links. For older approvals, open the application in Admin and save its Accepted status once." }, 409);
+    if (applicationResult.data.status !== "accepted" || !applicationResult.data.admin_finalized_at || !applicationResult.data.admin_finalized_by) return json({ error: "Only applications accepted and finalized by an admin can receive signup links from an admin account." }, 409);
     return await issueInvite(db, actorId, applicationResult.data, SITE_URL);
   }
 
@@ -116,14 +117,18 @@ Deno.serve(async (req: Request) => {
       .in("id", uniqueIds);
     if (appsResult.error) return json({ error: "Could not load the selected applications." }, 500);
     const apps = appsResult.data ?? [];
-    if (apps.length !== uniqueIds.length || apps.some((app) => app.status !== "accepted" || !app.admin_finalized_at || !app.admin_finalized_by)) {
-      return json({ error: "Every selected application must have a confirmed final admin approval. For older accepted applications, open each one in Admin and save its Accepted status once. No links were generated." }, 409);
+    if (apps.length !== uniqueIds.length || apps.some((app) => app.status !== "accepted")) {
+      return json({ error: "Every selected application must be accepted. No links were generated." }, 409);
+    }
+    if (admin.data && apps.some((app) => !app.admin_finalized_at || !app.admin_finalized_by)) {
+      return json({ error: "Admin bulk links require an admin-finalized decision. Department heads can generate links for accepted applications in their assigned scope." }, 409);
     }
     if (!admin.data) {
       const permitted = apps.every((app) => headResult!.data!.some((h) => {
         const teamMatches = h.department === app.team ||
           (h.department === "media_press" && (app.team === "media" || app.team === "media_press"));
-        return teamMatches && (!h.section || h.section === app.section);
+        const normalizedMatch = teamMatches || (h.department === "media" && app.team === "media_press");
+        return normalizedMatch && (!h.section || h.section === app.section);
       }));
       if (!permitted) return json({ error: "You can only generate bulk links for applications in your assigned team and section." }, 403);
     }
