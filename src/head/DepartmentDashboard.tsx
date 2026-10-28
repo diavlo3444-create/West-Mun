@@ -472,14 +472,21 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       rollbackOptimisticStatus();
       return { ok: false, error: 'This application is outside your assigned department. Refresh and verify the head account’s department assignment.' };
     }
-    const update = await supabase.from('team_registrations').update({ status, admin_notes: notes, updated_at: new Date().toISOString() }).eq('id', id).select('id,status').maybeSingle();
+    // Use the database RPC so every authorized operational head follows the same
+    // server-side team/section checks, without relying on client-side RLS update behavior.
+    const update = await supabase.rpc('head_update_team_registration_status', {
+      p_registration_id: id,
+      p_status: status,
+      p_notes: notes,
+    });
     if (update.error) {
       rollbackOptimisticStatus();
-      return { ok: false, error: explainAccessError(update.error) };
+      return { ok: false, error: explainAccessError(update.error) || update.error.message };
     }
-    if (!update.data) {
+    const saved = Array.isArray(update.data) ? update.data[0] : update.data;
+    if (!saved || saved.id !== id || saved.status !== status) {
       rollbackOptimisticStatus();
-      return { ok: false, error: 'The application was not updated. Confirm it is still assigned to your department and section.' };
+      return { ok: false, error: 'Supabase did not confirm the requested status. Refresh and try again.' };
     }
     return { ok: true };
   };
