@@ -139,7 +139,11 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
         .maybeSingle()
         .then(({ data, error }) => {
           if (error || !data) return;
-          setDraftStatus(data.head_decision === 'approved' ? 'accepted' : 'rejected');
+          // team_registrations.status is the authoritative status shown to the
+          // applicant and dashboard. The staffing row supplies notes/admin lock
+          // state only, so a stale or empty head_decision cannot turn Pending
+          // into Rejected (or override the persisted application status).
+          setDraftStatus(record.status || 'received');
           setDraftNotes(data.head_notes || '');
           setAdminDecision(data.admin_decision || 'pending');
         });
@@ -1063,8 +1067,13 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                   </button>
                 </div>
               </div>
-              {(adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected') && (
-                <Notice tone="info" title="Secretariat decision recorded">This application already has a final decision. The decision controls are locked.</Notice>
+              {adminDecision !== 'pending' && (
+                <Notice tone="info" title="Secretariat decision recorded">The Secretariat has finalized this application. Department decision controls are locked.</Notice>
+              )}
+              {adminDecision === 'pending' && (activeItem.status === 'accepted' || activeItem.status === 'rejected') && (
+                <Notice tone="success" title="Department decision saved">
+                  Your department’s decision is saved and the applicant status is {activeItem.status}. The Secretariat review is still pending.
+                </Notice>
               )}
               {activeItem.status === 'accepted' && (
                 <div className="mt-4 rounded-md border border-[#d4af37]/20 bg-[#d4af37]/[0.035] p-4">
