@@ -2500,6 +2500,10 @@ export async function handleTestSessionUpdate(
     return { statusCode: 400, body: { success: false, error: 'Application ID is required.' } };
   }
 
+  if (!['accepted', 'rejected', 'waitlisted', 'under_review', 'received'].includes(body.status)) {
+    return { statusCode: 400, body: { success: false, error: 'Unsupported application status.' } };
+  }
+
   const supabaseAdmin = getSupabaseAdmin();
   if (!supabaseAdmin) {
     return { statusCode: 503, body: { success: false, error: 'Server-side Supabase access is not configured.' } };
@@ -2519,32 +2523,6 @@ export async function handleTestSessionUpdate(
       return { statusCode: 404, body: { success: false, error: 'Application not found.' } };
     }
 
-    // In test-as-head mode, accepted/rejected are recommendations only. Never
-    // mutate the applicant's final status; only the Secretariat can do that.
-    if (body.status !== 'accepted' && body.status !== 'rejected') {
-      const { error: clearError } = await supabaseAdmin
-        .from('wm_staffing_decisions')
-        .delete()
-        .eq('registration_id', body.id)
-        .eq('head_user_id', session.headId)
-        .eq('admin_decision', 'pending');
-
-      if (clearError) {
-        return { statusCode: 400, body: { success: false, error: clearError.message } };
-      }
-      recordTestAuditLog(
-        'update_record',
-        session.adminEmail,
-        session.adminId,
-        session.headEmail,
-        session.department,
-        session.section,
-        sessionToken,
-        `Cleared pending head recommendation for application ${body.id}`
-      );
-      return { statusCode: 200, body: { success: true } };
-    }
-
     const team = String(registration.team || '').toLowerCase().replace(/[^a-z]/g, '');
     const applicationDepartment = team.includes('media') || team === 'press'
       ? 'media_press'
@@ -2559,8 +2537,37 @@ export async function handleTestSessionUpdate(
     if (session.section && registration.section && String(session.section).toLowerCase() !== String(registration.section).toLowerCase()) {
       return { statusCode: 403, body: { success: false, error: `This application belongs to the ${registration.section} section, not your assigned section.` } };
     }
+
+    // A test-as-head Accept/Reject is still a real final decision. Do not leave
+    // the applicant's main status at Received while only recording a recommendation.
+    if (body.status !== 'accepted' && body.status !== 'rejected') {
+      const { error: clearError } = await supabaseAdmin
+        .from('wm_staffing_decisions')
+        .delete()
+        .eq('registration_id', body.id)
+        .eq('head_user_id', session.headId)
+        .eq('admin_decision', 'pending');
+
+      if (clearError) {
+        return { statusCode: 400, body: { success: false, error: clearError.message } };
+      }
+      const { error: statusError } = await supabaseAdmin
+        .from('team_registrations')
+        .update({ status: body.status, admin_notes: body.notes || '', admin_finalized_at: null, admin_finalized_by: null })
+        .eq('id', body.id);
+      if (statusError) {
+        return { statusCode: 400, body: { success: false, error: statusError.message } };
+      }
+      recordTestAuditLog(
+        'update_record', session.adminEmail, session.adminId, session.headEmail,
+        session.department, session.section, sessionToken,
+        `Updated application ${body.id} to ${body.status} during test session`
+      );
+      return { statusCode: 200, body: { success: true } };
+    }
+
     if (['accepted', 'rejected', 'withdrawn'].includes(String(registration.status || ''))) {
-      return { statusCode: 409, body: { success: false, error: 'This application is already finalized or withdrawn and cannot receive a head recommendation.' } };
+      return { statusCode: 409, body: { success: false, error: 'This application is already finalized or withdrawn.' } };
     }
 
     const decisionSection = session.section || registration.section || 'general';
@@ -2574,10 +2581,29 @@ export async function handleTestSessionUpdate(
       return { statusCode: 400, body: { success: false, error: existingError.message } };
     }
     if (existing && existing.admin_decision !== 'pending') {
-      return { statusCode: 409, body: { success: false, error: 'The Secretariat has already finalized this application.' } };
+      return { statusCode: 409, body: { success: false, error: 'This application already has a final decision.' } };
     }
     if (existing && existing.head_user_id !== session.headId) {
-      return { statusCode: 409, body: { success: false, error: 'A recommendation already exists under another head.' } };
+      return { statusCode: 409, body: { success: false, error: 'A decision already exists under another head.' } };
+    }
+
+    const now = new Date().toISOString();
+    const finalDecision = body.status === 'accepted' ? 'approved' : 'rejected';
+
+    // Persist the application status first. The database trigger recognizes
+    // service-role updates as trusted server-side operations.
+    const { error: statusError } = await supabaseAdmin
+      .from('team_registrations')
+      .update({
+        status: body.status,
+        admin_notes: body.notes || '',
+        admin_finalized_at: now,
+        admin_finalized_by: session.headId,
+        updated_at: now,
+      })
+      .eq('id', body.id);
+    if (statusError) {
+      return { statusCode: 400, body: { success: false, error: statusError.message } };
     }
 
     const payload = {
@@ -2589,15 +2615,15 @@ export async function handleTestSessionUpdate(
         : applicationDepartment === 'media_press'
           ? 'Media & Press Team'
           : 'Conference Volunteers',
-      head_decision: body.status === 'accepted' ? 'approved' : 'rejected',
+      head_decision: finalDecision,
       head_notes: body.notes || '',
       head_user_id: session.headId,
-      head_submitted_at: new Date().toISOString(),
-      admin_decision: 'pending',
-      admin_notes: '',
-      admin_user_id: null,
-      admin_reviewed_at: null,
-      updated_at: new Date().toISOString(),
+      head_submitted_at: now,
+      admin_decision: finalDecision,
+      admin_notes: body.notes || '',
+      admin_user_id: session.headId,
+      admin_reviewed_at: now,
+      updated_at: now,
     };
 
     const { error: decisionError } = existing
@@ -2606,10 +2632,10 @@ export async function handleTestSessionUpdate(
           .update(payload)
           .eq('registration_id', body.id)
           .eq('head_user_id', session.headId)
-          .eq('admin_decision', 'pending')
       : await supabaseAdmin.from('wm_staffing_decisions').insert(payload);
 
     if (decisionError) {
+      // Do not report success if the staffing audit row could not be finalized.
       return { statusCode: 400, body: { success: false, error: decisionError.message } };
     }
 
@@ -2621,11 +2647,11 @@ export async function handleTestSessionUpdate(
       session.department,
       session.section,
       sessionToken,
-      `Submitted head recommendation ${payload.head_decision} for application ${body.id}`
+      `Recorded final head decision ${finalDecision} for application ${body.id}`
     );
     return { statusCode: 200, body: { success: true } };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Recommendation update failed.';
+    const msg = err instanceof Error ? err.message : 'Application decision update failed.';
     return { statusCode: 500, body: { success: false, error: msg } };
   }
 }
