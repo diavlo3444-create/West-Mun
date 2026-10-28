@@ -1057,7 +1057,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                   <p className="mt-1 text-[10.5px] text-neutral-500">Your department can make the final decision for applications in its assigned scope.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={() => void persist('accepted')} disabled={saving || adminDecision !== 'pending' || activeItem.status === 'accepted' || activeItem.status === 'rejected'} className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/25 bg-emerald-400/[0.07] px-3 py-2 text-[11px] font-medium text-emerald-300 transition-colors hover:bg-emerald-400/[0.13] disabled:opacity-40">
+                  <button type="button" onClick={() => void persist('accepted')} disabled={saving || activeItem.status === 'accepted' || activeItem.status === 'rejected'} className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/25 bg-emerald-400/[0.07] px-3 py-2 text-[11px] font-medium text-emerald-300 transition-colors hover:bg-emerald-400/[0.13] disabled:opacity-40">
                     {saving && draftStatus === 'accepted' ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
                     Accept applicant
                   </button>
@@ -1067,12 +1067,9 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                   </button>
                 </div>
               </div>
-              {adminDecision !== 'pending' && (
-                <Notice tone="info" title="Secretariat decision recorded">The Secretariat has finalized this application. Department decision controls are locked.</Notice>
-              )}
-              {adminDecision === 'pending' && (activeItem.status === 'accepted' || activeItem.status === 'rejected') && (
-                <Notice tone="success" title="Department decision saved">
-                  Your department’s decision is saved and the applicant status is {activeItem.status}. The Secretariat review is still pending.
+              {(activeItem.status === 'accepted' || activeItem.status === 'rejected') && (
+                <Notice tone="success" title="Final decision recorded">
+                  Your decision is final. The applicant status is {activeItem.status}; no additional admin or Secretariat approval is required.
                 </Notice>
               )}
               {activeItem.status === 'accepted' && (
