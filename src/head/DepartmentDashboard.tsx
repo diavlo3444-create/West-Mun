@@ -562,8 +562,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         ...(committeeAccess ? [{ id: 'dcc-applications', label: 'Applications', icon: Users }] : []),
         ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
         ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
-        { id: 'cohead-management', label: 'Co-Head Management', icon: Users },
-        { id: 'department', label: 'Assignment', icon: Building2 },
+        ...(!isHr ? [{ id: 'cohead-management', label: 'Co-Head Management', icon: Users }] : []),
+        ...(!isHr ? [{ id: 'department', label: 'Assignment', icon: Building2 }] : []),
         ...(securityScannerAccess ? [{ id: 'security-website', label: 'Security Scanner', icon: QrCode }] : []),
       ];
 
