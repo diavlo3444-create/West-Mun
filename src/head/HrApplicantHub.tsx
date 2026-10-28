@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Mail, RefreshCw, Search, Users } from 'lucide-react';
+import { Mail, RefreshCw, Search, Users, Send } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import { Notice, PageHeader, Panel, Skeleton, inputCls } from '../dashboard/ui';
@@ -77,12 +77,32 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
     });
   }, [rows, search, teamFilter]);
 
+  const sendAllEmails = useCallback(() => {
+    // Use the complete accepted list loaded for this HR area, not only the visible search results.
+    const recipients = Array.from(new Set(
+      rows.map((row) => String(row.email || '').trim()).filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    ));
+    if (recipients.length === 0) {
+      setError('There are no valid email addresses among the accepted applicants in this list.');
+      return;
+    }
+
+    // Gmail opens a draft with recipients hidden from one another.
+    const params = new URLSearchParams({
+      view: 'cm',
+      fs: '1',
+      bcc: recipients.join(','),
+      su: 'WEST MUN — Important Update',
+    });
+    window.open(`https://mail.google.com/mail/?${params.toString()}`, '_blank', 'noopener,noreferrer');
+  }, [rows]);
+
   const title = area === 'delegates' ? 'Delegate Applications' : area === 'chair' ? 'Chair Applications' : 'Team Member Applications';
   const description = area === 'delegates'
-    ? 'View accepted delegate applicants and open a prefilled email draft beside each applicant.'
+    ? 'View accepted delegate applicants. Send All Emails opens a Gmail draft addressed to all accepted applicants.'
     : area === 'chair'
-      ? 'View accepted chair applicants and open a prefilled email draft beside each applicant.'
-      : 'Browse accepted applicants across Media & Press, Security & Protocol, and Volunteers. Open a prefilled Gmail draft beside each applicant.';
+      ? 'View accepted chair applicants. Send All Emails opens a Gmail draft addressed to all accepted applicants.'
+      : 'Browse accepted applicants across Media & Press, Security & Protocol, and Volunteers. Send All Emails opens a Gmail draft addressed to all accepted applicants.';
 
   return (
     <div className="space-y-5">
@@ -90,7 +110,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
         eyebrow="Human resources"
         title={title}
         description={description}
-        actions={<button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-xs text-neutral-200 hover:bg-white/[0.04] disabled:opacity-50"><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />Refresh</button>}
+        actions={<div className="flex flex-wrap gap-2"><button type="button" onClick={sendAllEmails} disabled={loading || rows.length === 0} className="inline-flex items-center gap-2 rounded-md border border-[#d4af37]/40 bg-[#d4af37]/10 px-3 py-2 text-xs font-medium text-[#f1d98c] hover:bg-[#d4af37]/20 disabled:opacity-50"><Send className="h-3.5 w-3.5" />Send All Emails</button><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-xs text-neutral-200 hover:bg-white/[0.04] disabled:opacity-50"><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />Refresh</button></div>}
       />
       {area === 'team' && (
         <div className="flex flex-wrap gap-2">
