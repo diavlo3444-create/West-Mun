@@ -167,7 +167,10 @@ Deno.serve(async (req: Request) => {
     const applicationResult = await db.from("team_registrations").select("id,full_name,email,team,section,status,admin_finalized_at,admin_finalized_by")
       .eq("id", invite.registration_id).maybeSingle();
     const app = applicationResult.data;
-    if (applicationResult.error || !app || app.status !== "accepted" || !app.admin_finalized_at || !app.admin_finalized_by ||
+    // A department head's accepted status is sufficient. Secretariat finalization
+    // is not required for team signup links; this invitation remains valid until
+    // redeemed, explicitly revoked, or the application is no longer accepted.
+    if (applicationResult.error || !app || app.status !== "accepted" ||
         normalizedEmail(app.email) !== email || app.team !== invite.team || app.section !== invite.section) {
       return json({ error: "This application is no longer eligible for signup. Contact the WEST MUN admin team." }, 409);
     }
@@ -301,7 +304,7 @@ async function issueInvite(
   siteUrl: string,
 ) {
   const email = normalizedEmail(app.email);
-  if (app.status !== "accepted" || !app.admin_finalized_at || !app.admin_finalized_by) return json({ error: "Only applications finally approved by an admin can receive signup links." }, 409);
+  if (app.status !== "accepted") return json({ error: "Only accepted applications can receive signup links." }, 409);
   if (!validEmail(email)) return json({ error: "This application does not have a valid email address." }, 422);
   const token = randomHex(32);
   const tokenHash = await sha256(token);
