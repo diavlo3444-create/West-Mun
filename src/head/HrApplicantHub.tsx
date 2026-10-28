@@ -34,6 +34,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'accepted' | 'rejected'>('accepted');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,7 +52,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
       : area === 'chair'
         ? 'id,full_name,email,institution,status,created_at,committee_preferences'
         : 'id,full_name,email,institution,status,created_at,team,section';
-    const { data, error: queryError } = await supabase.from(table).select(columns).eq('status', 'accepted').order('created_at', { ascending: false });
+    const { data, error: queryError } = await supabase.from(table).select(columns).in('status', ['accepted', 'rejected']).order('created_at', { ascending: false });
     if (queryError) {
       setRows([]);
       setError(queryError.message || 'Applications could not be loaded.');
@@ -66,6 +67,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((row) => {
+      if (row.status !== statusFilter) return false;
       const haystack = [row.full_name, row.email, row.institution, row.team, row.section, row.tier, row.delegation_type, row.committee_preferences]
         .some((value) => String(value || '').toLowerCase().includes(q));
       const normalizedTeam = String(row.team || '').toLowerCase();
@@ -75,24 +77,35 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
         || (teamFilter === 'volunteer' && normalizedTeam.includes('volunteer'));
       return haystack && matchesTeam;
     });
-  }, [rows, search, teamFilter]);
+  }, [rows, search, teamFilter, statusFilter]);
 
-  const sendAllEmails = useCallback(() => {
-    // Use the complete accepted list loaded for this HR area, not only the visible search results.
+  const sendAllEmails = useCallback((targetStatus: 'accepted' | 'rejected') => {
+    // Use all applicants in the chosen decision section, not only visible search results.
     const recipients = Array.from(new Set(
-      rows.map((row) => String(row.email || '').trim()).filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      rows.filter((row) => row.status === targetStatus)
+        .map((row) => String(row.email || '').trim())
+        .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     ));
     if (recipients.length === 0) {
-      setError('There are no valid email addresses among the accepted applicants in this list.');
+      setError(`There are no valid email addresses among ${targetStatus} applicants in this list.`);
       return;
     }
 
-    // Gmail opens a draft with recipients hidden from one another.
+    const isAccepted = targetStatus === 'accepted';
+    const subject = isAccepted
+      ? 'WEST MUN 2027 — Application Approved'
+      : 'WEST MUN 2027 — Application Status Update';
+    const body = isAccepted
+      ? `Hello Applicant,\n\nCongratulations! Your application to WEST MUN 2027 has been accepted. The team will share any role-specific next steps separately.\n\nIf you have any questions, please reply to this email.\n\nBest regards,\nWEST MUN Team`
+      : `Hello Applicant,\n\nThank you for your interest in WEST MUN 2027 and for taking the time to submit your application. Following a review of applications, we regret to inform you that we are unable to offer you a position at this time. We appreciate your interest and encourage you to follow future WEST MUN announcements and opportunities at https://west-mun.vercel.app.\n\nBest regards,\nWEST MUN Secretariat`;
+
+    // Gmail opens a draft with recipients hidden from one another for privacy.
     const params = new URLSearchParams({
       view: 'cm',
       fs: '1',
       bcc: recipients.join(','),
-      su: 'WEST MUN — Important Update',
+      su: subject,
+      body,
     });
     window.open(`https://mail.google.com/mail/?${params.toString()}`, '_blank', 'noopener,noreferrer');
   }, [rows]);
@@ -110,8 +123,12 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
         eyebrow="Human resources"
         title={title}
         description={description}
-        actions={<div className="flex flex-wrap gap-2"><button type="button" onClick={sendAllEmails} disabled={loading || rows.length === 0} className="inline-flex items-center gap-2 rounded-md border border-[#d4af37]/40 bg-[#d4af37]/10 px-3 py-2 text-xs font-medium text-[#f1d98c] hover:bg-[#d4af37]/20 disabled:opacity-50"><Send className="h-3.5 w-3.5" />Send All Emails</button><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-xs text-neutral-200 hover:bg-white/[0.04] disabled:opacity-50"><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />Refresh</button></div>}
+        actions={<div className="flex flex-wrap gap-2"><button type="button" onClick={() => sendAllEmails('accepted')} disabled={loading || !rows.some((row) => row.status === 'accepted')} className="inline-flex items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-400/20 disabled:opacity-50"><Send className="h-3.5 w-3.5" />Draft Accepted Emails</button><button type="button" onClick={() => sendAllEmails('rejected')} disabled={loading || !rows.some((row) => row.status === 'rejected')} className="inline-flex items-center gap-2 rounded-md border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs font-medium text-rose-200 hover:bg-rose-400/20 disabled:opacity-50"><Send className="h-3.5 w-3.5" />Draft Rejected Emails</button><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-xs text-neutral-200 hover:bg-white/[0.04] disabled:opacity-50"><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />Refresh</button></div>}
       />
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => setStatusFilter('accepted')} className={`rounded-lg border px-3 py-2 text-xs transition ${statusFilter === 'accepted' ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-200' : 'border-white/10 text-neutral-300 hover:bg-white/[0.04]'}`}>Accepted ({rows.filter((row) => row.status === 'accepted').length})</button>
+        <button type="button" onClick={() => setStatusFilter('rejected')} className={`rounded-lg border px-3 py-2 text-xs transition ${statusFilter === 'rejected' ? 'border-rose-400/50 bg-rose-400/10 text-rose-200' : 'border-white/10 text-neutral-300 hover:bg-white/[0.04]'}`}>Rejected ({rows.filter((row) => row.status === 'rejected').length})</button>
+      </div>
       {area === 'team' && (
         <div className="flex flex-wrap gap-2">
           {teamOptions.map((option) => (
@@ -130,7 +147,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
           <span className="font-mono text-[10px] text-neutral-400">{filtered.length} shown</span>
         </div>
         {loading ? <div className="space-y-3 p-4"><Skeleton /><Skeleton /><Skeleton /></div> : filtered.length === 0 ? (
-          <div className="p-8 text-center"><Mail className="mx-auto h-6 w-6 text-neutral-500" /><p className="mt-2 text-sm text-neutral-300">No applicants found.</p><p className="mt-1 text-xs text-neutral-500">Try another search or refresh the list.</p></div>
+          <div className="p-8 text-center"><Mail className="mx-auto h-6 w-6 text-neutral-500" /><p className="mt-2 text-sm text-neutral-300">No applicants found.</p><p className="mt-1 text-xs text-neutral-500">Try another search, switch the Accepted/Rejected section, or refresh the list.</p></div>
         ) : (
           <ul className="divide-y divide-white/[0.06]">
             {filtered.map((applicant) => (
