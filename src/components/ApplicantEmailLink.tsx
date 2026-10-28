@@ -31,6 +31,8 @@ export interface ApplicantEmailLinkProps extends ApplicantEmailContext {
   align?: 'left' | 'right';
   variant?: 'inline' | 'badge' | 'button';
   buttonLabel?: string;
+  /** Open the standard Gmail draft without generating a private team invitation. */
+  skipInviteGeneration?: boolean;
 }
 
 export const ApplicantEmailLink: React.FC<ApplicantEmailLinkProps> = ({
@@ -53,6 +55,7 @@ export const ApplicantEmailLink: React.FC<ApplicantEmailLinkProps> = ({
   align = 'left',
   variant = 'inline',
   buttonLabel = 'Email applicant',
+  skipInviteGeneration = false,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<EmailTemplateType | null>(null);
@@ -109,7 +112,7 @@ export const ApplicantEmailLink: React.FC<ApplicantEmailLinkProps> = ({
     e.stopPropagation();
 
     // The accepted team email must carry the one-time invitation, not a protected dashboard URL.
-    if (currentTemplate.id === 'approved' && type === 'team') {
+    if (currentTemplate.id === 'approved' && type === 'team' && !skipInviteGeneration) {
       if (!registrationId) {
         window.alert('This application is missing its registration ID. Refresh the registrations page and try again.');
         return;
