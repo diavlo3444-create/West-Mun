@@ -455,11 +455,22 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       rollbackOptimisticStatus();
       return { ok: false, error: 'This application belongs to another section. Refresh the list or ask the Secretariat to correct the assignment.' };
     }
-    const normalizedHeadDepartment = String(department || '').toLowerCase();
-    const permittedDepartment = normalizedHeadDepartment === decisionDepartment || (normalizedHeadDepartment === 'media' && decisionDepartment === 'media_press') || (normalizedHeadDepartment === 'media_press' && decisionDepartment === 'media');
+    // Normalize department aliases the same way as application team labels.
+    // Some head routes use singular/display labels (e.g. "Volunteer" or
+    // "Security & Protocol") while the database stores canonical department keys.
+    const normalizedHeadLabel = String(department || '').toLowerCase().replace(/[^a-z]/g, '');
+    const normalizedHeadDepartment =
+      normalizedHeadLabel.includes('media') || normalizedHeadLabel === 'press'
+        ? 'media_press'
+        : normalizedHeadLabel.includes('volunteer')
+          ? 'volunteers'
+          : normalizedHeadLabel.includes('security') || normalizedHeadLabel.includes('protocol')
+            ? 'security'
+            : normalizedHeadLabel;
+    const permittedDepartment = normalizedHeadDepartment === decisionDepartment;
     if (!permittedDepartment) {
       rollbackOptimisticStatus();
-      return { ok: false, error: 'This application is outside your assigned department.' };
+      return { ok: false, error: 'This application is outside your assigned department. Refresh and verify the head account’s department assignment.' };
     }
     const update = await supabase.from('team_registrations').update({ status, admin_notes: notes, updated_at: new Date().toISOString() }).eq('id', id).select('id,status').maybeSingle();
     if (update.error) {
