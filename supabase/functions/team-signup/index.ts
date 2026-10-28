@@ -91,7 +91,7 @@ Deno.serve(async (req: Request) => {
     if (!/^[0-9a-f-]{36}$/i.test(registrationId)) return json({ error: "A valid application is required." }, 400);
     const applicationResult = await db.from("team_registrations").select("id,full_name,email,team,section,status,admin_finalized_at,admin_finalized_by").eq("id", registrationId).maybeSingle();
     if (applicationResult.error || !applicationResult.data) return json({ error: "Application not found." }, 404);
-    if (applicationResult.data.status !== "accepted" || !applicationResult.data.admin_finalized_at || !applicationResult.data.admin_finalized_by) return json({ error: "Only applications accepted and finalized by an admin can receive signup links from an admin account." }, 409);
+    if (applicationResult.data.status !== "accepted") return json({ error: "Only accepted applications can receive signup links." }, 409);
     return await issueInvite(db, actorId, applicationResult.data, SITE_URL);
   }
 
@@ -120,9 +120,8 @@ Deno.serve(async (req: Request) => {
     if (apps.length !== uniqueIds.length || apps.some((app) => app.status !== "accepted")) {
       return json({ error: "Every selected application must be accepted. No links were generated." }, 409);
     }
-    if (admin.data && apps.some((app) => !app.admin_finalized_at || !app.admin_finalized_by)) {
-      return json({ error: "Admin bulk links require an admin-finalized decision. Department heads can generate links for accepted applications in their assigned scope." }, 409);
-    }
+    // Accepted status is the final decision. Do not require legacy admin-finalization
+    // metadata: authorized heads can accept applicants directly without a second approval.
     if (!admin.data) {
       const permitted = apps.every((app) => headResult!.data!.some((h) => {
         const teamMatches = h.department === app.team ||
