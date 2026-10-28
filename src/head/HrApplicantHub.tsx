@@ -51,7 +51,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
       : area === 'chair'
         ? 'id,full_name,email,institution,status,created_at,committee_preferences'
         : 'id,full_name,email,institution,status,created_at,team,section';
-    const { data, error: queryError } = await supabase.from(table).select(columns).order('created_at', { ascending: false });
+    const { data, error: queryError } = await supabase.from(table).select(columns).eq('status', 'accepted').order('created_at', { ascending: false });
     if (queryError) {
       setRows([]);
       setError(queryError.message || 'Applications could not be loaded.');
@@ -79,10 +79,10 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
 
   const title = area === 'delegates' ? 'Delegate Applications' : area === 'chair' ? 'Chair Applications' : 'Team Member Applications';
   const description = area === 'delegates'
-    ? 'View delegate applicants and open a prefilled email draft beside each applicant.'
+    ? 'View accepted delegate applicants and open a prefilled email draft beside each applicant.'
     : area === 'chair'
-      ? 'View chair applicants and open a prefilled email draft beside each applicant.'
-      : 'Browse Media & Press, Security & Protocol, and Volunteers applicants. Open a prefilled Gmail draft beside each applicant.';
+      ? 'View accepted chair applicants and open a prefilled email draft beside each applicant.'
+      : 'Browse accepted applicants across Media & Press, Security & Protocol, and Volunteers. Open a prefilled Gmail draft beside each applicant.';
 
   return (
     <div className="space-y-5">
