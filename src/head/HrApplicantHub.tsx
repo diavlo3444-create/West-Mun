@@ -1,0 +1,131 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Mail, RefreshCw, Search, Users } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
+import { Notice, PageHeader, Panel, Skeleton, inputCls } from '../dashboard/ui';
+
+type HrArea = 'delegates' | 'chair' | 'team';
+type Applicant = {
+  id: string;
+  full_name: string;
+  email: string;
+  institution?: string | null;
+  status: string;
+  created_at: string;
+  team?: string | null;
+  section?: string | null;
+  tier?: string | null;
+  delegation_type?: string | null;
+  committee_preferences?: string | null;
+};
+
+const teamOptions = [
+  { label: 'All teams', value: 'all' },
+  { label: 'Media & Press', value: 'media' },
+  { label: 'Security & Protocol', value: 'security' },
+  { label: 'Volunteers', value: 'volunteer' },
+];
+
+const statusLabel = (status: string) => (status || 'pending').replaceAll('_', ' ');
+
+export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
+  const [rows, setRows] = useState<Applicant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [teamFilter, setTeamFilter] = useState('all');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    if (!supabase) {
+      setRows([]);
+      setError('Supabase is not configured on this deployment.');
+      setLoading(false);
+      return;
+    }
+
+    const table = area === 'delegates' ? 'delegates' : area === 'chair' ? 'wm_chair_applications' : 'team_registrations';
+    const columns = area === 'delegates'
+      ? 'id,full_name,email,institution,status,created_at,tier,delegation_type'
+      : area === 'chair'
+        ? 'id,full_name,email,institution,status,created_at,committee_preferences'
+        : 'id,full_name,email,institution,status,created_at,team,section';
+    const { data, error: queryError } = await supabase.from(table).select(columns).order('created_at', { ascending: false });
+    if (queryError) {
+      setRows([]);
+      setError(queryError.message || 'Applications could not be loaded.');
+    } else {
+      setRows((data || []) as Applicant[]);
+    }
+    setLoading(false);
+  }, [area]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      const haystack = [row.full_name, row.email, row.institution, row.team, row.section, row.tier, row.delegation_type, row.committee_preferences]
+        .some((value) => String(value || '').toLowerCase().includes(q));
+      const normalizedTeam = String(row.team || '').toLowerCase();
+      const matchesTeam = teamFilter === 'all'
+        || (teamFilter === 'media' && (normalizedTeam.includes('media') || normalizedTeam.includes('press')))
+        || (teamFilter === 'security' && (normalizedTeam.includes('security') || normalizedTeam.includes('protocol')))
+        || (teamFilter === 'volunteer' && normalizedTeam.includes('volunteer'));
+      return haystack && matchesTeam;
+    });
+  }, [rows, search, teamFilter]);
+
+  const title = area === 'delegates' ? 'Delegate Applications' : area === 'chair' ? 'Chair Applications' : 'Team Member Applications';
+  const description = area === 'delegates'
+    ? 'View delegate applicants and open a prefilled email draft beside each applicant.'
+    : area === 'chair'
+      ? 'View chair applicants and open a prefilled email draft beside each applicant.'
+      : 'Browse Media & Press, Security & Protocol, and Volunteers applicants. Open a prefilled Gmail draft beside each applicant.';
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Human resources"
+        title={title}
+        description={description}
+        actions={<button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-xs text-neutral-200 hover:bg-white/[0.04] disabled:opacity-50"><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />Refresh</button>}
+      />
+      {area === 'team' && (
+        <div className="flex flex-wrap gap-2">
+          {teamOptions.map((option) => (
+            <button key={option.value} type="button" onClick={() => setTeamFilter(option.value)} className={`rounded-lg border px-3 py-2 text-xs transition ${teamFilter === option.value ? 'border-[#d4af37]/50 bg-[#d4af37]/10 text-[#f1d98c]' : 'border-white/10 text-neutral-300 hover:bg-white/[0.04]'}`}>{option.label}</button>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, school, or team…" aria-label="Search applicants" className={`${inputCls} w-full pl-9`} />
+      </div>
+      {error && <Notice tone="error" title="Could not load applications">{error}</Notice>}
+      <Panel>
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+          <p className="flex items-center gap-2 text-xs font-medium text-white"><Users className="h-4 w-4 text-[#d4af37]" />Applicants</p>
+          <span className="font-mono text-[10px] text-neutral-400">{filtered.length} shown</span>
+        </div>
+        {loading ? <div className="space-y-3 p-4"><Skeleton /><Skeleton /><Skeleton /></div> : filtered.length === 0 ? (
+          <div className="p-8 text-center"><Mail className="mx-auto h-6 w-6 text-neutral-500" /><p className="mt-2 text-sm text-neutral-300">No applicants found.</p><p className="mt-1 text-xs text-neutral-500">Try another search or refresh the list.</p></div>
+        ) : (
+          <ul className="divide-y divide-white/[0.06]">
+            {filtered.map((applicant) => (
+              <li key={applicant.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-medium text-white">{applicant.full_name}</p><span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] capitalize text-neutral-300">{statusLabel(applicant.status)}</span></div>
+                  <p className="mt-1 truncate text-xs text-neutral-300">{applicant.email || 'No email provided'}</p>
+                  <p className="mt-1 text-[11px] text-neutral-500">{area === 'team' ? [applicant.team, applicant.section, applicant.institution].filter(Boolean).join(' · ') : area === 'delegates' ? [applicant.institution, applicant.delegation_type?.replaceAll('_', ' '), applicant.tier?.replaceAll('_', ' ')].filter(Boolean).join(' · ') : [applicant.institution, applicant.committee_preferences].filter(Boolean).join(' · ')}</p>
+                </div>
+                <ApplicantEmailLink applicantName={applicant.full_name} applicantEmail={applicant.email} type={area === 'delegates' ? 'delegate' : 'team'} department={area === 'team' ? applicant.team : area === 'chair' ? 'Chair' : 'Delegates'} section={applicant.section || undefined} status={applicant.status} institution={applicant.institution || undefined} templateType="general" skipInviteGeneration variant="button" buttonLabel="Send Email" align="right" />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+    </div>
+  );
+};
