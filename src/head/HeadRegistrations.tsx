@@ -570,6 +570,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                               section={record.section || section}
                               status={record.status}
                               institution={record.institution}
+                            skipInviteGeneration={isHrHead}
                             />
                           </div>
                         </div>
@@ -647,6 +648,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                             section={record.section || section}
                             status={record.status}
                             institution={record.institution}
+                          skipInviteGeneration={isHrHead}
                           />
                         </div>
                       </div>
@@ -715,6 +717,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                 section={activeItem.section || section}
                 status={activeItem.status}
                 institution={activeItem.institution}
+                skipInviteGeneration={isHrHead}
                 variant="badge"
               />
               {activeItem.phone ? <span className="font-mono text-[10.5px] text-neutral-400">· {activeItem.phone}</span> : null}
@@ -805,6 +808,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                 section={activeItem.section || section}
                 status={activeItem.status}
                 institution={activeItem.institution}
+                skipInviteGeneration={isHrHead}
                 missingInfoNote={draftNotes}
                 variant="button"
                 buttonLabel="Compose Email"
@@ -831,6 +835,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                         section={activeItem.section || section}
                         status={activeItem.status}
                         institution={activeItem.institution}
+                        skipInviteGeneration={isHrHead}
                         align="right"
                       />
                     </dd>
