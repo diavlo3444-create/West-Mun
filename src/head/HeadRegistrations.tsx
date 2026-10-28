@@ -294,7 +294,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       setSignupMessage(message);
       try {
         await navigator.clipboard.writeText(message);
-        setSignupNotice(`Acceptance message and signup link copied. Expires ${new Date(data.expiresAt).toLocaleString()}.`);
+        setSignupNotice(`Acceptance message and signup link copied. ${typeof data.expiresAt === 'string' ? data.expiresAt : 'No expiry (valid until used or revoked)'}.`);
       } catch {
         setSignupNotice('Acceptance message and link are ready below. Copy them and send manually to the applicant.');
       }
@@ -315,7 +315,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
       setBulkSignupNotice('Filter to 25 or fewer finally accepted applications before generating links.');
       return;
     }
-    if (!window.confirm(`Generate one-time signup links for ${bulkSignupCandidates.length} finally accepted application(s)? Existing unused links for these applicants will be revoked. No emails will be sent.`)) return;
+    if (!window.confirm(`Generate non-expiring, one-time-use signup links for ${bulkSignupCandidates.length} accepted application(s)? Existing unused links for these applicants will be revoked. No emails will be sent.`)) return;
     setBulkSignupBusy(true);
     setBulkSignupNotice(null);
     setBulkSignupLinks([]);
