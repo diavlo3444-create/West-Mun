@@ -120,6 +120,33 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
   const [bulkSignupBusy, setBulkSignupBusy] = useState(false);
   const [bulkSignupLinks, setBulkSignupLinks] = useState<Array<{ signupUrl: string; message: string; applicantEmail: string; team: string; section: string | null; expiresAt: string }>>([]);
   const [bulkSignupNotice, setBulkSignupNotice] = useState<string | null>(null);
+  const [emailComposerOpen, setEmailComposerOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [emailTemplate, setEmailTemplate] = useState<'custom' | 'acceptance' | 'rejection' | 'follow_up' | 'announcement'>('custom');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailNotice, setEmailNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [emailHistory, setEmailHistory] = useState<Array<{ id: string; subject: string; status: string; created_at: string; sent_at: string | null; error_message: string | null; recipient_email: string }>>([]);
+  const isHrHead = String(department || '').toLowerCase() === 'hr';
+
+  useEffect(() => {
+    let alive = true;
+    if (!supabase || !isHrHead || !activeItem?.id) {
+      setEmailHistory([]);
+      return () => { alive = false; };
+    }
+    void supabase.from('wm_email_messages')
+      .select('id,subject,status,created_at,sent_at,error_message,recipient_email')
+      .eq('applicant_id', activeItem.id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (!error && data) setEmailHistory(data as any);
+      });
+    return () => { alive = false; };
+  }, [activeItem?.id, isHrHead]);
+
 
   const openItem = (record: HeadRegistration) => {
     setActiveItem(record);
@@ -216,6 +243,73 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
     setActiveItem(null);
     setPendingAction(null);
     setModalNotice(null);
+  };
+
+
+  const prepareEmail = (template: 'custom' | 'acceptance' | 'rejection' | 'follow_up' | 'announcement' = 'custom') => {
+    if (!activeItem) return;
+    setEmailTemplate(template);
+    setEmailNotice(null);
+    setEmailComposerOpen(true);
+    const name = activeItem.full_name || 'Applicant';
+    const presets = {
+      acceptance: {
+        subject: 'WEST MUN 2027 — Application Accepted',
+        body: `Dear ${name},\\n\\nCongratulations! Your WEST MUN 2027 team application has been accepted. Further information about your role and next steps will be shared by the Secretariat.\\n\\nPlease reply to this email if you have any questions.\\n\\nKind regards,\\nWEST MUN Secretariat`,
+      },
+      rejection: {
+        subject: 'WEST MUN 2027 — Application Update',
+        body: `Dear ${name},\\n\\nThank you for applying to join the WEST MUN 2027 team. We appreciate the time and effort you put into your application. Unfortunately, we are unable to offer you a position at this time.\\n\\nKind regards,\\nWEST MUN Secretariat`,
+      },
+      follow_up: {
+        subject: 'WEST MUN 2027 — Follow-up on Your Application',
+        body: `Dear ${name},\\n\\nWe are contacting you regarding your WEST MUN 2027 application. Please reply to this email when you have a moment.\\n\\nKind regards,\\nWEST MUN Secretariat`,
+      },
+      announcement: {
+        subject: 'WEST MUN 2027 — Important Update',
+        body: `Dear ${name},\\n\\nWe are writing to share an important update regarding WEST MUN 2027.\\n\\nKind regards,\\nWEST MUN Secretariat`,
+      },
+      custom: { subject: '', body: '' },
+    };
+    setEmailSubject(presets[template].subject);
+    setEmailBody(presets[template].body);
+  };
+
+  const sendApplicantEmail = async () => {
+    if (!supabase || !activeItem || emailSending) return;
+    setEmailSending(true);
+    setEmailNotice(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('hr-send-email', {
+        body: {
+          applicant_id: activeItem.id,
+          subject: emailSubject.trim(),
+          body: emailBody.trim(),
+          template_key: emailTemplate,
+        },
+      });
+      if (error || !data?.ok) {
+        let message = data?.error || error?.message || 'Email could not be sent.';
+        try {
+          const details = await (error as any)?.context?.json();
+          if (details?.error) message = details.error;
+        } catch {}
+        setEmailNotice({ tone: 'error', text: message });
+        return;
+      }
+      setEmailNotice({ tone: 'success', text: `Email sent to ${data.recipient}.` });
+      const { data: history } = await supabase.from('wm_email_messages')
+        .select('id,subject,status,created_at,sent_at,error_message,recipient_email')
+        .eq('applicant_id', activeItem.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (history) setEmailHistory(history as any);
+      setEmailComposerOpen(false);
+    } catch {
+      setEmailNotice({ tone: 'error', text: 'Email could not be sent. Check the connection and try again.' });
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   const persist = async (targetStatus: string) => {
@@ -753,6 +847,81 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                 </div>
               ))}
             </div>
+
+            {isHrHead && (
+              <section className="space-y-3 rounded-md border border-[#d4af37]/25 bg-[#d4af37]/[0.04] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-white">
+                      <Mail className="h-3.5 w-3.5 text-[#d4af37]" aria-hidden="true" />
+                      Email applicant
+                    </p>
+                    <p className="mt-1 text-[10.5px] text-neutral-400">Send a real email to the applicant's registered address and keep a history here.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {activeItem.status === 'accepted' && (
+                      <button type="button" className={btnSecondary} onClick={() => prepareEmail('acceptance')}>
+                        Acceptance email
+                      </button>
+                    )}
+                    <button type="button" className={btnPrimary} onClick={() => prepareEmail('custom')}>
+                      <Mail className="h-3.5 w-3.5" aria-hidden="true" /> Send Email
+                    </button>
+                  </div>
+                </div>
+                {emailNotice && <Notice tone={emailNotice.tone === 'error' ? 'error' : 'success'}>{emailNotice.text}</Notice>}
+                {emailComposerOpen && (
+                  <div className="space-y-3 border-t border-white/[0.08] pt-3">
+                    <div>
+                      <label className={labelCls}>To</label>
+                      <div className="mt-1 rounded border border-white/[0.08] bg-black/20 px-3 py-2 text-xs text-neutral-300">{activeItem.email}</div>
+                    </div>
+                    <div>
+                      <label htmlFor="hr-email-template" className={labelCls}>Template</label>
+                      <select id="hr-email-template" className={selectCls} value={emailTemplate} onChange={(e) => prepareEmail(e.target.value as any)}>
+                        <option value="custom">Custom message</option>
+                        <option value="acceptance" disabled={activeItem.status !== 'accepted'}>Acceptance</option>
+                        <option value="rejection">Application update / rejection</option>
+                        <option value="follow_up">Follow-up</option>
+                        <option value="announcement">General announcement</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="hr-email-subject" className={labelCls}>Subject</label>
+                      <input id="hr-email-subject" className={inputCls} maxLength={200} value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} placeholder="Email subject" />
+                    </div>
+                    <div>
+                      <label htmlFor="hr-email-body" className={labelCls}>Message</label>
+                      <textarea id="hr-email-body" className={inputCls} rows={7} maxLength={12000} value={emailBody} onChange={(e) => setEmailBody(e.target.value)} placeholder="Write your message…" />
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <button type="button" className={btnSecondary} disabled={emailSending} onClick={() => setEmailComposerOpen(false)}>Cancel</button>
+                      <button type="button" className={btnPrimary} disabled={emailSending || !emailSubject.trim() || !emailBody.trim() || !activeItem.email} onClick={() => void sendApplicantEmail()}>
+                        {emailSending && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                        {emailSending ? 'Sending…' : 'Send email'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="border-t border-white/[0.08] pt-3">
+                  <p className="mb-2 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">Email history</p>
+                  {emailHistory.length ? (
+                    <div className="space-y-2">
+                      {emailHistory.map((message) => (
+                        <div key={message.id} className="flex flex-wrap items-start justify-between gap-2 rounded border border-white/[0.06] bg-black/20 px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="break-words text-[11px] text-neutral-200">{message.subject}</p>
+                            <p className="mt-1 text-[9px] text-neutral-400">{formatDate(message.created_at, true)} · {message.recipient_email}</p>
+                            {message.error_message && <p className="mt-1 text-[10px] text-red-300">{message.error_message}</p>}
+                          </div>
+                          <span className={`rounded border px-2 py-0.5 text-[9px] uppercase tracking-wider ${message.status === 'sent' ? 'border-emerald-500/30 text-emerald-300' : message.status === 'failed' ? 'border-red-500/30 text-red-300' : 'border-amber-500/30 text-amber-200'}`}>{message.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-[10.5px] text-neutral-500">No emails sent to this applicant yet.</p>}
+                </div>
+              </section>
+            )}
 
             {/* Contact Applicant Action */}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#d4af37]/25 bg-[#d4af37]/[0.05] p-3">
