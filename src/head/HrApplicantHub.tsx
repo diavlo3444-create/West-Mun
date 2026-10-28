@@ -32,6 +32,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
   const [rows, setRows] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'accepted' | 'rejected'>('accepted');
@@ -81,6 +82,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
 
   const sendAllEmails = useCallback(async (targetStatus: 'accepted' | 'rejected') => {
     setError('');
+    setNotice('');
     // Accepted team members need separate private signup links, so prepare one draft per person.
     if (area === 'team' && targetStatus === 'accepted') {
       const scopedRows = rows.filter((row) => {
@@ -133,9 +135,9 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
         });
         const preparedCount = applicants.filter((applicant) => linksByEmail.has(String(applicant.email || '').trim().toLowerCase())).length;
         if (preparedCount !== applicants.length) {
-          setError('Prepared ' + preparedCount + ' individual draft(s) with signup links out of ' + applicants.length + ' accepted applicants. Refresh and retry for any missing drafts.');
+          setNotice('Prepared ' + preparedCount + ' individual draft(s) with signup links out of ' + applicants.length + ' accepted applicants. Refresh and retry for any missing drafts.');
         } else {
-          setError('Prepared ' + preparedCount + ' individual Gmail draft(s), each with that applicant’s private signup link. Review and send each draft.');
+          setNotice('Prepared ' + preparedCount + ' individual Gmail draft(s), each with that applicant’s private signup link. Review and send each draft.');
         }
       } catch (err) {
         draftWindows.forEach((draft) => draft?.close());
@@ -197,7 +199,8 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, school, or team…" aria-label="Search applicants" className={`${inputCls} w-full pl-9`} />
       </div>
-      {error && <Notice tone="error" title="Could not load applications">{error}</Notice>}
+      {error && <Notice tone="error" title="Could not complete action">{error}</Notice>}
+      {notice && <div role="status" className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-200">{notice}</div>}
       <Panel>
         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <p className="flex items-center gap-2 text-xs font-medium text-white"><Users className="h-4 w-4 text-[#d4af37]" />Applicants</p>
