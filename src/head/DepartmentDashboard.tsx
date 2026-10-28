@@ -33,7 +33,7 @@ import { HeadDepartment } from './HeadDepartment';
 import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 import { HeadSponsorsManager } from './HeadSponsorsManager';
 import { HeadInquiriesManager } from './HeadInquiriesManager';
-import { HrAcceptedApplicants } from './HrAcceptedApplicants';
+import { HrApplicantHub } from './HrApplicantHub';
 import { DCCCommitteeManager } from './DCCCommitteeManager';
 import { DCCApplicationsManager } from './DCCApplicationsManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
@@ -134,7 +134,11 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (qrPassOnly) return 'qr-pass';
     if (initialView === 'sponsors' && isPr) return 'sponsors';
     if (initialView === 'inquiries' && isHr) return 'inquiries';
-    if (initialView === 'hr-applicants' && isHr) return 'hr-applicants';
+    if (initialView === 'hr-applicants' && isHr) return 'team-members';
+    if (initialView === 'delegates' && isHr) return 'hr-delegates';
+    if (initialView === 'chair' && isHr) return 'hr-chair';
+    if (initialView === 'team-members' && isHr) return 'team-members';
+    if (isHr && !initialView) return 'team-members';
     if (initialView === 'dcc-applications' && department === 'dcc') return 'dcc-applications';
     if (initialView === 'dcc-committees' && department === 'dcc') return 'dcc-committees';
     if (['roles', 'groups'].includes(initialView || '') && operationsAccess) return 'groups';
@@ -528,7 +532,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (id === 'roles' && !rolesAccess) return;
     if (id === 'sponsors' && !isPr) return;
     if (id === 'inquiries' && !isHr) return;
-    if (id === 'hr-applicants' && !isHr) return;
+    if (['hr-applicants', 'hr-delegates', 'hr-chair', 'team-members'].includes(id) && !isHr) return;
     if (isHr && ['cohead-management', 'department'].includes(id)) return;
     if (id === 'dcc-committees' && !committeeAccess) return;
     if (id === 'dcc-applications' && !committeeAccess) return;
@@ -562,7 +566,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
           : []),
         ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
-        ...(isHr ? [{ id: 'hr-applicants', label: 'Accepted Applicants', icon: Users }, { id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
+        ...(isHr ? [{ id: 'hr-delegates', label: 'Delegates', icon: Users }, { id: 'hr-chair', label: 'Chair', icon: Award }, { id: 'team-members', label: 'Team Members', icon: Users }, { id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
         ...(committeeAccess ? [{ id: 'dcc-applications', label: 'Applications', icon: Users }] : []),
         ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
         ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
@@ -601,8 +605,12 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
               ? 'Sponsors & Partners'
               : view === 'inquiries'
                 ? 'Inquiries & Messages'
-                : view === 'hr-applicants'
-                  ? 'Accepted Applicants'
+                : view === 'hr-applicants' || view === 'team-members'
+                  ? 'Team Member Applications'
+                : view === 'hr-delegates'
+                  ? 'Delegate Applications'
+                : view === 'hr-chair'
+                  ? 'Chair Applications'
                 : view === 'dcc-committees'
                   ? 'Committee Management'
                 : view === 'dcc-applications'
@@ -807,7 +815,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           <HeadInquiriesManager headName={headName} headEmail={headEmail} />
         )}
 
-        {view === 'hr-applicants' && isHr && <HrAcceptedApplicants />}
+        {view === 'hr-applicants' && isHr && <HrApplicantHub area="team" />}
+        {view === 'hr-delegates' && isHr && <HrApplicantHub area="delegates" />}
+        {view === 'hr-chair' && isHr && <HrApplicantHub area="chair" />}
+        {view === 'team-members' && isHr && <HrApplicantHub area="team" />}
 
         {view === 'dcc-committees' && committeeAccess && <DCCCommitteeManager />}
         {view === 'dcc-applications' && committeeAccess && <DCCApplicationsManager />}
