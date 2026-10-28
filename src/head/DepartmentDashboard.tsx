@@ -138,7 +138,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (initialView === 'delegates' && isHr) return 'hr-delegates';
     if (initialView === 'chair' && isHr) return 'hr-chair';
     if (initialView === 'team-members' && isHr) return 'team-members';
-    if (isHr && !initialView) return 'team-members';
+    if (isHr && !['inquiries', 'delegates', 'chair', 'team-members', 'hr-applicants'].includes(initialView || '')) return 'team-members';
     if (initialView === 'dcc-applications' && department === 'dcc') return 'dcc-applications';
     if (initialView === 'dcc-committees' && department === 'dcc') return 'dcc-committees';
     if (['roles', 'groups'].includes(initialView || '') && operationsAccess) return 'groups';
