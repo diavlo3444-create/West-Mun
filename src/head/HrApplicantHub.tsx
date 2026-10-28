@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Mail, RefreshCw, Search, Users, Send } from 'lucide-react';
+import { Mail, RefreshCw, Search, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ApplicantEmailLink } from '../components/ApplicantEmailLink';
 import { Notice, PageHeader, Panel, Skeleton, inputCls } from '../dashboard/ui';
@@ -80,101 +80,12 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
     });
   }, [rows, search, teamFilter, statusFilter]);
 
-  const sendAllEmails = useCallback(async (targetStatus: 'accepted' | 'rejected') => {
-    setError('');
-    setNotice('');
-    // Accepted team members need separate private signup links, so prepare one draft per person.
-    if (area === 'team' && targetStatus === 'accepted') {
-      const scopedRows = rows.filter((row) => {
-        if (row.status !== 'accepted') return false;
-        const normalizedTeam = String(row.team || '').toLowerCase();
-        return teamFilter === 'all'
-          || (teamFilter === 'media' && (normalizedTeam.includes('media') || normalizedTeam.includes('press')))
-          || (teamFilter === 'security' && (normalizedTeam.includes('security') || normalizedTeam.includes('protocol')))
-          || (teamFilter === 'volunteer' && normalizedTeam.includes('volunteer'));
-      });
-      const applicants = scopedRows.filter((row) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(row.email || '').trim()));
-      if (!applicants.length) {
-        setError('There are no accepted applicants with valid email addresses in this team section.');
-        return;
-      }
-      if (!supabase) {
-        setError('Supabase is not configured on this deployment.');
-        return;
-      }
-      const draftWindows = applicants.map(() => window.open('about:blank', '_blank'));
-      if (draftWindows.every((draft) => !draft)) {
-        setError('Your browser blocked the Gmail draft tabs. Allow pop-ups for this site, then try again.');
-        return;
-      }
-      try {
-        const allLinks: Array<{ signupUrl: string; applicantEmail: string; message?: string }> = [];
-        for (let i = 0; i < applicants.length; i += 25) {
-          const batch = applicants.slice(i, i + 25);
-          const { data, error: invokeError } = await supabase.functions.invoke('team-signup', {
-            body: { action: 'create_batch', registrationIds: batch.map((applicant) => applicant.id) },
-          });
-          if (invokeError || !data?.links) {
-            throw new Error(data?.error || invokeError?.message || 'Could not generate signup links for this section.');
-          }
-          allLinks.push(...data.links);
-        }
-        const linksByEmail = new Map(allLinks.map((item) => [String(item.applicantEmail || '').trim().toLowerCase(), item]));
-        applicants.forEach((applicant, index) => {
-          const draft = draftWindows[index];
-          if (!draft) return;
-          const invitation = linksByEmail.get(String(applicant.email || '').trim().toLowerCase());
-          if (!invitation?.signupUrl) {
-            draft.close();
-            return;
-          }
-          const subject = 'WEST MUN 2027 — Application Approved';
-          const body = invitation.message || ('Hello ' + (applicant.full_name || 'Applicant') + ',\n\nCongratulations! Your application to WEST MUN 2027 has been accepted.\n\nCreate your team account using your personal signup link:\n' + invitation.signupUrl + '\n\nPlease use the same email address you used on your application and do not share this private link.\n\nBest regards,\nWEST MUN 2027 Secretariat');
-          const params = new URLSearchParams({ view: 'cm', fs: '1', to: String(applicant.email).trim(), su: subject, body });
-          draft.location.href = 'https://mail.google.com/mail/?' + params.toString();
-        });
-        const preparedCount = applicants.filter((applicant) => linksByEmail.has(String(applicant.email || '').trim().toLowerCase())).length;
-        if (preparedCount !== applicants.length) {
-          setNotice('Prepared ' + preparedCount + ' individual draft(s) with signup links out of ' + applicants.length + ' accepted applicants. Refresh and retry for any missing drafts.');
-        } else {
-          setNotice('Prepared ' + preparedCount + ' individual Gmail draft(s), each with that applicant’s private signup link. Review and send each draft.');
-        }
-      } catch (err) {
-        draftWindows.forEach((draft) => draft?.close());
-        setError(err instanceof Error ? err.message : 'Could not generate the section signup links.');
-      }
-      return;
-    }
-
-    // Rejection notices can safely use one BCC draft because they contain no private links.
-    const recipients = Array.from(new Set(
-      rows.filter((row) => row.status === targetStatus)
-        .map((row) => String(row.email || '').trim())
-        .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    ));
-    if (recipients.length === 0) {
-      setError('There are no valid email addresses among ' + targetStatus + ' applicants in this list.');
-      return;
-    }
-
-    const isAccepted = targetStatus === 'accepted';
-    const subject = isAccepted
-      ? 'WEST MUN 2027 — Application Approved'
-      : 'WEST MUN 2027 — Application Status Update';
-    const body = isAccepted
-      ? 'Hello Applicant,\n\nCongratulations! Your application to WEST MUN 2027 has been accepted. Please visit https://west-mun.vercel.app/#register for the next steps.\n\nIf you have any questions, please reply to this email.\n\nBest regards,\nWEST MUN Team'
-      : 'Hello Applicant,\n\nThank you for your interest in WEST MUN 2027 and for taking the time to submit your application. Following a review of applications, we regret to inform you that we are unable to offer you a position at this time. We appreciate your interest and encourage you to follow future WEST MUN announcements and opportunities at https://west-mun.vercel.app.\n\nBest regards,\nWEST MUN Secretariat';
-
-    const params = new URLSearchParams({ view: 'cm', fs: '1', bcc: recipients.join(','), su: subject, body });
-    window.open('https://mail.google.com/mail/?' + params.toString(), '_blank', 'noopener,noreferrer');
-  }, [area, rows, teamFilter]);
-
   const title = area === 'delegates' ? 'Delegate Applications' : area === 'chair' ? 'Chair Applications' : 'Team Member Applications';
   const description = area === 'delegates'
-    ? 'View accepted delegate applicants. Send All Emails opens a Gmail draft addressed to all accepted applicants.'
+    ? 'View accepted and rejected delegate applicants and contact each applicant individually.'
     : area === 'chair'
-      ? 'View accepted chair applicants. Send All Emails opens a Gmail draft addressed to all accepted applicants.'
-      : 'Browse accepted and rejected applicants by team. Accepted team emails generate personal signup links and individual Gmail drafts; rejected emails are drafted together.';
+      ? 'View accepted and rejected chair applicants and contact each applicant individually.'
+      : 'Browse accepted and rejected applicants by team and contact each applicant individually.';
 
   return (
     <div className="space-y-5">
@@ -182,7 +93,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
         eyebrow="Human resources"
         title={title}
         description={description}
-        actions={<div className="flex flex-wrap gap-2"><button type="button" onClick={() => sendAllEmails('accepted')} disabled={loading || !rows.some((row) => row.status === 'accepted')} className="inline-flex items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-400/20 disabled:opacity-50"><Send className="h-3.5 w-3.5" />Draft Accepted Emails</button><button type="button" onClick={() => sendAllEmails('rejected')} disabled={loading || !rows.some((row) => row.status === 'rejected')} className="inline-flex items-center gap-2 rounded-md border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs font-medium text-rose-200 hover:bg-rose-400/20 disabled:opacity-50"><Send className="h-3.5 w-3.5" />Draft Rejected Emails</button><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-xs text-neutral-200 hover:bg-white/[0.04] disabled:opacity-50"><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />Refresh</button></div>}
+        actions={<div className="flex flex-wrap gap-2"><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-xs text-neutral-200 hover:bg-white/[0.04] disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" />Refresh</button></div>}
       />
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => setStatusFilter('accepted')} className={`rounded-lg border px-3 py-2 text-xs transition ${statusFilter === 'accepted' ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-200' : 'border-white/10 text-neutral-300 hover:bg-white/[0.04]'}`}>Accepted ({rows.filter((row) => row.status === 'accepted').length})</button>
