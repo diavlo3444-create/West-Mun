@@ -33,6 +33,7 @@ import { HeadDepartment } from './HeadDepartment';
 import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 import { HeadSponsorsManager } from './HeadSponsorsManager';
 import { HeadInquiriesManager } from './HeadInquiriesManager';
+import { HrAcceptedApplicants } from './HrAcceptedApplicants';
 import { DCCCommitteeManager } from './DCCCommitteeManager';
 import { DCCApplicationsManager } from './DCCApplicationsManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
@@ -133,6 +134,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (qrPassOnly) return 'qr-pass';
     if (initialView === 'sponsors' && isPr) return 'sponsors';
     if (initialView === 'inquiries' && isHr) return 'inquiries';
+    if (initialView === 'hr-applicants' && isHr) return 'hr-applicants';
     if (initialView === 'dcc-applications' && department === 'dcc') return 'dcc-applications';
     if (initialView === 'dcc-committees' && department === 'dcc') return 'dcc-committees';
     if (['roles', 'groups'].includes(initialView || '') && operationsAccess) return 'groups';
@@ -526,6 +528,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (id === 'roles' && !rolesAccess) return;
     if (id === 'sponsors' && !isPr) return;
     if (id === 'inquiries' && !isHr) return;
+    if (id === 'hr-applicants' && !isHr) return;
+    if (isHr && ['cohead-management', 'department'].includes(id)) return;
     if (id === 'dcc-committees' && !committeeAccess) return;
     if (id === 'dcc-applications' && !committeeAccess) return;
     setView(id);
@@ -558,7 +562,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
           : []),
         ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
-        ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
+        ...(isHr ? [{ id: 'hr-applicants', label: 'Accepted Applicants', icon: Users }, { id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
         ...(committeeAccess ? [{ id: 'dcc-applications', label: 'Applications', icon: Users }] : []),
         ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
         ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
@@ -597,6 +601,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
               ? 'Sponsors & Partners'
               : view === 'inquiries'
                 ? 'Inquiries & Messages'
+                : view === 'hr-applicants'
+                  ? 'Accepted Applicants'
                 : view === 'dcc-committees'
                   ? 'Committee Management'
                 : view === 'dcc-applications'
@@ -801,10 +807,12 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           <HeadInquiriesManager headName={headName} headEmail={headEmail} />
         )}
 
+        {view === 'hr-applicants' && isHr && <HrAcceptedApplicants />}
+
         {view === 'dcc-committees' && committeeAccess && <DCCCommitteeManager />}
         {view === 'dcc-applications' && committeeAccess && <DCCApplicationsManager />}
 
-        {view === 'cohead-management' && (
+        {view === 'cohead-management' && !isHr && (
           <HeadCoHeadManagement department={department} section={section} headName={headName} />
         )}
 
@@ -849,7 +857,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           </div>
         )}
 
-        {view === 'department' && (
+        {view === 'department' && !isHr && (
           <HeadDepartment
             meta={meta}
             section={section}
