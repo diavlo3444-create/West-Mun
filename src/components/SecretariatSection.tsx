@@ -68,16 +68,15 @@ export const SecretariatSection: React.FC = React.memo(() => {
   const rows = usePublicTable<SecretariatRow>('secretariat', DEFAULT_SECRETARIAT);
   const positionClass = { center: 'object-center', top: 'object-top', bottom: 'object-bottom' } as const;
 
-  const secretariat: TeamMember[] = rows.map((r, i) => {
+  const secretariat: TeamMember[] = rows
+    .filter((r) => r.id !== 'd-sec-3' && r.id !== 'd-sec-4' && !/zain\s+firas|muaz\s+el\s*amir/i.test(r.name))
+    .map((r, i) => {
     const isUsg =
       r.id === 'd-sec-3' ||
       /under[- ]?secretary[- ]?general/i.test(r.role) ||
       /\bUSG\b/i.test(r.role);
 
-    const isAdvisor =
-      r.id === 'd-sec-4' ||
-      /advisor/i.test(r.role) ||
-      /muaz/i.test(r.name);
+    const isAdvisor = /muaz/i.test(r.name);
 
     const isSecretaryGeneral =
       r.id === 'd-sec-1' ||
@@ -116,7 +115,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
     }
 
     return {
-      role: r.role,
+      role: r.id === 'd-sec-2' || /yousef/i.test(r.name) ? 'Senior Advisor' : r.role,
       name,
       department: r.department,
       bio: r.bio,
