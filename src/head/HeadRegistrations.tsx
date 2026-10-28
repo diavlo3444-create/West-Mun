@@ -859,7 +859,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
                     <p className="mt-1 text-[10.5px] text-neutral-400">Send a real email to the applicant's registered address and keep a history here.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {activeItem.status === 'accepted' && (
+                    {draftStatus === 'accepted' && (
                       <button type="button" className={btnSecondary} onClick={() => prepareEmail('acceptance')}>
                         Acceptance email
                       </button>
