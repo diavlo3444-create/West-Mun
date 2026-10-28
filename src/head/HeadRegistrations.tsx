@@ -428,7 +428,7 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
             { value: 'all', label: 'All', count: counts.all },
             { value: 'pending', label: 'Pending', count: counts.pending },
             { value: 'approved', label: 'Accepted (all)', count: counts.approved },
-            { value: 'accepted-secretariat', label: 'Admin-finalized', count: counts.acceptedSecretariat },
+            { value: 'accepted-secretariat', label: 'Final decision', count: counts.acceptedSecretariat },
             { value: 'waitlisted', label: 'Waitlisted', count: counts.waitlisted },
             { value: 'rejected', label: 'Rejected', count: counts.rejected },
           ]}
