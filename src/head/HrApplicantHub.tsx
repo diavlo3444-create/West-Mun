@@ -120,7 +120,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
                   <p className="mt-1 truncate text-xs text-neutral-300">{applicant.email || 'No email provided'}</p>
                   <p className="mt-1 text-[11px] text-neutral-500">{area === 'team' ? [applicant.team, applicant.section, applicant.institution].filter(Boolean).join(' · ') : area === 'delegates' ? [applicant.institution, applicant.delegation_type?.replaceAll('_', ' '), applicant.tier?.replaceAll('_', ' ')].filter(Boolean).join(' · ') : [applicant.institution, applicant.committee_preferences].filter(Boolean).join(' · ')}</p>
                 </div>
-                <ApplicantEmailLink applicantName={applicant.full_name} applicantEmail={applicant.email} type={area === 'delegates' ? 'delegate' : 'team'} department={area === 'team' ? applicant.team : area === 'chair' ? 'Chair' : 'Delegates'} section={applicant.section || undefined} status={applicant.status} institution={applicant.institution || undefined} templateType="general" skipInviteGeneration variant="button" buttonLabel="Send Email" align="right" />
+                <ApplicantEmailLink applicantName={applicant.full_name} applicantEmail={applicant.email} registrationId={area === 'team' ? applicant.id : undefined} type={area === 'delegates' ? 'delegate' : 'team'} department={area === 'team' ? applicant.team : area === 'chair' ? 'Chair' : 'Delegates'} section={applicant.section || undefined} status={applicant.status} institution={applicant.institution || undefined} templateType={area === 'team' ? undefined : 'general'} skipInviteGeneration={area !== 'team'} variant="button" buttonLabel="Send Email" align="right" />
               </li>
             ))}
           </ul>
