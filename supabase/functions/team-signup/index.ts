@@ -229,8 +229,46 @@ Deno.serve(async (req: Request) => {
         }
         const existingUser = verified.data.user;
         const existingMeta = (existingUser.app_metadata ?? {}) as Record<string, unknown>;
-        if ((existingMeta.wm_role && existingMeta.wm_role !== "team_member") ||
-            (existingMeta.wm_role === "team_member" && existingMeta.wm_registration_id !== app.id)) {
+        const existingRole = String(existingMeta.wm_role ?? "");
+        let conflictingAssignment = false;
+
+        // Do not rely on Auth metadata alone to decide whether an old WEST MUN
+        // assignment is still active. The Super IT panel can remove the database
+        // assignment while legacy Auth metadata remains on the reusable login.
+        if (existingRole && existingRole !== "team_member") {
+          const [adminAssignment, headAssignment, activePass] = await Promise.all([
+            db.from("admins").select("user_id").eq("user_id", existingUser.id).maybeSingle(),
+            db.from("department_heads").select("user_id").eq("user_id", existingUser.id).eq("active", true).maybeSingle(),
+            db.from("wm_qr_passes").select("user_id").eq("user_id", existingUser.id).eq("active", true).maybeSingle(),
+          ]);
+          if (adminAssignment.error || headAssignment.error || activePass.error) {
+            await verifier.auth.signOut();
+            await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
+              .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+            return json({ error: "Could not verify the existing WEST MUN assignment. The invitation is still available; contact the Secretariat." }, 500);
+          }
+          conflictingAssignment = Boolean(adminAssignment.data || headAssignment.data || activePass.data);
+        } else if (existingRole === "team_member" && existingMeta.wm_registration_id !== app.id) {
+          const oldRegistrationId = String(existingMeta.wm_registration_id ?? "");
+          const [oldRegistration, activePass] = await Promise.all([
+            oldRegistrationId
+              ? db.from("team_registrations").select("id,status").eq("id", oldRegistrationId).maybeSingle()
+              : Promise.resolve({ data: null, error: null }),
+            db.from("wm_qr_passes").select("user_id").eq("user_id", existingUser.id).eq("active", true).maybeSingle(),
+          ]);
+          if (oldRegistration.error || activePass.error) {
+            await verifier.auth.signOut();
+            await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
+              .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+            return json({ error: "Could not verify the existing WEST MUN assignment. The invitation is still available; contact the Secretariat." }, 500);
+          }
+          // A prior assignment is still protected only while its application is
+          // accepted and its active QR pass remains. If the Super IT panel removed
+          // that pass, treat leftover Auth metadata as stale and safely reassign.
+          conflictingAssignment = Boolean(oldRegistration.data?.status === "accepted" && activePass.data);
+        }
+
+        if (conflictingAssignment) {
           await verifier.auth.signOut();
           await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
             .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
