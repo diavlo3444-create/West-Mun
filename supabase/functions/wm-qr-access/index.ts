@@ -15,6 +15,10 @@ const randomHex = (length = 32) => {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 const clean = (v: unknown) => typeof v === "string" ? v.trim() : "";
+const validFullName = (v: unknown) => {
+  const name = clean(v).replace(/\\s+/g, " ");
+  return name.length >= 5 && name.length <= 120 && name.split(/\\s+/).filter(Boolean).length >= 2 ? name : "";
+};
 const normalized = (v: unknown) => clean(v).toLowerCase().replace(/\s+/g, " ");
 const normalizedRole = (v: unknown) => normalized(v).replace(/[ -]+/g, "_");
 const isSecurityDepartment = (v: unknown) => {
@@ -65,7 +69,7 @@ Deno.serve(async (req: Request) => {
   let applicationFullName = "";
   // For invited team members, recover the canonical name from their accepted application.
   // The registration ID comes from server-controlled app metadata, and email must match.
-  if (!clean(userMeta.full_name) && typeof meta.wm_registration_id === "string" && clean(actor.email)) {
+  if (!validFullName(userMeta.full_name) && typeof meta.wm_registration_id === "string" && clean(actor.email)) {
     const application = await db.from("team_registrations")
       .select("full_name,email,status")
       .eq("id", meta.wm_registration_id)
@@ -74,7 +78,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (!application.error && application.data) applicationFullName = clean(application.data.full_name);
   }
-  const fullName = clean(userMeta.full_name) || clean(head?.head_name) || clean(pass?.full_name) || applicationFullName || requestedFullName;
+  // Ignore stale or malformed stored names so a valid name entered on the pass page can repair the account.\n  const fullName = validFullName(userMeta.full_name) || validFullName(head?.head_name) || validFullName(applicationFullName) || validFullName(requestedFullName) || validFullName(pass?.full_name);
   const accountRole = isAdmin ? "admin" : head ? "head" : (clean(pass?.account_role) || (typeof meta.wm_eb_role === "string" ? meta.wm_eb_role : "") || (typeof meta.wm_role === "string" ? meta.wm_role : "team_member"));
   // Co-head permissions can be represented in auth metadata OR the official QR-pass row.
   // Do not let a department_heads row (which labels the role as "head") hide the EB co-head role.
@@ -111,7 +115,7 @@ Deno.serve(async (req: Request) => {
     if (fullName.length < 5 || fullName.length > 120 || fullName.split(/\s+/).filter(Boolean).length < 2) {
       return json({ error: "Your WEST MUN account needs your full real name before a QR pass can be issued. Contact an admin." }, 409);
     }
-    if (!clean(userMeta.full_name) && !clean(head?.head_name) && fullName) {
+    if (!validFullName(userMeta.full_name) && !validFullName(head?.head_name) && fullName) {
       const metadataUpdate = await db.auth.admin.updateUserById(actor.id, {
         user_metadata: { ...userMeta, full_name: fullName },
       });
