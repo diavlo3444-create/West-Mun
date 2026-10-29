@@ -16,8 +16,8 @@ const randomHex = (length = 32) => {
 };
 const clean = (v: unknown) => typeof v === "string" ? v.trim() : "";
 const validFullName = (v: unknown) => {
-  const name = clean(v).replace(/\\s+/g, " ");
-  return name.length >= 5 && name.length <= 120 && name.split(/\\s+/).filter(Boolean).length >= 2 ? name : "";
+  const name = clean(v).replace(/\s+/g, " ");
+  return name.length >= 5 && name.length <= 120 && name.split(/\s+/).filter(Boolean).length >= 2 ? name : "";
 };
 const normalized = (v: unknown) => clean(v).toLowerCase().replace(/\s+/g, " ");
 const normalizedRole = (v: unknown) => normalized(v).replace(/[ -]+/g, "_");
