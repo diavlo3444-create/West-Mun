@@ -73,7 +73,7 @@ Deno.serve(async (req: Request) => {
     const application = await db.from("team_registrations")
       .select("full_name,email,status")
       .eq("id", meta.wm_registration_id)
-      .eq("email", clean(actor.email).toLowerCase())
+      .ilike("email", clean(actor.email))
       .eq("status", "accepted")
       .maybeSingle();
     if (!application.error && application.data) applicationFullName = clean(application.data.full_name);
