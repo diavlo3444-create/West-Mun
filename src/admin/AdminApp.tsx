@@ -563,7 +563,7 @@ export default function AdminApp() {
         { id: 'heads', label: 'Heads', icon: UserRoundCog },
         { id: 'teams', label: 'Departments', icon: Layers },
         { id: 'reports', label: 'Reports', icon: BarChart3 },
-        { id: 'security-website', label: 'Security Website', icon: QrCode },
+        { id: 'qr-scanner', label: 'QR Scanner', icon: QrCode },
         { id: 'checked-in', label: 'Checked-In People', icon: UserCheck },
       ],
     },
@@ -619,7 +619,7 @@ export default function AdminApp() {
       brandSubtitle="Secretariat command"
       navGroups={navGroups}
       active={page}
-      onNavigate={(id) => { if (id === 'security-website') { window.location.assign('/scanner'); return; } setPage(id as NavigationPage); }}
+      onNavigate={(id) => { if (id === 'qr-scanner') { window.location.assign('/scanner'); return; } setPage(id as NavigationPage); }}
       user={user}
       onSignOut={signOut}
       topbarLabel={activeLabel}
