@@ -69,14 +69,33 @@ Deno.serve(async (req: Request) => {
   let applicationFullName = "";
   // For invited team members, recover the canonical name from their accepted application.
   // The registration ID comes from server-controlled app metadata, and email must match.
-  if (!validFullName(userMeta.full_name) && typeof meta.wm_registration_id === "string" && clean(actor.email)) {
-    const application = await db.from("team_registrations")
-      .select("full_name,email,status")
-      .eq("id", meta.wm_registration_id)
-      .ilike("email", clean(actor.email))
-      .eq("status", "accepted")
-      .maybeSingle();
-    if (!application.error && application.data) applicationFullName = clean(application.data.full_name);
+  if (!validFullName(userMeta.full_name) && clean(actor.email)) {
+    // First try the registration ID attached to the account, if present.
+    // Older accounts can carry a stale ID, so fall back to the authenticated
+    // email instead of letting a stale ID block the accepted-application lookup.
+    if (typeof meta.wm_registration_id === "string" && clean(meta.wm_registration_id)) {
+      const byId = await db.from("team_registrations")
+        .select("full_name,email,status")
+        .eq("id", clean(meta.wm_registration_id))
+        .ilike("email", clean(actor.email))
+        .maybeSingle();
+      if (!byId.error && byId.data && normalized(byId.data.status) === "accepted") {
+        applicationFullName = clean(byId.data.full_name);
+      }
+    }
+    if (!validFullName(applicationFullName)) {
+      const byEmail = await db.from("team_registrations")
+        .select("full_name,email,status,created_at")
+        .ilike("email", clean(actor.email))
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (!byEmail.error && byEmail.data) {
+        const accepted = byEmail.data.find((row: { status?: string | null; full_name?: string | null }) =>
+          normalized(row.status) === "accepted" && validFullName(row.full_name)
+        );
+        if (accepted) applicationFullName = clean(accepted.full_name);
+      }
+    }
   }
   // Ignore stale or malformed stored names so a valid name entered on the pass page can repair the account.\n  const fullName = validFullName(userMeta.full_name) || validFullName(head?.head_name) || validFullName(applicationFullName) || validFullName(requestedFullName) || validFullName(pass?.full_name);
   const accountRole = isAdmin ? "admin" : head ? "head" : (clean(pass?.account_role) || (typeof meta.wm_eb_role === "string" ? meta.wm_eb_role : "") || (typeof meta.wm_role === "string" ? meta.wm_role : "team_member"));
