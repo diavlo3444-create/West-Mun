@@ -67,12 +67,39 @@ Deno.serve(async (req: Request) => {
   const section = head?.section ?? pass?.section ?? (typeof meta.wm_section === "string" ? meta.wm_section : null);
   const requestedFullName = clean(body.fullName);
   let applicationFullName = "";
-  // For invited team members, recover the canonical name from their accepted application.
-  // The registration ID comes from server-controlled app metadata, and email must match.
-  if (!validFullName(userMeta.full_name) && clean(actor.email)) {
-    // First try the registration ID attached to the account, if present.
-    // Older accounts can carry a stale ID, so fall back to the authenticated
-    // email instead of letting a stale ID block the accepted-application lookup.
+  let personFullName = "";
+
+  // Resolve the canonical person record first. Older WEST MUN accounts may
+  // have their name in wm_people even when Auth metadata is missing.
+  const personByUser = await db.from("wm_people")
+    .select("display_name,updated_at,created_at")
+    .eq("auth_user_id", actor.id)
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(5);
+  if (!personByUser.error && personByUser.data) {
+    const person = personByUser.data.find((row: { display_name?: string | null }) => validFullName(row.display_name));
+    if (person) personFullName = clean(person.display_name);
+  }
+
+  // For legacy people records without an auth_user_id, match only the
+  // authenticated account email. Never use an unverified name.
+  if (!validFullName(personFullName) && clean(actor.email)) {
+    const personByEmail = await db.from("wm_people")
+      .select("display_name,updated_at,created_at")
+      .ilike("email", clean(actor.email))
+      .eq("status", "active")
+      .order("updated_at", { ascending: false })
+      .limit(5);
+    if (!personByEmail.error && personByEmail.data) {
+      const person = personByEmail.data.find((row: { display_name?: string | null }) => validFullName(row.display_name));
+      if (person) personFullName = clean(person.display_name);
+    }
+  }
+
+  // Recover the canonical name from the accepted application. Bind it to
+  // both the account's registration ID (when present) and authenticated email.
+  if (!validFullName(userMeta.full_name) && !validFullName(userMeta.fullName) && !validFullName(userMeta.name) && clean(actor.email)) {
     if (typeof meta.wm_registration_id === "string" && clean(meta.wm_registration_id)) {
       const byId = await db.from("team_registrations")
         .select("full_name,email,status")
@@ -97,7 +124,18 @@ Deno.serve(async (req: Request) => {
       }
     }
   }
-  // Ignore stale or malformed stored names so a valid name entered on the pass page can repair the account.\n  const fullName = validFullName(userMeta.full_name) || validFullName(head?.head_name) || validFullName(applicationFullName) || validFullName(requestedFullName) || validFullName(pass?.full_name);
+
+  // Prefer accepted application data, then the linked people record, before
+  // cached QR data or any optional form value.
+  const fullName =
+    validFullName(userMeta.full_name) ||
+    validFullName(userMeta.fullName) ||
+    validFullName(userMeta.name) ||
+    validFullName(applicationFullName) ||
+    validFullName(personFullName) ||
+    validFullName(head?.head_name) ||
+    validFullName(pass?.full_name) ||
+    validFullName(requestedFullName);
   const accountRole = isAdmin ? "admin" : head ? "head" : (clean(pass?.account_role) || (typeof meta.wm_eb_role === "string" ? meta.wm_eb_role : "") || (typeof meta.wm_role === "string" ? meta.wm_role : "team_member"));
   // Co-head permissions can be represented in auth metadata OR the official QR-pass row.
   // Do not let a department_heads row (which labels the role as "head") hide the EB co-head role.
