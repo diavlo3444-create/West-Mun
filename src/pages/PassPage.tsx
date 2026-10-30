@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { supabase } from "../lib/supabase";
-import { ArrowLeft, Loader2, ShieldCheck, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck, RefreshCw, Sparkles, Ticket } from "lucide-react";
+import "./qr-experience.css";
 
 type PassData = {
   user_id: string;
@@ -62,9 +63,9 @@ export default function PassPage() {
   useEffect(() => { void loadPass(); }, []);
 
   return (
-    <main className="min-h-screen bg-[#070707] px-4 py-10 text-[#f5f5f5]">
+    <main className="qr-page qr-pass-page min-h-screen px-4 py-10 text-[#f5f5f5]">
       <div className="mx-auto max-w-lg">
-        <header className="mb-7 flex items-center justify-between border-b border-[#d4af37]/20 pb-5">
+        <header className="qr-topbar mb-7 flex items-center justify-between border-b border-[#d4af37]/20 pb-5">
           <a href={(() => {
             if (!pass) return "/eb";
             const role = (pass.account_role || "").toLowerCase().replace(/[ -]+/g, "_");
@@ -81,9 +82,9 @@ export default function PassPage() {
           })()} className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to dashboard</a>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#d4af37]">Official QR Pass</span>
         </header>
-        <section className="overflow-hidden rounded-2xl border border-[#d4af37]/25 bg-gradient-to-b from-[#17150f] to-[#0b0b0c] shadow-2xl">
-          <div className="border-b border-[#d4af37]/20 px-6 py-5 text-center">
-            <ShieldCheck className="mx-auto mb-3 h-8 w-8 text-[#d4af37]" />
+        <section className="qr-shell qr-pass-shell overflow-hidden rounded-2xl border border-[#d4af37]/25 shadow-2xl">
+          <div className="qr-pass-heading border-b border-[#d4af37]/20 px-6 py-6 text-center">
+            <div className="qr-emblem mx-auto mb-4"><ShieldCheck className="h-7 w-7 text-[#e7c86e]" /></div>
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#d4af37]">WEST MUN 2027</p>
             <h1 className="mt-2 font-serif text-3xl text-white">Your official pass</h1>
             <p className="mt-2 text-sm text-neutral-400">Show this QR code to an authorized Security member at the venue.</p>
@@ -104,18 +105,18 @@ export default function PassPage() {
             </div>
           ) : pass && (
             <>
-              <div className="flex flex-col items-center px-6 py-7">
-                <div className="rounded-xl bg-white p-3 shadow-xl"><img src={qrImage} alt="Your unique WEST MUN QR pass" className="h-64 w-64 max-w-full" /></div>
-                <h2 className="mt-5 text-center font-serif text-2xl text-white">{pass.full_name}</h2>
+              <div className="qr-pass-body flex flex-col items-center px-6 py-8">
+                <div className="qr-code-frame"><div className="qr-code-inner"><img src={qrImage} alt="Your unique WEST MUN QR pass" className="h-64 w-64 max-w-full" /></div><span className="qr-corner qr-corner-tl" /><span className="qr-corner qr-corner-tr" /><span className="qr-corner qr-corner-bl" /><span className="qr-corner qr-corner-br" /></div>
+                <div className="qr-pass-identity mt-6 text-center"><p className="qr-eyebrow"><Ticket className="mr-2 inline h-3.5 w-3.5" /> REGISTERED PASS HOLDER</p><h2 className="mt-2 text-center font-serif text-3xl text-white">{pass.full_name}</h2></div>
                 <p className="mt-1 text-sm text-[#d4af37]">{pass.account_role === "admin" ? "WEST MUN Administrator" : pass.account_role === "head" ? "Executive / Department Head" : pass.account_role === "team_member" ? "WEST MUN Team Member" : pass.account_role.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}</p>
                 {(pass.team || pass.section) && <p className="mt-1 text-xs text-neutral-400">{[pass.team, pass.section].filter(Boolean).join(" · ")}</p>}
-                <div className="mt-5 w-full rounded-lg border border-white/10 bg-black/25 p-3 text-center">
+                <div className="qr-entry-status mt-6 w-full rounded-lg border border-white/10 p-4 text-center">
                   <p className="text-xs text-neutral-400">Entry status</p>
                   <p className={pass.inside ? "mt-1 text-sm font-semibold text-emerald-300" : "mt-1 text-sm font-semibold text-neutral-200"}>{pass.inside ? "Checked in" : "Not checked in"}</p>
                 </div>
                 <p className="mt-4 max-w-sm text-center text-[11px] leading-relaxed text-neutral-500">This pass is linked to your signed-in WEST MUN account. Do not share screenshots or copies with other people.</p>
               </div>
-              <div className="border-t border-[#d4af37]/15 p-4">
+              <div className="qr-pass-footer border-t border-[#d4af37]/15 p-4">
                 <button onClick={() => void loadPass()} className="flex w-full items-center justify-center gap-2 rounded-md border border-[#d4af37]/30 px-4 py-3 text-sm text-[#e6cc78] hover:bg-[#d4af37]/10"><RefreshCw className="h-4 w-4" /> Refresh pass status</button>
               </div>
             </>
