@@ -172,6 +172,28 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
             </button>
           </div>
         )}
+
+        {/* Website inquiry CTA — placed after all page content */}
+        <div className="mt-12 relative overflow-hidden border border-[#d4af37]/30 bg-[#0d0d0f] px-6 py-12 sm:px-10 sm:py-14 text-center rounded-sm">
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.10),transparent_65%)]" />
+          <div className="relative z-10">
+            <p className="text-xs uppercase tracking-[0.28em] text-[#d4af37] font-semibold mb-4">
+              Have a vision of your own?
+            </p>
+            <h3 className="text-2xl sm:text-4xl font-serif text-white mb-7" style={{ fontFamily: 'var(--font-heading)' }}>
+              Want a website like this?
+            </h3>
+            <a
+              href="https://wa.me/966558792450?text=Hi%20Mohammed%2C%20I%27m%20interested%20in%20getting%20a%20website%20like%20WEST%20MUN."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-3 px-7 py-3.5 border border-[#d4af37] bg-[#d4af37] text-black text-xs sm:text-sm font-semibold uppercase tracking-[0.16em] hover:bg-transparent hover:text-[#d4af37] transition-all duration-300"
+            >
+              Contact Mohammed Magdi
+              <span aria-hidden="true" className="text-base">↗</span>
+            </a>
+          </div>
+        </div>
       </div>
     </footer>
   );
