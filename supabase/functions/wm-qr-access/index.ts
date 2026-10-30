@@ -19,6 +19,13 @@ const validFullName = (v: unknown) => {
   const name = clean(v).replace(/\s+/g, " ");
   return name.length >= 5 && name.length <= 120 && name.split(/\s+/).filter(Boolean).length >= 2 ? name : "";
 };
+// Stored application/account names are authoritative even when a person's
+// legal or culturally used name is a single token. Keep the stricter check
+// only for names typed manually when no trusted stored name exists.
+const validStoredName = (v: unknown) => {
+  const name = clean(v).replace(/\s+/g, " ");
+  return name.length >= 2 && name.length <= 120 ? name : "";
+};
 const normalized = (v: unknown) => clean(v).toLowerCase().replace(/\s+/g, " ");
 const normalizedRole = (v: unknown) => normalized(v).replace(/[ -]+/g, "_");
 const isSecurityDepartment = (v: unknown) => {
@@ -128,13 +135,13 @@ Deno.serve(async (req: Request) => {
   // Prefer accepted application data, then the linked people record, before
   // cached QR data or any optional form value.
   const fullName =
-    validFullName(userMeta.full_name) ||
-    validFullName(userMeta.fullName) ||
-    validFullName(userMeta.name) ||
-    validFullName(applicationFullName) ||
-    validFullName(personFullName) ||
+    validStoredName(userMeta.full_name) ||
+    validStoredName(userMeta.fullName) ||
+    validStoredName(userMeta.name) ||
+    validStoredName(applicationFullName) ||
+    validStoredName(personFullName) ||
     validFullName(head?.head_name) ||
-    validFullName(pass?.full_name) ||
+    validStoredName(pass?.full_name) ||
     validFullName(requestedFullName);
   const accountRole = isAdmin ? "admin" : head ? "head" : (clean(pass?.account_role) || (typeof meta.wm_eb_role === "string" ? meta.wm_eb_role : "") || (typeof meta.wm_role === "string" ? meta.wm_role : "team_member"));
   // Co-head permissions can be represented in auth metadata OR the official QR-pass row.
@@ -169,10 +176,10 @@ Deno.serve(async (req: Request) => {
       if (!officialPass.data || !officialPass.data.active) return json({ error: "Your EB pass is not active. Contact a WEST MUN admin." }, 403);
       return json({ success: true, pass: officialPass.data });
     }
-    if (fullName.length < 5 || fullName.length > 120 || fullName.split(/\s+/).filter(Boolean).length < 2) {
+    if (!validStoredName(fullName)) {
       return json({ error: "Your WEST MUN account needs your full real name before a QR pass can be issued. Contact an admin." }, 409);
     }
-    if (!validFullName(userMeta.full_name) && !validFullName(head?.head_name) && fullName) {
+    if (!validStoredName(userMeta.full_name) && !validFullName(head?.head_name) && fullName) {
       const metadataUpdate = await db.auth.admin.updateUserById(actor.id, {
         user_metadata: { ...userMeta, full_name: fullName },
       });
