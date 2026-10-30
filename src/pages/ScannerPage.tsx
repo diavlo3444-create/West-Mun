@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "../lib/supabase";
 import { CheckedInPeople } from "../components/CheckedInPeople";
-import { ArrowLeft, Camera, CameraOff, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Camera, CameraOff, Loader2, ShieldCheck, ScanLine, ImagePlus, Zap } from "lucide-react";
+import "./qr-experience.css";
 
 type ScanReply = { success?: boolean; outcome?: string; error?: string; direction?: string; person?: { fullName?: string; team?: string | null; section?: string | null; role?: string } };
 
@@ -307,14 +308,14 @@ export default function ScannerPage() {
   const statusClass = message?.success ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-200" : "border-rose-500/30 bg-rose-950/20 text-rose-200";
 
   return (
-    <main className="min-h-screen bg-[#070707] px-4 py-10 text-[#f5f5f5]">
+    <main className="qr-page qr-scanner-page min-h-screen px-4 py-10 text-[#f5f5f5]">
       <div className="mx-auto max-w-2xl">
-        <header className="mb-7 flex items-center justify-between border-b border-[#d4af37]/20 pb-5">
+        <header className="qr-topbar mb-7 flex items-center justify-between border-b border-[#d4af37]/20 pb-5">
           <a href={backDestination.href} className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white"><ArrowLeft className="h-4 w-4" /> {backDestination.label}</a>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#d4af37]">Authorized Scanner</span>
         </header>
-        <section className="rounded-2xl border border-[#d4af37]/25 bg-gradient-to-b from-[#17150f] to-[#0b0b0c] p-5 shadow-2xl sm:p-7">
-          <div className="mb-5 flex items-center gap-3"><ShieldCheck className="h-7 w-7 text-[#d4af37]" /><div><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#d4af37]">WEST MUN 2027</p><h1 className="font-serif text-3xl text-white">Venue QR scanner</h1></div></div>
+        <section className="qr-shell qr-scanner-shell rounded-2xl border border-[#d4af37]/25 p-5 shadow-2xl sm:p-7">
+          <div className="qr-scanner-heading mb-6 flex items-center gap-4"><div className="qr-emblem"><ScanLine className="h-7 w-7 text-[#e7c86e]" /></div><div><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#d4af37]">WEST MUN 2027</p><h1 className="font-serif text-3xl text-white">Venue QR scanner</h1></div></div>
           {loading ? <div className="flex min-h-40 items-center justify-center gap-3 text-sm text-neutral-400"><Loader2 className="h-5 w-5 animate-spin" /> Verifying scanner permissions…</div> :
             accessError ? <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/20 p-4 text-sm text-rose-200">{accessError}</p> :
             <>
@@ -322,20 +323,20 @@ export default function ScannerPage() {
                 <button onClick={() => setDirection("entry")} className={direction === "entry" ? "rounded-md bg-[#d4af37] px-3 py-2 text-sm font-semibold text-black" : "rounded-md px-3 py-2 text-sm text-neutral-400"}>Check in</button>
                 <button onClick={() => setDirection("exit")} className={direction === "exit" ? "rounded-md bg-[#d4af37] px-3 py-2 text-sm font-semibold text-black" : "rounded-md px-3 py-2 text-sm text-neutral-400"}>Check out</button>
               </div>
-              <div className="overflow-hidden rounded-xl border border-white/10 bg-black p-2"><div id="westmun-qr-reader" className="min-h-16 w-full" /></div>
+              <div className={`qr-scan-stage ${scanning ? "is-scanning" : ""} ${busy ? "is-processing" : ""}`}><div className="qr-stage-topline"><span><span className="qr-live-dot" /> {busy ? "VERIFYING PASS" : scanning ? "LIVE CAMERA FEED" : "SCANNER STANDBY"}</span><span>WEST MUN · 2027</span></div><div className="qr-reader-wrap"><div id="westmun-qr-reader" className="min-h-16 w-full" /><div className="qr-scan-overlay" aria-hidden="true"><span className="qr-scan-corner qr-scan-tl" /><span className="qr-scan-corner qr-scan-tr" /><span className="qr-scan-corner qr-scan-bl" /><span className="qr-scan-corner qr-scan-br" /><span className="qr-laser" /><span className="qr-target-ring" /></div>{!scanning && !busy && <div className="qr-stage-idle"><ScanLine className="h-9 w-9" /><span>Camera preview will appear here</span></div>}</div><div className="qr-stage-caption"><span>{scanning ? "Align the QR code inside the frame" : busy ? "Checking pass credentials…" : "Ready when you are"}</span><span className="qr-stage-indicator"><Zap className="h-3 w-3" /> SECURE SCAN</span></div></div>
               <p className="mb-3 text-xs leading-relaxed text-neutral-400">When you click <span className="font-semibold text-neutral-200">Allow camera in Chrome</span>, Chrome may show its official camera permission popup. Choose <span className="font-semibold text-neutral-200">Allow</span> to start scanning. WEST MUN never receives camera access unless your browser grants it.</p>
               <div className="mt-4 flex gap-2">
-                <button onClick={startCamera} disabled={scanning || busy} className="flex flex-1 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-[#e5c158] to-[#aa8232] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"><Camera className="h-4 w-4" /> {scanning ? "Camera active…" : "Allow camera in Chrome"}</button>
-                <button onClick={() => setScanning(false)} disabled={!scanning} className="flex items-center justify-center gap-2 rounded-md border border-white/15 px-4 py-3 text-sm text-neutral-300 disabled:opacity-40"><CameraOff className="h-4 w-4" /> Stop</button>
+                <button onClick={startCamera} disabled={scanning || busy} className="qr-primary-action flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"><Camera className="h-4 w-4" /> {scanning ? "Camera active…" : "Allow camera in Chrome"}</button>
+                <button onClick={() => setScanning(false)} disabled={!scanning} className="qr-secondary-action flex items-center justify-center gap-2 rounded-md border border-white/15 px-4 py-3 text-sm text-neutral-300 disabled:opacity-40"><CameraOff className="h-4 w-4" /> Stop</button>
               </div>
               <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <p className="text-sm font-medium text-neutral-200">Camera not available?</p>
                 <p className="mt-1 text-xs leading-relaxed text-neutral-400">Use a screenshot or photo of the person's WEST MUN QR pass. This fallback does not need camera permission.</p>
-                <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="mt-3 block w-full text-xs text-neutral-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#d4af37] file:px-3 file:py-2 file:font-semibold file:text-black" disabled={busy} onChange={(event) => void scanQrImage(event.target.files?.[0])} />
+                <label className="qr-upload-control mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm"><ImagePlus className="h-4 w-4" /> Choose QR image<input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="sr-only" disabled={busy} onChange={(event) => void scanQrImage(event.target.files?.[0])} /></label>
               </div>
               <p className="mt-3 text-xs leading-relaxed text-neutral-500">To restore live scanning after a previous denial, the browser's camera permission must be changed back to Allow. A website cannot override a browser denial.</p>
               {busy && <p className="mt-4 flex items-center gap-2 text-sm text-neutral-400"><Loader2 className="h-4 w-4 animate-spin" /> Verifying pass…</p>}
-              {message && <div role="status" className={`mt-4 rounded-lg border p-4 ${statusClass}`}>
+              {message && <div role="status" className={`qr-scan-result mt-4 rounded-lg border p-4 ${message.success ? "is-approved" : "is-denied"} ${statusClass}`}>
                 <p className="font-semibold">{message.success ? (direction === "entry" ? "Entry approved" : "Exit recorded") : "Scan denied"}</p>
                 {message.person?.fullName && <p className="mt-2 text-lg font-medium">{message.person.fullName}</p>}
                 {message.person && <p className="mt-1 text-sm opacity-80">{[message.person.team, message.person.section].filter(Boolean).join(" · ")}</p>}
