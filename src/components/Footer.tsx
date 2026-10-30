@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { ArrowUp, Shield, Instagram } from 'lucide-react';
 import { useInView } from '../hooks/useInView';
 import { useSettings, orTba } from '../lib/content';
@@ -173,27 +174,82 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
           </div>
         )}
 
-        {/* Website inquiry CTA — placed after all page content */}
-        <div className="mt-12 relative overflow-hidden border border-[#d4af37]/30 bg-[#0d0d0f] px-6 py-12 sm:px-10 sm:py-14 text-center rounded-sm">
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.10),transparent_65%)]" />
-          <div className="relative z-10">
-            <p className="text-xs uppercase tracking-[0.28em] text-[#d4af37] font-semibold mb-4">
-              Have a vision of your own?
-            </p>
-            <h3 className="text-2xl sm:text-4xl font-serif text-white mb-7" style={{ fontFamily: 'var(--font-heading)' }}>
-              Want a website like this?
-            </h3>
-            <a
+        {/* Cinematic website inquiry CTA — final element on the page */}
+        <motion.section
+          initial={{ opacity: 0, y: 44, scale: 0.985 }}
+          animate={isInView ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 44, scale: 0.985 }}
+          transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="group mt-16 sm:mt-20 relative isolate overflow-hidden border border-[#d4af37]/25 bg-[#080809] px-6 py-16 sm:px-12 sm:py-24 text-center"
+        >
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_50%_55%,rgba(212,175,55,0.16),transparent_58%)]" />
+          <motion.div
+            aria-hidden="true"
+            className="absolute -top-40 left-1/2 h-80 w-[ min(90%,900px)] -translate-x-1/2 rounded-full border border-[#d4af37]/10"
+            animate={{ scale: [1, 1.08, 1], opacity: [0.25, 0.55, 0.25] }}
+            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            aria-hidden="true"
+            className="absolute -inset-y-1/2 left-[-35%] w-1/3 rotate-[18deg] bg-gradient-to-r from-transparent via-[#f3e5ab]/[0.07] to-transparent blur-xl pointer-events-none"
+            animate={{ x: ['0%', '480%'] }}
+            transition={{ duration: 8, repeat: Infinity, repeatDelay: 2, ease: 'easeInOut' }}
+          />
+          <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/70 to-transparent" />
+          <div className="absolute inset-x-8 bottom-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/40 to-transparent" />
+
+          <div className="relative z-10 mx-auto max-w-3xl">
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={isInView ? { width: 56, opacity: 1 } : { width: 0, opacity: 0 }}
+              transition={{ duration: 0.8, delay: 0.55 }}
+              className="h-px mx-auto mb-7 bg-[#d4af37]"
+            />
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
+              transition={{ duration: 0.7, delay: 0.45 }}
+              className="text-[10px] sm:text-xs uppercase tracking-[0.38em] text-[#d4af37] font-semibold mb-6"
+            >
+              YOUR VISION. BUILT WITH PURPOSE.
+            </motion.p>
+            <motion.h3
+              initial={{ opacity: 0, y: 20 }}
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+              transition={{ duration: 0.85, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="text-3xl sm:text-5xl md:text-6xl font-serif font-normal leading-[1.08] tracking-tight text-white"
+              style={{ fontFamily: 'var(--font-heading)' }}
+            >
+              Want a website
+              <span className="block mt-2 text-[#d4af37] italic">like this?</span>
+            </motion.h3>
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
+              transition={{ duration: 0.75, delay: 0.78 }}
+              className="mx-auto mt-6 max-w-lg text-sm sm:text-base leading-relaxed text-neutral-400 font-light"
+            >
+              Let’s turn your idea into a digital experience people remember.
+            </motion.p>
+            <motion.a
               href="https://wa.me/966558792450?text=Hi%20Mohammed%2C%20I%27m%20interested%20in%20getting%20a%20website%20like%20WEST%20MUN."
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-3 px-7 py-3.5 border border-[#d4af37] bg-[#d4af37] text-black text-xs sm:text-sm font-semibold uppercase tracking-[0.16em] hover:bg-transparent hover:text-[#d4af37] transition-all duration-300"
+              initial={{ opacity: 0, y: 18 }}
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
+              transition={{ duration: 0.75, delay: 0.95 }}
+              whileHover={{ y: -4, scale: 1.025 }}
+              whileTap={{ scale: 0.98 }}
+              className="relative mt-9 inline-flex items-center justify-center gap-4 overflow-hidden border border-[#d4af37] bg-[#d4af37] px-8 py-4 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-black shadow-[0_0_35px_rgba(212,175,55,0.12)] transition-shadow duration-500 hover:shadow-[0_0_45px_rgba(212,175,55,0.32)]"
             >
-              Contact Mohammed Magdi
-              <span aria-hidden="true" className="text-base">↗</span>
-            </a>
+              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/35 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+              <span className="relative">Contact Mohammed Magdi</span>
+              <span aria-hidden="true" className="relative text-base">↗</span>
+            </motion.a>
+            <p className="mt-6 text-[9px] uppercase tracking-[0.24em] text-neutral-600">
+              Riyadh · Available for select projects
+            </p>
           </div>
-        </div>
+        </motion.section>
       </div>
     </footer>
   );
