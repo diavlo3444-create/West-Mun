@@ -174,80 +174,44 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
           </div>
         )}
 
-        {/* Cinematic website inquiry CTA — final element on the page */}
+        {/* Subtle cinematic website inquiry CTA — final element on the page */}
         <motion.section
-          initial={{ opacity: 0, y: 44, scale: 0.985 }}
-          animate={isInView ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 44, scale: 0.985 }}
-          transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="group mt-16 sm:mt-20 relative isolate overflow-hidden border border-[#d4af37]/25 bg-[#080809] px-6 py-16 sm:px-12 sm:py-24 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="group mt-10 sm:mt-12 relative isolate overflow-hidden border-y border-[#d4af37]/20 bg-gradient-to-r from-[#080809] via-[#11100c] to-[#080809] px-5 py-7 sm:px-8 sm:py-8"
         >
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_50%_55%,rgba(212,175,55,0.16),transparent_58%)]" />
+          <div className="absolute inset-y-0 left-0 w-1/3 bg-[radial-gradient(ellipse_at_left,rgba(212,175,55,0.09),transparent_75%)] pointer-events-none" />
           <motion.div
             aria-hidden="true"
-            className="absolute -top-40 left-1/2 h-80 w-[ min(90%,900px)] -translate-x-1/2 rounded-full border border-[#d4af37]/10"
-            animate={{ scale: [1, 1.08, 1], opacity: [0.25, 0.55, 0.25] }}
-            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute left-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/70 to-transparent"
+            initial={{ width: "0%" }}
+            animate={isInView ? { width: "100%" } : { width: "0%" }}
+            transition={{ duration: 1.2, delay: 0.35, ease: "easeOut" }}
           />
-          <motion.div
-            aria-hidden="true"
-            className="absolute -inset-y-1/2 left-[-35%] w-1/3 rotate-[18deg] bg-gradient-to-r from-transparent via-[#f3e5ab]/[0.07] to-transparent blur-xl pointer-events-none"
-            animate={{ x: ['0%', '480%'] }}
-            transition={{ duration: 8, repeat: Infinity, repeatDelay: 2, ease: 'easeInOut' }}
-          />
-          <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/70 to-transparent" />
-          <div className="absolute inset-x-8 bottom-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/40 to-transparent" />
-
-          <div className="relative z-10 mx-auto max-w-3xl">
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={isInView ? { width: 56, opacity: 1 } : { width: 0, opacity: 0 }}
-              transition={{ duration: 0.8, delay: 0.55 }}
-              className="h-px mx-auto mb-7 bg-[#d4af37]"
-            />
-            <motion.p
-              initial={{ opacity: 0, y: 12 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-              transition={{ duration: 0.7, delay: 0.45 }}
-              className="text-[10px] sm:text-xs uppercase tracking-[0.38em] text-[#d4af37] font-semibold mb-6"
-            >
-              YOUR VISION. BUILT WITH PURPOSE.
-            </motion.p>
-            <motion.h3
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              transition={{ duration: 0.85, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
-              className="text-3xl sm:text-5xl md:text-6xl font-serif font-normal leading-[1.08] tracking-tight text-white"
-              style={{ fontFamily: 'var(--font-heading)' }}
-            >
-              Want a website
-              <span className="block mt-2 text-[#d4af37] italic">like this?</span>
-            </motion.h3>
-            <motion.p
-              initial={{ opacity: 0, y: 16 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
-              transition={{ duration: 0.75, delay: 0.78 }}
-              className="mx-auto mt-6 max-w-lg text-sm sm:text-base leading-relaxed text-neutral-400 font-light"
-            >
-              Let’s turn your idea into a digital experience people remember.
-            </motion.p>
+          <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center justify-between gap-5 text-center sm:flex-row sm:text-left">
+            <div>
+              <p className="mb-2 text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-[#d4af37]/80 font-semibold">
+                YOUR VISION. BUILT WITH PURPOSE.
+              </p>
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-serif font-normal tracking-tight text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                Want a website <span className="text-[#d4af37] italic">like this?</span>
+              </h3>
+              <p className="mt-2 text-xs sm:text-sm text-neutral-500 font-light">
+                Let’s create something people remember.
+              </p>
+            </div>
             <motion.a
               href="https://wa.me/966558792450?text=Hi%20Mohammed%2C%20I%27m%20interested%20in%20getting%20a%20website%20like%20WEST%20MUN."
               target="_blank"
               rel="noopener noreferrer"
-              initial={{ opacity: 0, y: 18 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
-              transition={{ duration: 0.75, delay: 0.95 }}
-              whileHover={{ y: -4, scale: 1.025 }}
+              whileHover={{ y: -2, scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="relative mt-9 inline-flex items-center justify-center gap-4 overflow-hidden border border-[#d4af37] bg-[#d4af37] px-8 py-4 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-black shadow-[0_0_35px_rgba(212,175,55,0.12)] transition-shadow duration-500 hover:shadow-[0_0_45px_rgba(212,175,55,0.32)]"
+              className="inline-flex shrink-0 items-center justify-center gap-3 border border-[#d4af37]/60 bg-[#d4af37]/[0.08] px-5 py-3 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.16em] text-[#e7c75b] transition-all duration-300 hover:border-[#d4af37] hover:bg-[#d4af37] hover:text-black hover:shadow-[0_0_24px_rgba(212,175,55,0.16)]"
             >
-              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/35 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-              <span className="relative">Contact Mohammed Magdi</span>
-              <span aria-hidden="true" className="relative text-base">↗</span>
+              Contact Mohammed Magdi
+              <span aria-hidden="true" className="text-sm">↗</span>
             </motion.a>
-            <p className="mt-6 text-[9px] uppercase tracking-[0.24em] text-neutral-600">
-              Riyadh · Available for select projects
-            </p>
           </div>
         </motion.section>
       </div>
