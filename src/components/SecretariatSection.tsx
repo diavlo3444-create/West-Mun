@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 import { usePublicTable, DEFAULT_SECRETARIAT, type SecretariatRow } from '../lib/content';
 import { safeUrl } from '../lib/safe';
+import { TiltCard3D } from './TiltCard3D';
 
 interface TeamMember {
   role: string;
@@ -15,6 +16,7 @@ interface TeamMember {
   isConfirmed: boolean;
   appointmentNumber: string;
   imagePosition?: string;
+  objectPosition?: string;
 }
 
 const SecretariatAvatar: React.FC<{
@@ -22,7 +24,8 @@ const SecretariatAvatar: React.FC<{
   fallbackSrc?: string;
   name: string;
   positionClass?: string;
-}> = ({ src, fallbackSrc, name, positionClass }) => {
+  objectPosition?: string;
+}> = ({ src, fallbackSrc, name, positionClass, objectPosition }) => {
   const [currentSrc, setCurrentSrc] = React.useState<string | undefined>(src || fallbackSrc);
   const [hasFailed, setHasFailed] = React.useState(false);
 
@@ -56,6 +59,7 @@ const SecretariatAvatar: React.FC<{
       alt={name}
       onError={handleError}
       className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${positionClass || 'object-center'}`}
+      style={objectPosition ? { objectPosition } : undefined}
       loading="lazy"
       referrerPolicy="no-referrer"
     />
@@ -90,9 +94,16 @@ export const SecretariatSection: React.FC = React.memo(() => {
     let imageUrl = safeUrl(r.image_url) || undefined;
     let fallbackImage: string | undefined;
 
+    // Resolve any ImgBB page URL to direct image link
+    if (imageUrl && imageUrl.includes('ibb.co/9RcgM85')) {
+      imageUrl = 'https://i.ibb.co/L4YRGk7/Whats-App-Image-2026-10-27-at-8-52-57-PM.jpg';
+      fallbackImage = '/ibrahim-khan.jpg';
+    }
+
     if (isUsg) {
       name = 'Ibrahim Khan';
-      imageUrl = 'https://ibb.co/9RcgM85';
+      imageUrl = 'https://i.ibb.co/L4YRGk7/Whats-App-Image-2026-10-27-at-8-52-57-PM.jpg';
+      fallbackImage = '/ibrahim-khan.jpg';
     } else if (isAdvisor) {
       // Senior Advisor Muaz El Amir
       if (!imageUrl || imageUrl.includes('i.ibb.co')) {
@@ -108,15 +119,16 @@ export const SecretariatSection: React.FC = React.memo(() => {
     }
 
     return {
-      role: r.id === 'd-sec-2' || /yousef/i.test(r.name) ? 'Senior Advisor' : r.role,
+      role: isUsg ? 'Under-Secretary-General' : (r.id === 'd-sec-2' || /yousef/i.test(r.name) ? 'Senior Advisor' : r.role),
       name,
-      department: r.department,
+      department: isUsg ? 'Executive Secretariat' : r.department,
       bio: isUsg
-        ? 'As Under-Secretary-General, Ibrahim Khan supports the Secretary-General in coordinating the conference team, helping departments work together, and contributing to a smooth, well-organized delegate experience.'
+        ? "As Under-Secretary-General of WEST MUN, Ibrahim Khan supports the Secretary-General in coordinating the conference's executive operations. He works closely with department heads to ensure effective communication, organizational efficiency, and the smooth execution of conference activities, helping deliver an exceptional experience for every delegate."
         : r.bio,
       image: imageUrl,
       fallbackImage,
-      imagePosition: positionClass[r.image_position] ?? 'object-center',
+      imagePosition: isUsg ? 'object-top' : (positionClass[r.image_position] ?? 'object-center'),
+      objectPosition: isUsg ? '50% 15%' : undefined,
       isConfirmed: r.confirmed,
       appointmentNumber: String(i + 1).padStart(2, '0'),
     };
@@ -166,70 +178,73 @@ export const SecretariatSection: React.FC = React.memo(() => {
                 delay: index * 0.1,
                 ease: [0.25, 0.1, 0.25, 1],
               }}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-              whileTap={{ scale: 0.99 }}
-              className={`group p-6 sm:p-7 bg-[#0e0e11] border rounded-sm transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden h-full ${
-                member.isConfirmed
-                  ? 'border-[#d4af37]/40 hover:border-[#d4af37] shadow-[0_0_25px_rgba(212,175,55,0.06)]'
-                  : 'border-neutral-800/80 hover:border-[#d4af37]/30'
-              }`}
+              className="h-full"
             >
-              {/* Top Department Badge (Equal Height) */}
-              <div className="h-5 flex items-center justify-center mb-4">
-                <span className="text-[10px] sm:text-[11px] font-mono tracking-widest uppercase text-[#d4af37]">
-                  {member.department}
-                </span>
-              </div>
+              <TiltCard3D
+                className={`group p-6 sm:p-7 bg-[#0e0e11] border rounded-sm transition-colors duration-300 flex flex-col items-center text-center relative overflow-hidden h-full ${
+                  member.isConfirmed
+                    ? 'border-[#d4af37]/40 hover:border-[#d4af37] shadow-[0_0_25px_rgba(212,175,55,0.06)]'
+                    : 'border-neutral-800/80 hover:border-[#d4af37]/30'
+                }`}
+              >
+                {/* Top Department Badge (Equal Height) */}
+                <div className="h-5 flex items-center justify-center mb-4 tilt-depth-badge">
+                  <span className="text-[10px] sm:text-[11px] font-mono tracking-widest uppercase text-[#d4af37]">
+                    {member.department}
+                  </span>
+                </div>
 
-              {/* Portrait (Identical Dimensions & Circular Border Treatment) */}
-              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full mb-5 relative overflow-hidden flex items-center justify-center shrink-0 bg-gradient-to-b from-[#18181f] to-[#0c0c0e] border-2 border-[#d4af37]/40 group-hover:border-[#d4af37] transition-all shadow-xl">
-                <SecretariatAvatar
-                  src={member.image}
-                  fallbackSrc={member.fallbackImage}
-                  name={member.name}
-                  positionClass={member.imagePosition}
-                />
-              </div>
+                {/* Portrait (Identical Dimensions & Circular Border Treatment) */}
+                <div className="tilt-depth-avatar w-28 h-28 sm:w-32 sm:h-32 rounded-full mb-5 relative overflow-hidden flex items-center justify-center shrink-0 bg-gradient-to-b from-[#18181f] to-[#0c0c0e] border-2 border-[#d4af37]/40 group-hover:border-[#d4af37] transition-all shadow-xl">
+                  <SecretariatAvatar
+                    src={member.image}
+                    fallbackSrc={member.fallbackImage}
+                    name={member.name}
+                    positionClass={member.imagePosition}
+                    objectPosition={member.objectPosition}
+                  />
+                </div>
 
-              {/* Role Title (Fixed Min-Height to Guarantee Vertical Alignment Across All Rows) */}
-              <div className="min-h-[2.85rem] flex items-center justify-center mb-2">
-                <h3 className="text-lg sm:text-xl font-serif text-white group-hover:text-[#f3e5ab] transition-colors leading-snug">
-                  {member.role}
-                </h3>
-              </div>
+                {/* Role Title (Fixed Min-Height to Guarantee Vertical Alignment Across All Rows) */}
+                <div className="tilt-depth-text min-h-[2.85rem] flex items-center justify-center mb-2">
+                  <h3 className="text-lg sm:text-xl font-serif text-white group-hover:text-[#f3e5ab] transition-colors leading-snug">
+                    {member.role}
+                  </h3>
+                </div>
 
-              {/* Name Badge (Identical Offset & Dimensions) */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#141418] border border-neutral-800 rounded-sm mb-4 shrink-0">
-                <Shield className="w-3 h-3 text-[#d4af37]" />
-                <span className="text-xs font-mono text-neutral-200 font-semibold tracking-wider">
-                  {member.name}
-                </span>
-              </div>
+                {/* Name Badge (Identical Offset & Dimensions) */}
+                <div className="tilt-depth-badge inline-flex items-center gap-1.5 px-3 py-1 bg-[#141418] border border-neutral-800 rounded-sm mb-4 shrink-0">
+                  <Shield className="w-3 h-3 text-[#d4af37]" />
+                  <span className="text-xs font-mono text-neutral-200 font-semibold tracking-wider">
+                    {member.name}
+                  </span>
+                </div>
 
-              {/* Bio Container (Starts at Identical Offset, Harmonious Typography) */}
-              <div className="flex-1 flex items-start justify-center">
-                <p className="text-neutral-300 text-xs sm:text-[13px] leading-relaxed font-light">
-                  {member.bio}
-                </p>
-              </div>
+                {/* Bio Container (Starts at Identical Offset, Harmonious Typography) */}
+                <div className="tilt-depth-text flex-1 flex items-start justify-center">
+                  <p className="text-neutral-300 text-xs sm:text-[13px] leading-relaxed font-light">
+                    {member.bio}
+                  </p>
+                </div>
 
-              {/* Card Footer (Pinned to Bottom via mt-auto, Consistent Status Layout) */}
-              <div className="mt-6 pt-3.5 w-full border-t border-neutral-800/60 flex items-center justify-between text-[10px] uppercase tracking-widest font-mono text-neutral-500">
-                <span>Appointment {member.appointmentNumber}</span>
-                <span className={`inline-flex items-center gap-1 ${member.isConfirmed ? 'text-[#d4af37]' : 'text-neutral-400'}`}>
-                  {member.isConfirmed ? (
-                    <>
-                      <CheckCircle2 className="w-3 h-3 text-[#d4af37]" />
-                      <span>Confirmed</span>
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="w-3 h-3 text-[#d4af37]/70" />
-                      <span>Pending TBA</span>
-                    </>
-                  )}
-                </span>
-              </div>
+                {/* Card Footer (Pinned to Bottom via mt-auto, Consistent Status Layout) */}
+                <div className="tilt-depth-text mt-6 pt-3.5 w-full border-t border-neutral-800/60 flex items-center justify-between text-[10px] uppercase tracking-widest font-mono text-neutral-500">
+                  <span>Appointment {member.appointmentNumber}</span>
+                  <span className={`inline-flex items-center gap-1 ${member.isConfirmed ? 'text-[#d4af37]' : 'text-neutral-400'}`}>
+                    {member.isConfirmed ? (
+                      <>
+                        <CheckCircle2 className="w-3 h-3 text-[#d4af37]" />
+                        <span>Confirmed</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-3 h-3 text-[#d4af37]/70" />
+                        <span>Pending TBA</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              </TiltCard3D>
             </motion.div>
           ))}
         </div>

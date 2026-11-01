@@ -170,6 +170,25 @@ body {
   contain: paint style;
 }
 
+/* ========================================================
+   CARD-ONLY 3D TILT DEPTH
+   ======================================================== */
+.tilt-depth-avatar {
+  transform: translateZ(24px);
+  transform-style: preserve-3d;
+}
+
+.tilt-depth-text {
+  transform: translateZ(14px);
+  transform-style: preserve-3d;
+}
+
+.tilt-depth-badge {
+  transform: translateZ(18px);
+  transform-style: preserve-3d;
+}
+
+
 /* =====================================================================
    WEST MUN — Dashboard design system
    Shared by /admin and /head only. Scoped under .wm-app so the public

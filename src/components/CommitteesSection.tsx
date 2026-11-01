@@ -3,6 +3,7 @@ import { Shield, FileText, UserCheck, X, ExternalLink, Info } from 'lucide-react
 import { motion } from 'motion/react';
 import { useInView } from '../hooks/useInView';
 import { usePublicTable, DEFAULT_COMMITTEES, type CommitteeRow } from '../lib/content';
+import { TiltCard3D } from './TiltCard3D';
 
 interface CommitteeData {
   id: string;
@@ -102,61 +103,62 @@ export const CommitteesSection: React.FC = React.memo(() => {
                 delay: Math.min(index * 0.08, 0.48),
                 ease: [0.25, 0.1, 0.25, 1],
               }}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-              className="group p-7 bg-[#0e0e11] border border-neutral-800/90 hover:border-[#d4af37]/50 transition-all duration-300 rounded-sm flex flex-col justify-between"
+              className="h-full"
             >
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[11px] font-mono tracking-widest uppercase px-2.5 py-0.5 bg-[#17171c] text-[#d4af37] border border-[#d4af37]/20 rounded-sm">
-                    {item.type}
-                  </span>
-                  <span className="text-xs font-mono text-neutral-500">
-                    Track {item.trackNumber}
-                  </span>
+              <TiltCard3D className="group p-7 bg-[#0e0e11] border border-neutral-800/90 hover:border-[#d4af37]/50 transition-colors duration-300 rounded-sm flex flex-col justify-between h-full">
+                <div>
+                  <div className="flex items-center justify-between mb-4 tilt-depth-badge">
+                    <span className="text-[11px] font-mono tracking-widest uppercase px-2.5 py-0.5 bg-[#17171c] text-[#d4af37] border border-[#d4af37]/20 rounded-sm">
+                      {item.type}
+                    </span>
+                    <span className="text-xs font-mono text-neutral-500">
+                      Track {item.trackNumber}
+                    </span>
+                  </div>
+
+                  <h3 className="text-xl font-serif text-white mb-2 group-hover:text-[#f3e5ab] transition-colors tilt-depth-text">
+                    Committee Name: <span className="text-[#d4af37] font-semibold">{item.name}</span>
+                  </h3>
+
+                  <p className="text-neutral-400 text-xs leading-relaxed mb-6 font-light tilt-depth-text">
+                    {item.description}
+                  </p>
+
+                  {/* Structured Fields */}
+                  <div className="space-y-2.5 pt-4 border-t border-neutral-800/80 text-xs mb-6 tilt-depth-text">
+                    <div className="flex justify-between items-center">
+                      <span className="text-neutral-500 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-[#d4af37]" /> Agenda / Topic
+                      </span>
+                      <span className="font-mono text-neutral-300 font-medium">{item.topic}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-neutral-500 flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5 text-[#d4af37]" /> Chairperson
+                      </span>
+                      <span className="font-mono text-neutral-300 font-medium">{item.chair}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-neutral-500 flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5 text-[#d4af37]" /> Delegate Level
+                      </span>
+                      <span className="text-neutral-300">{item.level}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <h3 className="text-xl font-serif text-white mb-2 group-hover:text-[#f3e5ab] transition-colors">
-                  Committee Name: <span className="text-[#d4af37] font-semibold">{item.name}</span>
-                </h3>
-
-                <p className="text-neutral-400 text-xs leading-relaxed mb-6 font-light">
-                  {item.description}
-                </p>
-
-                {/* Structured Fields */}
-                <div className="space-y-2.5 pt-4 border-t border-neutral-800/80 text-xs mb-6">
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-500 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-[#d4af37]" /> Agenda / Topic
-                    </span>
-                    <span className="font-mono text-neutral-300 font-medium">{item.topic}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-500 flex items-center gap-1.5">
-                      <UserCheck className="w-3.5 h-3.5 text-[#d4af37]" /> Chairperson
-                    </span>
-                    <span className="font-mono text-neutral-300 font-medium">{item.chair}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-500 flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-[#d4af37]" /> Delegate Level
-                    </span>
-                    <span className="text-neutral-300">{item.level}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* View Committee Details CTA Button */}
-              <motion.button
-                type="button"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedCommittee(item)}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 text-xs uppercase tracking-wider font-semibold text-neutral-200 bg-[#141418] hover:bg-[#d4af37] hover:text-black border border-neutral-700/80 hover:border-[#d4af37] rounded-sm transition-all cursor-pointer"
-              >
-                <span>View Committee Details</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </motion.button>
+                {/* View Committee Details CTA Button */}
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedCommittee(item)}
+                  className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 text-xs uppercase tracking-wider font-semibold text-neutral-200 bg-[#141418] hover:bg-[#d4af37] hover:text-black border border-neutral-700/80 hover:border-[#d4af37] rounded-sm transition-all cursor-pointer tilt-depth-badge"
+                >
+                  <span>View Committee Details</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </motion.button>
+              </TiltCard3D>
             </motion.div>
           ))}
         </div>
