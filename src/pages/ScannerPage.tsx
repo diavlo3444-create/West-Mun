@@ -23,7 +23,10 @@ export default function ScannerPage() {
   const handleDecoded = useCallback(async (decodedText: string) => {
     if (scanBusyRef.current) return;
     scanBusyRef.current = true;
-    setScanning(false);
+    // Pause decoding while this pass is verified, but keep the camera stream alive.
+    // Stopping the scanner here forced Security to click the camera button after every check-in.
+    const activeScanner = scannerRef.current;
+    try { activeScanner?.pause(true); } catch {}
     setBusy(true);
     setMessage(null);
     try {
@@ -138,6 +141,13 @@ export default function ScannerPage() {
     } finally {
       setBusy(false);
       scanBusyRef.current = false;
+      // Resume the existing preview after the result is shown. The short delay
+      // prevents the same QR from being submitted repeatedly on consecutive frames.
+      window.setTimeout(() => {
+        if (activeScanner && scannerRef.current === activeScanner) {
+          try { activeScanner.resume(); } catch {}
+        }
+      }, 1200);
     }
   }, [direction]);
 
