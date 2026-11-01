@@ -3,54 +3,259 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WEST MUN 2027 — Official Western Model United Nations | Riyadh</title>
-    <meta name="description" content="Official website of WEST MUN 2027 (Western Model United Nations) in Riyadh, Saudi Arabia. Explore conference committees, delegate registration, the schedule, secretariat, and official conference updates." />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <title>WEST MUN 2027 — Western Model United Nations | Riyadh</title>
+    <meta
+      name="description"
+      content="Western Model United Nations (WEST MUN) is a student diplomacy conference in Riyadh, Saudi Arabia. Explore conference committees, delegate registration, secretariat, and updates."
+    />
+    <meta
+      name="keywords"
+      content="WEST MUN, Western Model United Nations, WEST MUN Riyadh, Model United Nations conference in Riyadh, Student diplomacy conference, Model UN Saudi Arabia, Model United Nations 2027"
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="theme-color" content="#070707" />
     <link rel="canonical" href="https://west-mun.vercel.app/" />
-    <meta property="og:site_name" content="WEST MUN" />
+    <link rel="icon" type="image/jpeg" href="/westmun-logo.jpg" />
+    <link rel="apple-touch-icon" href="/westmun-logo.jpg" />
+
+    <!-- Open Graph Social Metadata -->
+    <meta property="og:site_name" content="Western Model United Nations" />
     <meta property="og:locale" content="en_US" />
-    <meta property="og:title" content="WEST MUN 2027 — Official Western Model United Nations" />
-    <meta property="og:description" content="The official WEST MUN 2027 website in Riyadh, Saudi Arabia. Explore committees, delegate registration, conference information, and updates." />
+    <meta property="og:title" content="WEST MUN 2027 — Western Model United Nations | Riyadh" />
+    <meta
+      property="og:description"
+      content="Western Model United Nations (WEST MUN) is a premier student diplomacy conference in Riyadh, Saudi Arabia. Explore committees, delegate registration, secretariat, and conference updates."
+    />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://west-mun.vercel.app/" />
     <meta property="og:image" content="https://west-mun.vercel.app/og-image.jpg" />
+    <meta property="og:image:alt" content="WEST MUN 2027 — Western Model United Nations Conference in Riyadh" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+
+    <!-- Twitter / X Cards -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="WEST MUN 2027 — Official Western Model United Nations" />
-    <meta name="twitter:description" content="The official WEST MUN 2027 website in Riyadh, Saudi Arabia. Explore committees, delegate registration, conference information, and updates." />
+    <meta name="twitter:title" content="WEST MUN 2027 — Western Model United Nations | Riyadh" />
+    <meta
+      name="twitter:description"
+      content="Western Model United Nations (WEST MUN) is a premier student diplomacy conference in Riyadh, Saudi Arabia. Explore committees, registration, and secretariat."
+    />
     <meta name="twitter:image" content="https://west-mun.vercel.app/og-image.jpg" />
-    <link rel="icon" type="image/jpeg" href="/westmun-logo.jpg" />
-    <link rel="apple-touch-icon" href="/westmun-logo.jpg" />
+    <meta name="twitter:image:alt" content="WEST MUN 2027 — Western Model United Nations" />
+
+    <!-- Schema.org Structured Data (JSON-LD) for Search Engines & AI Overviews -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@graph": [
           {
-            "@type": "Organization",
+            "@type": ["Organization", "EducationalOrganization"],
             "@id": "https://west-mun.vercel.app/#organization",
-            "name": "WEST MUN",
-            "alternateName": "Western Model United Nations",
+            "name": "Western Model United Nations",
+            "alternateName": ["WEST MUN", "WEST MUN Riyadh", "WEST MUN 2027"],
             "url": "https://west-mun.vercel.app/",
-            "logo": "https://west-mun.vercel.app/westmun-logo.jpg",
-            "sameAs": ["https://www.instagram.com/westmun_27/"]
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://west-mun.vercel.app/westmun-logo.jpg",
+              "caption": "Western Model United Nations Official Logo"
+            },
+            "image": "https://west-mun.vercel.app/og-image.jpg",
+            "description": "Western Model United Nations (WEST MUN) is an academic student diplomacy conference in Riyadh, Saudi Arabia, dedicated to cultivating diplomatic dialogue, consensus building, and global leadership for high school and university delegates.",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Riyadh",
+              "addressCountry": "SA"
+            },
+            "sameAs": [
+              "https://www.instagram.com/westmun_27/"
+            ],
+            "knowsAbout": [
+              "Model United Nations",
+              "Student Diplomacy",
+              "International Relations",
+              "Parliamentary Procedure",
+              "Multilateral Negotiation",
+              "United Nations Simulation",
+              "Public Speaking and Debate",
+              "Resolution Drafting"
+            ]
+          },
+          {
+            "@type": "Event",
+            "@id": "https://west-mun.vercel.app/#event-2027",
+            "name": "WEST MUN 2027 — Western Model United Nations Conference",
+            "alternateName": "Western Model United Nations Riyadh 2027",
+            "description": "The official WEST MUN 2027 conference in Riyadh, Saudi Arabia. A premier student diplomacy conference bringing together youth delegates to debate global crises, draft international treaties, and simulate United Nations bodies.",
+            "url": "https://west-mun.vercel.app/",
+            "image": "https://west-mun.vercel.app/og-image.jpg",
+            "eventStatus": "https://schema.org/EventScheduled",
+            "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+            "location": {
+              "@type": "Place",
+              "name": "Riyadh, Saudi Arabia (Host Venue TBA)",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Riyadh",
+                "addressCountry": "SA"
+              }
+            },
+            "organizer": {
+              "@id": "https://west-mun.vercel.app/#organization"
+            },
+            "inLanguage": "en",
+            "offers": {
+              "@type": "Offer",
+              "name": "Delegate & Delegation Registration (TBA)",
+              "url": "https://west-mun.vercel.app/#register",
+              "price": "0",
+              "priceCurrency": "SAR",
+              "availability": "https://schema.org/PreOrder"
+            }
           },
           {
             "@type": "WebSite",
             "@id": "https://west-mun.vercel.app/#website",
             "url": "https://west-mun.vercel.app/",
-            "name": "WEST MUN",
-            "alternateName": "Western Model United Nations",
+            "name": "WEST MUN — Western Model United Nations",
+            "alternateName": "WEST MUN Riyadh Official Portal",
+            "description": "Official portal of Western Model United Nations (WEST MUN) in Riyadh, Saudi Arabia. Explore conference committees, delegate registration, schedule, secretariat, and official announcements.",
             "inLanguage": "en",
-            "publisher": {"@id": "https://west-mun.vercel.app/#organization"}
+            "publisher": {
+              "@id": "https://west-mun.vercel.app/#organization"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://west-mun.vercel.app/#breadcrumb",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://west-mun.vercel.app/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "About WEST MUN",
+                "item": "https://west-mun.vercel.app/#about"
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "Committees",
+                "item": "https://west-mun.vercel.app/#committees"
+              },
+              {
+                "@type": "ListItem",
+                "position": 4,
+                "name": "Registration",
+                "item": "https://west-mun.vercel.app/#register"
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://west-mun.vercel.app/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "What is WEST MUN?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "WEST MUN (Western Model United Nations) is an academic conference simulating the United Nations and associated multilateral organs in Riyadh, Saudi Arabia. Student delegates act as diplomats representing designated countries, researching international issues, negotiating policies, and authoring formal resolutions."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Who can participate in WEST MUN?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "WEST MUN welcomes high school and university students with an interest in international relations, debate, politics, law, and diplomacy. Both individual delegates (independent registrations) and school delegations accompanied by faculty advisors are eligible to register."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Do I need previous Model UN experience to attend WEST MUN?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No prior Model UN experience is required. The conference features committees tailored across skill levels, ranging from beginner-friendly General Assembly rooms with dais guidance to fast-paced advanced crisis simulations. Introductory procedure briefings are held during Day 1."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "What should delegates prepare prior to the conference?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Delegates should thoroughly study their committee's official Background Guide, research their assigned nation's foreign policy and treaty record, and prepare a written Position Paper. Delegates will also benefit from practicing speeches and familiarizing themselves with the Rules of Procedure."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Where and when will WEST MUN 2027 take place?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "WEST MUN takes place in Riyadh, Saudi Arabia. The official conference dates and host venue are To Be Announced (TBA). The Secretariat is finalizing partner facility agreements and will publish confirmed dates and venue details on the official website."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "What are the registration fees for WEST MUN?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Official registration fees for delegates, delegations, and faculty advisors are To Be Announced (TBA). The Secretariat is committed to keeping registration accessible and will announce final pricing alongside early-bird deadlines prior to open enrollment."
+                }
+              }
+            ]
           }
         ]
       }
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Semantic crawlable HTML for search engine indexers prior to JS hydration -->
+      <main class="sr-only" aria-label="Western Model United Nations Conference">
+        <h1>WEST MUN 2027 — Western Model United Nations | Riyadh</h1>
+        <p>
+          Official website of Western Model United Nations (WEST MUN 2027), an academic student diplomacy conference in Riyadh, Saudi Arabia. High school and university delegates represent sovereign nations across General Assembly, Security Council, and specialized regional committees to debate global crises, draft multilateral treaties, and master international negotiation.
+        </p>
+        <section>
+          <h2>About Western Model United Nations (WEST MUN Riyadh)</h2>
+          <p>
+            WEST MUN is an academically rigorous Model United Nations simulation in Riyadh, Saudi Arabia. Our educational mission empowers delegates to deconstruct complex geopolitical deadlocks, author binding resolutions, and build cross-cultural coalitions through consensus-driven parliamentary debate.
+          </p>
+          <ul>
+            <li><strong>Official Name:</strong> Western Model United Nations (WEST MUN)</li>
+            <li><strong>Conference Edition:</strong> WEST MUN 2027</li>
+            <li><strong>Host City:</strong> Riyadh, Kingdom of Saudi Arabia</li>
+            <li><strong>Format:</strong> Student Diplomacy Conference (In-Person)</li>
+            <li><strong>Eligibility:</strong> High School and University Students (Single Delegates and School Delegations)</li>
+            <li><strong>Language:</strong> English (UN Parliamentary Procedure)</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Committees & Academic Organs</h2>
+          <p>
+            Simulating the United Nations General Assembly, Security Council, Economic and Social Council (ECOSOC), Regional Bodies, and dynamic Crisis Committees.
+          </p>
+        </section>
+        <section>
+          <h2>Delegate Registration & Schedule</h2>
+          <p>
+            Registration details, conference dates, and the host venue in Riyadh are To Be Announced (TBA) by the Secretariat.
+          </p>
+        </section>
+      </main>
+    </div>
+    <noscript>
+      <div style="padding: 24px; font-family: sans-serif; background: #070707; color: #f5f5f5;">
+        <h2>Western Model United Nations (WEST MUN 2027) — Riyadh, Saudi Arabia</h2>
+        <p>
+          Please enable JavaScript to experience the full interactive WEST MUN conference portal, committee agendas, delegate registration, and schedule.
+        </p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

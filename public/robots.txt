@@ -1,5 +1,17 @@
+# https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
+Allow: /terms
+Allow: /privacy
 Disallow: /admin
+Disallow: /admin/
+Disallow: /head
+Disallow: /head/
+Disallow: /eb
+Disallow: /eb/
+Disallow: /scanner
+Disallow: /scanner/
+Disallow: /pass
+Disallow: /api/
 
 Sitemap: https://west-mun.vercel.app/sitemap.xml

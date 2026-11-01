@@ -322,9 +322,9 @@ class VelocityInertiaHelper {
 
 export const Hero: React.FC<HeroProps> = memo(({ displayedText, isDoneTyping }) => {
   const { t } = useCmsContent();
-  const stage1Eyebrow = t('hero_stage1_eyebrow', 'Official Delegation Summit · 2027');
+  const stage1Eyebrow = t('hero_stage1_eyebrow', 'Western Model United Nations · Riyadh 2027');
   const stage1Title = t('hero_stage1_title', 'WEST MUN 2027');
-  const stage1Subtitle = t('hero_stage1_subtitle', 'The Western Model United Nations Conference — convening sovereign youth delegations to debate global crises, draft treaties, and advance multilateral diplomacy.');
+  const stage1Subtitle = t('hero_stage1_subtitle', 'Western Model United Nations (WEST MUN Riyadh) — a premier student diplomacy conference convening youth delegations to debate global crises, draft treaties, and advance multilateral consensus.');
   const stage1ScrollHint = t('hero_stage1_scroll_hint', 'Scroll down to initiate proceedings');
   const stage2Badge = t('hero_stage2_badge', 'Plenary Session Dispatch');
   const stage2Title = t('hero_stage2_title', 'Diplomatic Engagement in Real-Time');

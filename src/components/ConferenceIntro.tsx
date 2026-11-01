@@ -15,11 +15,11 @@ export const ConferenceIntro: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
   const { t, introPillars } = useCmsContent();
 
-  const eyebrow = t('intro_eyebrow', 'The Mission of WEST MUN');
+  const eyebrow = t('intro_eyebrow', 'The Mission of Western Model United Nations');
   const title = t('intro_title', 'Diplomacy. Dialogue. Impact.');
   const description = t(
     'intro_description',
-    'Model United Nations is an authentic simulation of the UN General Assembly, Security Council, and multilateral diplomatic agencies. Delegates represent sovereign nations, advocating foreign policy objectives, drafting binding resolutions, and navigating international crises.',
+    'Western Model United Nations (WEST MUN) is an academic conference and student diplomacy summit in Riyadh, Saudi Arabia. Simulating the UN General Assembly, Security Council, and multilateral agencies, WEST MUN convenes high school and university delegates to represent sovereign nations, draft binding resolutions, and master international negotiation.',
   );
   const themeBadge = t('intro_theme_badge', 'Official Conference Theme');
   const themeText = t(

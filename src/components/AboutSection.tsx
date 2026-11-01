@@ -8,43 +8,43 @@ export const AboutSection: React.FC = React.memo(() => {
   const { ref, isInView } = useInView<HTMLElement>();
   const { t } = useCmsContent();
 
-  const eyebrow = t('about_eyebrow', 'Institutional Profile');
-  const title = t('about_title', 'About WEST MUN');
+  const eyebrow = t('about_eyebrow', 'Institutional Profile · Riyadh 2027');
+  const title = t('about_title', 'About Western Model United Nations');
   const description = t(
     'about_description',
-    'WEST MUN is established to offer an uncompromising, academically rigorous platform for high school and collegiate delegates. We convene future diplomats to test their grasp of real-time crises, treaty obligations, and international negotiation.',
+    'Western Model United Nations (WEST MUN) is a student diplomacy conference hosted in Riyadh, Saudi Arabia. Established to offer an uncompromising, academically rigorous platform for high school and collegiate delegates, WEST MUN convenes future diplomats to debate international policy, author multilateral draft resolutions, and master consensus-driven diplomacy.',
   );
-  const missionTitle = t('about_mission_title', 'Mission & Vision');
+  const missionTitle = t('about_mission_title', 'Educational Purpose & Mission');
   const missionText = t(
     'about_mission_text',
-    'Our mission is to foster analytical critical thinking, cross-cultural empathy, and diplomatic discipline. WEST MUN empowers delegates to deconstruct complex international deadlocks and build durable coalitions through consensus.',
+    'Our educational mission is to foster analytical critical thinking, cross-cultural empathy, and diplomatic leadership. WEST MUN empowers emerging student delegates to deconstruct complex geopolitical deadlocks, defend sovereign policy mandates, and build durable coalitions through respectful parliamentary debate.',
   );
   const themeTitle = t('about_theme_notice_title', 'Official Conference Theme');
   const themeText = t(
     'about_theme_notice_text',
     'TBA — The Secretariat will release the annual conference theme and comprehensive delegate handbook ahead of the registration deadline.',
   );
-  const whyTitle = t('about_why_title', 'Why Participate?');
+  const whyTitle = t('about_why_title', 'Who Participates & Why Attend?');
   const whyBullet1 = t(
     'about_why_bullet1',
-    'Develop substantive fluency in international law, foreign policy, and treaty resolution drafting.',
+    'High school and university students develop fluency in international law, foreign policy, and treaty resolution drafting.',
   );
   const whyBullet2 = t(
     'about_why_bullet2',
-    'Gain command of parliamentary procedure and high-stakes diplomatic rhetoric under pressure.',
+    'Master official parliamentary procedure, unmoderated caucus strategy, and high-stakes diplomatic rhetoric under pressure.',
   );
   const whyBullet3 = t(
     'about_why_bullet3',
-    'Network with driven student delegates, faculty advisors, and guest speakers in international affairs.',
+    'Connect with driven student delegates, faculty advisors, and institutional leaders from Riyadh and international delegations.',
   );
-  const expectationsTitle = t('about_expectations_title', 'What Delegates Can Expect');
+  const expectationsTitle = t('about_expectations_title', 'Conference Format & Academic Simulation');
   const expectationsText = t(
     'about_expectations_text',
-    'From opening plenary to final voting procedure, delegates will engage in rigorous committee sessions led by experienced dais members. Expect deep background research, dynamic crises updates, spirited debate, and collegiate social events.',
+    'Across multi-day committee proceedings led by experienced Secretariat dais officers, delegates engage in authentic simulations of the UN General Assembly, Security Council, and specialized regional committees. Expect deep background research, fast-paced crisis scenarios, and rigorous resolution voting.',
   );
   const factsDates = t('conference_dates') || t('about_facts_dates', 'TBA');
-  const factsVenue = t('conference_venue') || t('about_facts_venue', 'TBA');
-  const factsDelegations = t('about_facts_delegations', 'Single Delegates & School Delegations');
+  const factsVenue = t('conference_venue') || t('about_facts_venue', 'TBA (Riyadh, Saudi Arabia)');
+  const factsDelegations = t('about_facts_delegations', 'High School & University (Individual & Delegations)');
   const factsLanguage = t(
     'about_facts_language',
     'English (Official UN Parliamentary Procedure)',
