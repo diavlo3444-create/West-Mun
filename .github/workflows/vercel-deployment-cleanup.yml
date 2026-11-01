@@ -1,0 +1,42 @@
+name: WEST MUN Vercel deployment cleanup
+
+on:
+  schedule:
+    - cron: "20 3 * * *"
+  workflow_dispatch:
+    inputs:
+      minimum_age_hours:
+        description: "Only delete deployments at least this old"
+        required: true
+        type: choice
+        default: "24"
+        options:
+          - "24"
+          - "72"
+          - "168"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: west-mun-vercel-deployment-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Remove eligible old Vercel deployments
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          MIN_AGE_HOURS: ${{ inputs.minimum_age_hours || '24' }}
+        run: node scripts/vercel-cleanup-deployments.mjs
