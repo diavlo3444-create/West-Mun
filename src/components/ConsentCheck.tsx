@@ -25,10 +25,14 @@ export const ConsentCheck: React.FC<ConsentCheckProps> = ({ id, checked, onChang
             I have read and agree to the{' '}
             <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#d4af37] underline underline-offset-2 hover:text-[#f3e5ab]">
               Terms of Service
-            </a>{' '}
-            and the{' '}
+            </a>
+            ,{' '}
             <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#d4af37] underline underline-offset-2 hover:text-[#f3e5ab]">
               Privacy Policy
+            </a>
+            , and{' '}
+            <a href="/code-of-conduct" target="_blank" rel="noopener noreferrer" className="text-[#d4af37] underline underline-offset-2 hover:text-[#f3e5ab]">
+              Code of Conduct
             </a>
             .
           </>

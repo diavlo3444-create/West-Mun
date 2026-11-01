@@ -138,15 +138,18 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
         </div>
 
         {/* Bottom Bar with Back to Top */}
-        <div className="pt-8 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
+        <div className="pt-8 border-t border-neutral-900 flex flex-col lg:flex-row items-center justify-between gap-5 text-xs text-neutral-500">
           <p>{copyright}</p>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
             <a href="/terms" className="hover:text-[#d4af37] transition-colors">Terms of Service</a>
-            <a href="/privacy" className="hover:text-[#d4af37] transition-colors">Privacy Policy</a>
+            <a href="/privacy" className="hover:text-[#d4af37] transition-colors">Privacy Policy (PDPL)</a>
+            <a href="/copyright" className="hover:text-[#d4af37] transition-colors">Copyright & IP</a>
+            <a href="/media-consent" className="hover:text-[#d4af37] transition-colors">Media Consent</a>
+            <a href="/code-of-conduct" className="hover:text-[#d4af37] transition-colors">Code of Conduct</a>
             <button
               type="button"
               onClick={scrollToTop}
-              className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-[#d4af37] transition-colors cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-[#d4af37] transition-colors cursor-pointer active:scale-95 ml-2"
               aria-label="Back to top"
             >
               <span>Back to top</span>
@@ -155,8 +158,8 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
           </div>
         </div>
 
-        <p className="mt-6 text-[11px] text-neutral-600 leading-relaxed max-w-3xl">
-          WEST MUN is an independent Model United Nations conference simulation. It is not affiliated with, endorsed by, or sponsored by the United Nations.
+        <p className="mt-6 text-[11px] text-neutral-500 leading-relaxed max-w-4xl border-t border-neutral-900/60 pt-4">
+          <strong className="text-neutral-400 font-medium">Independent Educational Simulation Disclaimer:</strong> WEST MUN (Western Model United Nations) is an independent educational simulation organized by students in Riyadh, Kingdom of Saudi Arabia. It is not affiliated with, endorsed by, sponsored by, or an official agency of the United Nations. All UN emblems, acronyms, and committee structures are utilized solely for academic simulation under educational fair use.
         </p>
 
         {/* Dedicated Replay Intro Button at the very bottom */}
