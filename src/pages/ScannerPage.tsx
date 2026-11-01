@@ -270,23 +270,12 @@ export default function ScannerPage() {
       setMessage({ success: false, outcome: "denied", error: "This browser does not provide camera access. Open WEST MUN in the latest Chrome or Edge." });
       return;
     }
-    try {
-      // This call runs directly from the user's click so the browser can show its prompt.
-      const permissionStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-      permissionStream.getTracks().forEach((track) => track.stop());
-      setScanning(true);
-    } catch (e) {
-      const errorName = e instanceof DOMException ? e.name : "";
-      let detail = e instanceof Error ? e.message : String(e);
-      if (errorName === "NotAllowedError" || errorName === "PermissionDeniedError" || errorName === "SecurityError") {
-        detail = "Chrome/Edge is blocking camera access for this site, so it will not show a prompt. Click the site-controls icon beside the address bar → Site settings → Camera → Allow, then reload WEST MUN. Also check Windows Settings → Privacy & security → Camera and enable desktop-app camera access.";
-      } else if (errorName === "NotFoundError" || errorName === "DevicesNotFoundError") {
-        detail = "No camera was found. Connect a webcam or use a phone with a working camera.";
-      } else if (errorName === "NotReadableError" || errorName === "TrackStartError") {
-        detail = "The camera may be in use by another app. Close Camera, Teams, Zoom, or other browser tabs using it, then try again.";
-      }
-      setMessage({ success: false, outcome: "denied", error: `Camera permission could not be obtained: ${detail}` });
-    }
+
+    // Let html5-qrcode request and own the camera stream. A separate getUserMedia
+    // preflight here opened a second stream immediately before the scanner started.
+    // Chrome remembers the site's Allow decision for this origin when its site
+    // permission is set to Allow; the browser controls whether that decision persists.
+    setScanning(true);
   };
   const scanQrImage = async (file?: File) => {
     if (!file || busy) return;
