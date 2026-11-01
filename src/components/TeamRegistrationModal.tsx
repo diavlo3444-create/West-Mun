@@ -24,12 +24,41 @@ interface TeamRegistrationModalProps {
   defaultTeam?: 'security' | 'media' | 'volunteers';
 }
 
+const PHONE_COUNTRIES = [
+  { code: 'SA', name: 'Saudi Arabia', dial: '+966', flag: '🇸🇦' },
+  { code: 'AE', name: 'United Arab Emirates', dial: '+971', flag: '🇦🇪' },
+  { code: 'BH', name: 'Bahrain', dial: '+973', flag: '🇧🇭' },
+  { code: 'KW', name: 'Kuwait', dial: '+965', flag: '🇰🇼' },
+  { code: 'OM', name: 'Oman', dial: '+968', flag: '🇴🇲' },
+  { code: 'QA', name: 'Qatar', dial: '+974', flag: '🇶🇦' },
+  { code: 'SD', name: 'Sudan', dial: '+249', flag: '🇸🇩' },
+  { code: 'EG', name: 'Egypt', dial: '+20', flag: '🇪🇬' },
+  { code: 'JO', name: 'Jordan', dial: '+962', flag: '🇯🇴' },
+  { code: 'LB', name: 'Lebanon', dial: '+961', flag: '🇱🇧' },
+  { code: 'IQ', name: 'Iraq', dial: '+964', flag: '🇮🇶' },
+  { code: 'US', name: 'United States', dial: '+1', flag: '🇺🇸' },
+  { code: 'GB', name: 'United Kingdom', dial: '+44', flag: '🇬🇧' },
+  { code: 'CA', name: 'Canada', dial: '+1', flag: '🇨🇦' },
+  { code: 'IN', name: 'India', dial: '+91', flag: '🇮🇳' },
+  { code: 'PK', name: 'Pakistan', dial: '+92', flag: '🇵🇰' },
+  { code: 'TR', name: 'Türkiye', dial: '+90', flag: '🇹🇷' },
+  { code: 'FR', name: 'France', dial: '+33', flag: '🇫🇷' },
+  { code: 'DE', name: 'Germany', dial: '+49', flag: '🇩🇪' },
+  { code: 'IT', name: 'Italy', dial: '+39', flag: '🇮🇹' },
+  { code: 'ES', name: 'Spain', dial: '+34', flag: '🇪🇸' },
+  { code: 'MY', name: 'Malaysia', dial: '+60', flag: '🇲🇾' },
+  { code: 'CN', name: 'China', dial: '+86', flag: '🇨🇳' },
+  { code: 'JP', name: 'Japan', dial: '+81', flag: '🇯🇵' },
+  { code: 'AU', name: 'Australia', dial: '+61', flag: '🇦🇺' },
+] as const;
+
 export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
   settings,
   onClose,
   defaultTeam = 'security',
 }) => {
   const [team, setTeam] = useState<'security' | 'media' | 'volunteers'>(defaultTeam);
+  const [phoneCountry, setPhoneCountry] = useState('SA');
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -138,12 +167,14 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     const name = form.fullName.trim();
     const email = form.email.trim().toLowerCase();
     const inst = form.institution.trim();
-    const phone = form.phone.trim();
+    const phoneDigits = form.phone.replace(/\D/g, '');
+    const selectedCountry = PHONE_COUNTRIES.find((country) => country.code === phoneCountry) ?? PHONE_COUNTRIES[0];
+    const phone = phoneDigits ? selectedCountry.dial + phoneDigits : '';
 
     if (name.length < 2 || name.length > 100) errs.fullName = 'Please enter your full name.';
     if (!EMAIL_RE.test(email) || email.length > 120) errs.email = 'Please enter a valid email address.';
     if (inst.length < 2 || inst.length > 150) errs.institution = 'Please enter your school or organisation.';
-    if (phone.length < 7 || phone.length > 25) errs.phone = 'Please enter a valid phone number (7–25 characters).';
+    if (phoneDigits.length < 6 || phoneDigits.length > 15) errs.phone = 'Please enter a valid phone number (6–15 digits).';
     if (!form.ageOk) errs.ageOk = 'Please confirm this.';
     if (!form.consent) errs.consent = 'You must agree to the Terms and Privacy Policy.';
 
@@ -253,7 +284,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     const fullPayload = {
       full_name: name,
       email,
-      phone: form.phone.trim(),
+      phone,
       institution: inst,
       team,
       section: form.section,
@@ -291,7 +322,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
           const fallbackPayload = {
             full_name: name,
             email,
-            phone: form.phone.trim(),
+            phone,
             institution: inst,
             team,
             section: form.section,
@@ -548,18 +579,21 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Phone Number *</label>
-                <input
-                  type="tel"
-                  required
-                  disabled={!currentlyOpen || busy}
-                  className={inputCls}
-                  placeholder="+966 50 123 4567"
-                  value={form.phone}
-                  onChange={(e) => {
-                    setForm({ ...form, phone: e.target.value });
-                    if (errors.phone) setErrors((prev) => { const next = { ...prev }; delete next.phone; return next; });
-                  }}
-                />
+                <div className="flex min-w-0 overflow-hidden rounded-sm border border-neutral-800 bg-[#141418] transition-colors focus-within:border-[#d4af37]">
+                  <select aria-label="Country calling code" value={phoneCountry} disabled={!currentlyOpen || busy}
+                    onChange={(e) => setPhoneCountry(e.target.value)}
+                    className="max-w-[48%] shrink-0 border-r border-neutral-800 bg-[#19191e] px-2.5 py-2.5 text-xs text-white outline-none">
+                    {PHONE_COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.flag} {country.name} ({country.dial})</option>)}
+                  </select>
+                  <input type="tel" inputMode="numeric" autoComplete="tel-national" required disabled={!currentlyOpen || busy}
+                    className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-xs text-white placeholder-neutral-600 outline-none"
+                    placeholder="50 123 4567" value={form.phone}
+                    onChange={(e) => {
+                      setForm({ ...form, phone: e.target.value.replace(/[^0-9 ()-]/g, '') });
+                      if (errors.phone) setErrors((prev) => { const next = { ...prev }; delete next.phone; return next; });
+                    }} />
+                </div>
+                <p className="mt-1 text-[10px] text-neutral-500">Saudi Arabia (+966) is selected by default. Your full international number will be saved.</p>
                 {errors.phone && <p className="text-[11px] text-red-400 mt-1">{errors.phone}</p>}
               </div>
 
