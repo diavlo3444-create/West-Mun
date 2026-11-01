@@ -71,6 +71,7 @@ const TBA_COMMITTEE =
 export const DEFAULT_SECRETARIAT: SecretariatRow[] = [
   { id: 'd-sec-1', role: 'Secretary-General', name: 'Rakan Almerbad', department: 'Executive Leadership', bio: 'Overseeing conference proceedings, guiding delegates, and maintaining parliamentary decorum. Dedicated to ensuring an exceptional, collaborative MUN experience for all delegations.', image_url: '/rakan-almerbad.jpg', image_position: 'center', confirmed: true },
   { id: 'd-sec-2', role: 'Senior Advisor', name: 'Yousef Saifi', department: 'Executive Secretariat', bio: 'Experienced debater with a deep passion for global diplomacy and constructive dialogue. Committed to youth empowerment, collaborative problem-solving, and delivering an unforgettable conference.', image_url: '/yousef.jpg', image_position: 'top', confirmed: true },
+  { id: 'd-sec-3', role: 'Under-Secretary-General', name: 'Ibrahim Khan', department: 'Executive Secretariat', bio: 'As Under-Secretary-General, Ibrahim Khan supports the Secretary-General in coordinating the conference team, helping departments work together, and contributing to a smooth, well-organized delegate experience.', image_url: 'https://ibb.co/9RcgM85', image_position: 'center', confirmed: true },
 ];
 
 export const DEFAULT_COMMITTEES: CommitteeRow[] = [
