@@ -243,11 +243,13 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
     setHeadRecommendation(null);
     setHeadRecommendationError(null);
     if (!supabase || !activeItem || activeItem._type !== 'team') return () => { current = false; };
-    void supabase.from('wm_staffing_decisions')
-      .select('head_decision,head_notes,admin_decision')
-      .eq('registration_id', activeItem.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('wm_staffing_decisions')
+          .select('head_decision,head_notes,admin_decision')
+          .eq('registration_id', activeItem.id)
+          .maybeSingle();
         if (!current) return;
         if (error) {
           console.error('[WEST MUN] Could not load head recommendation:', error);
@@ -259,11 +261,11 @@ export const RegistrationsManager: React.FC<RegistrationsManagerProps> = ({
           return;
         }
         if (data) setHeadRecommendation(data as any);
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         if (!current) return;
         setHeadRecommendationError(error instanceof Error ? error.message : 'Could not load the head recommendation.');
-      });
+      }
+    })();
     return () => { current = false; };
   }, [activeItem?.id, activeItem?._type]);
 

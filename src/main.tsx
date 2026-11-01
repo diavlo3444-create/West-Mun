@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import { Analytics } from '@vercel/analytics/react';
+const Analytics = () => null;
 // Fonts are bundled with the site (no requests to Google Fonts or other third parties).
 import '@fontsource/cinzel/latin-500.css';
 import '@fontsource/cinzel/latin-600.css';

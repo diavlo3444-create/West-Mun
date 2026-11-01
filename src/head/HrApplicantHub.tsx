@@ -58,7 +58,7 @@ export const HrApplicantHub: React.FC<{ area: HrArea }> = ({ area }) => {
       setRows([]);
       setError(queryError.message || 'Applications could not be loaded.');
     } else {
-      setRows((data || []) as Applicant[]);
+      setRows(((data || []) as unknown) as Applicant[]);
     }
     setLoading(false);
   }, [area]);
