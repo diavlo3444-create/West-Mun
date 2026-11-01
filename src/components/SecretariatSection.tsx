@@ -69,7 +69,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
   const positionClass = { center: 'object-center', top: 'object-top', bottom: 'object-bottom' } as const;
 
   const secretariat: TeamMember[] = rows
-    .filter((r) => r.id !== 'd-sec-3' && r.id !== 'd-sec-4' && !/zain\s+firas|muaz\s+el\s*amir/i.test(r.name))
+    .filter((r) => r.id !== 'd-sec-4' && !/zain\s+firas|muaz\s+el\s*amir/i.test(r.name))
     .map((r, i) => {
     const isUsg =
       r.id === 'd-sec-3' ||
@@ -91,15 +91,8 @@ export const SecretariatSection: React.FC = React.memo(() => {
     let fallbackImage: string | undefined;
 
     if (isUsg) {
-      // Under-Secretary-General must always be Zain Firas
-      if (!name || name.trim().toLowerCase() === 'fahad' || name.trim().toLowerCase() === 'fahad al kendi') {
-        name = 'Zain Firas';
-      }
-      // Replace external/flaky links with reliable local high-res asset
-      if (!imageUrl || imageUrl.includes('i.ibb.co') || imageUrl.includes('fahad.jpg')) {
-        imageUrl = '/zain-firas.jpg';
-      }
-      fallbackImage = '/zain-firas.jpg';
+      name = 'Ibrahim Khan';
+      imageUrl = 'https://ibb.co/9RcgM85';
     } else if (isAdvisor) {
       // Senior Advisor Muaz El Amir
       if (!imageUrl || imageUrl.includes('i.ibb.co')) {
@@ -118,7 +111,9 @@ export const SecretariatSection: React.FC = React.memo(() => {
       role: r.id === 'd-sec-2' || /yousef/i.test(r.name) ? 'Senior Advisor' : r.role,
       name,
       department: r.department,
-      bio: r.bio,
+      bio: isUsg
+        ? 'As Under-Secretary-General, Ibrahim Khan supports the Secretary-General in coordinating the conference team, helping departments work together, and contributing to a smooth, well-organized delegate experience.'
+        : r.bio,
       image: imageUrl,
       fallbackImage,
       imagePosition: positionClass[r.image_position] ?? 'object-center',
