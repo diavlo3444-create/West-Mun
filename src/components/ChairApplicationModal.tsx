@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2, CheckCircle2, AlertCircle, GraduationCap } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { EMAIL_RE } from '../lib/safe';
@@ -56,7 +57,7 @@ export const ChairApplicationModal: React.FC<ChairApplicationModalProps> = ({ on
   const field = 'w-full rounded-sm border border-neutral-700 bg-[#09090b] px-3.5 py-3 text-sm text-white placeholder:text-neutral-600 focus:border-[#d4af37] focus:outline-none';
   const label = 'mb-1.5 block text-[10px] font-mono uppercase tracking-widest text-neutral-400';
 
-  return <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="chair-form-title">
+  return createPortal(<div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="chair-form-title">
     <div className="my-auto w-full max-w-2xl border border-[#d4af37]/30 bg-[#0c0c0e] shadow-2xl">
       <div className="flex items-start justify-between border-b border-neutral-800 px-5 py-5 sm:px-7">
         <div className="flex gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#d4af37]/30 bg-[#d4af37]/10 text-[#d4af37]"><GraduationCap size={20}/></span><div><p className="text-[9px] font-mono uppercase tracking-[0.2em] text-[#d4af37]">WEST MUN 2027 · Dais recruitment</p><h2 id="chair-form-title" className="mt-1 font-serif text-2xl text-white">Chair application</h2><p className="mt-1 text-xs text-neutral-400">Apply to chair a committee at WEST MUN.</p></div></div>
@@ -81,5 +82,5 @@ export const ChairApplicationModal: React.FC<ChairApplicationModalProps> = ({ on
         <div className="flex flex-col-reverse gap-3 border-t border-neutral-800 pt-4 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} className="border border-neutral-700 px-5 py-3 text-xs font-semibold uppercase tracking-widest text-neutral-300">Cancel</button><button type="submit" disabled={busy} className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#e5c158] via-[#d4af37] to-[#aa8232] px-6 py-3 text-xs font-semibold uppercase tracking-widest text-black disabled:opacity-60">{busy && <Loader2 size={15} className="animate-spin"/>}{busy ? 'Submitting…' : 'Submit application'}</button></div>
       </form>}
     </div>
-  </div>;
+  </div>, document.body);
 };
