@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2, CheckCircle2, Shield, Camera, HeartHandshake, Lock, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { EMAIL_RE } from '../lib/safe';
@@ -422,7 +423,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
     'w-full bg-[#141418] border border-neutral-800 focus:border-[#d4af37] rounded-sm py-2 px-3 text-xs text-white placeholder-neutral-600 focus:outline-none transition-colors';
   const labelCls = 'block text-xs uppercase tracking-wider text-neutral-300 mb-1 font-medium';
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 overflow-y-auto"
       role="dialog"
@@ -978,6 +979,7 @@ export const TeamRegistrationModal: React.FC<TeamRegistrationModalProps> = ({
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
