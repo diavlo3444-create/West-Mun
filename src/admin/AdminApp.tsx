@@ -78,6 +78,7 @@ export default function AdminApp() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [recoverySent, setRecoverySent] = useState(false);
   const idleTimer = useRef<number | undefined>(undefined);
 
   // Real data state
@@ -528,6 +529,33 @@ export default function AdminApp() {
                   </>
                 )}
               </button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  disabled={busy || recoverySent || !email.trim()}
+                  onClick={async () => {
+                    if (!supabase || !supabaseConfigured) {
+                      setError('Password recovery is unavailable because Supabase Auth is not configured.');
+                      return;
+                    }
+                    setBusy(true);
+                    setError('');
+                    const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(
+                      email.trim().toLowerCase(),
+                      { redirectTo: `${window.location.origin}/head?type=recovery` },
+                    );
+                    setBusy(false);
+                    if (recoveryError) {
+                      setError(recoveryError.message);
+                      return;
+                    }
+                    setRecoverySent(true);
+                  }}
+                  className="text-[11px] text-neutral-400 underline underline-offset-4 transition-colors hover:text-[#d4af37] disabled:opacity-50"
+                >
+                  {recoverySent ? 'Recovery email requested — check your inbox' : 'Forgot password? Send a secure reset link'}
+                </button>
+              </div>
             </form>
 
             <div className="mt-6 flex items-center justify-between border-t border-white/[0.07] pt-4 text-[10.5px] text-neutral-400">
