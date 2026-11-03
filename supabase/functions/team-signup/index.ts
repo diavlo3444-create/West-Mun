@@ -40,7 +40,7 @@ const acceptanceMessage = (app: { full_name: string; team: string; section: stri
   const assignment = app.section
     ? `${app.section} section of the ${teamLabel(app.team)} team`
     : `${teamLabel(app.team)} team`;
-  return `Hi ${firstName},\n\nCongratulations! Your application to WEST MUN 2027 has been accepted for the ${assignment}.\n\n**Next step: create your team account**\n1. Open your private signup link: ${signupUrl}\n2. Sign up using the exact same email address you used in your application.\n3. Enter your full name as it appears on your application and create your password.\n\nThis invitation is personal to you and remains valid until it is used or revoked. Please do not share it.\n\nIf you have any trouble signing up, reply to this email for help.\n\nBest regards,\nWEST MUN 2027 Secretariat`;
+  return `Hi ${firstName},\n\nCongratulations! Your application to WEST MUN 2027 has been accepted for the ${assignment}.\n\n**Next step: create your team account**\n1. Open your private signup link: ${signupUrl}\n2. Sign up using the exact same email address you used in your application.\n3. Enter your full name as it appears on your application and create your password.\n\nThis invitation is personal to you and remains valid indefinitely until it is revoked or your application is no longer accepted. Please do not share it.\n\nIf you have any trouble signing up, reply to this email for help.\n\nBest regards,\nWEST MUN 2027 Secretariat`;
 };
 
 Deno.serve(async (req: Request) => {
@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
     const inviteResult = await db.from("team_signup_invites").select("id,registration_id,email,team,section,expires_at,redeemed_at,revoked_at,claimed_at,claim_id")
       .eq("token_hash", tokenHash).maybeSingle();
     const invite = inviteResult.data;
-    if (inviteResult.error || !invite || invite.revoked_at || invite.redeemed_at) {
+    if (inviteResult.error || !invite || invite.revoked_at) {
       return json({ error: "This signup link is invalid, expired, or already used. Ask your section head for a new link." }, 400);
     }
     if (email !== invite.email) return json({ error: "Please use the same email you applied with." }, 403);
@@ -180,14 +180,14 @@ Deno.serve(async (req: Request) => {
     const now = new Date();
     if (invite.claimed_at && new Date(invite.claimed_at).getTime() < now.getTime() - 10 * 60 * 1000) {
       await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-        .eq("id", invite.id).eq("claim_id", invite.claim_id).is("redeemed_at", null).is("revoked_at", null);
+        .eq("id", invite.id).eq("claim_id", invite.claim_id).is("revoked_at", null);
     } else if (invite.claimed_at) {
       return json({ error: "This signup link is currently being used. Wait a few minutes or ask your section head for a new link." }, 409);
     }
 
     const claimId = crypto.randomUUID();
     const claimResult = await db.from("team_signup_invites").update({ claimed_at: now.toISOString(), claim_id: claimId })
-      .eq("id", invite.id).eq("token_hash", tokenHash).is("claimed_at", null).is("redeemed_at", null).is("revoked_at", null)
+      .eq("id", invite.id).eq("token_hash", tokenHash).is("claimed_at", null).is("revoked_at", null)
       .select("id").maybeSingle();
     if (claimResult.error || !claimResult.data) return json({ error: "This signup link was just used or is no longer available. Ask your section head for a new link." }, 409);
 
@@ -216,14 +216,14 @@ Deno.serve(async (req: Request) => {
         const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
         if (!anonKey) {
           await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-            .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+            .eq("id", invite.id).eq("claim_id", claimId);
           return json({ error: "An account already exists for this email. Sign in with its existing password, or ask your section head for help." }, 409);
         }
         const verifier = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
         const verified = await verifier.auth.signInWithPassword({ email, password });
         if (verified.error || !verified.data.user) {
           await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-            .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+            .eq("id", invite.id).eq("claim_id", claimId);
           return json({ error: "An account already exists for this email. Use its existing password; this invitation has not been consumed." }, 409);
         }
         const existingUser = verified.data.user;
@@ -243,7 +243,7 @@ Deno.serve(async (req: Request) => {
           if (adminAssignment.error || headAssignment.error || activePass.error) {
             await verifier.auth.signOut();
             await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-              .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+              .eq("id", invite.id).eq("claim_id", claimId);
             return json({ error: "Could not verify the existing WEST MUN assignment. The invitation is still available; contact the Secretariat." }, 500);
           }
           conflictingAssignment = Boolean(adminAssignment.data || headAssignment.data || activePass.data);
@@ -258,7 +258,7 @@ Deno.serve(async (req: Request) => {
           if (oldRegistration.error || activePass.error) {
             await verifier.auth.signOut();
             await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-              .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+              .eq("id", invite.id).eq("claim_id", claimId);
             return json({ error: "Could not verify the existing WEST MUN assignment. The invitation is still available; contact the Secretariat." }, 500);
           }
           // A prior assignment is still protected only while its application is
@@ -270,7 +270,7 @@ Deno.serve(async (req: Request) => {
         if (conflictingAssignment) {
           await verifier.auth.signOut();
           await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-            .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+            .eq("id", invite.id).eq("claim_id", claimId);
           return json({ error: "This email already has a different WEST MUN assignment. Contact the Secretariat to resolve the account before using this invitation." }, 409);
         }
         previousAppMetadata = { ...existingMeta };
@@ -293,27 +293,27 @@ Deno.serve(async (req: Request) => {
         await verifier.auth.signOut();
         if (linked.error || !linked.data.user) {
           await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-            .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+            .eq("id", invite.id).eq("claim_id", claimId);
           console.error("[team-signup] Existing account assignment failed", { error: (linked.error?.message || "").slice(0, 160) });
           return json({ error: "Your existing account was verified, but its team assignment could not be updated. The invitation is still available; contact the Secretariat." }, 500);
         }
         accountUserId = existingUser.id;
       } else {
         await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-          .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+          .eq("id", invite.id).eq("claim_id", claimId);
         console.error("[team-signup] Auth account creation failed", { error: msg.slice(0, 160) });
         return json({ error: "Could not create the account. The invitation is still available; try again shortly." }, 500);
       }
     }
     if (!accountUserId) {
       await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-        .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+        .eq("id", invite.id).eq("claim_id", claimId);
       return json({ error: "Could not verify the account. The invitation is still available; try again shortly." }, 500);
     }
 
     const finalized = await db.from("team_signup_invites").update({
-      redeemed_at: new Date().toISOString(), claimed_at: null, claim_id: null,
-    }).eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null).is("revoked_at", null).select("id").maybeSingle();
+      claimed_at: null, claim_id: null,
+    }).eq("id", invite.id).eq("claim_id", claimId).is("revoked_at", null).select("id").maybeSingle();
     if (finalized.error || !finalized.data) {
       let rollbackFailed = false;
       if (createdNewUser && accountUserId) {
@@ -324,7 +324,7 @@ Deno.serve(async (req: Request) => {
         rollbackFailed = Boolean(rollback.error);
       }
       await db.from("team_signup_invites").update({ claimed_at: null, claim_id: null })
-        .eq("id", invite.id).eq("claim_id", claimId).is("redeemed_at", null);
+        .eq("id", invite.id).eq("claim_id", claimId);
       console.error("[team-signup] Invite finalization failed", { rollback_failed: rollbackFailed });
       return json({ error: "Signup could not be finalized safely. Your link has not been consumed; please try again." }, 500);
     }
@@ -348,7 +348,7 @@ async function issueInvite(
   const now = new Date();
   const expires = new Date("9999-12-31T23:59:59.999Z");
   const revoke = await db.from("team_signup_invites").update({ revoked_at: now.toISOString() })
-    .eq("registration_id", app.id).is("redeemed_at", null).is("revoked_at", null);
+    .eq("registration_id", app.id).is("revoked_at", null);
   if (revoke.error) return json({ error: "Could not replace the previous signup link." }, 500);
   const inserted = await db.from("team_signup_invites").insert({
     registration_id: app.id,
@@ -367,7 +367,7 @@ async function issueInvite(
     success: true,
     signupUrl: `${siteUrl}/signup#token=${token}`,
     message: acceptanceMessage(app, `${siteUrl}/signup#token=${token}`),
-    expiresAt: "No expiry (valid until used or revoked)",
+    expiresAt: "No expiry (valid until explicitly revoked or application is no longer accepted)",
     applicantEmail: email,
     team: canonicalTeam(app.team),
     section: app.section,
