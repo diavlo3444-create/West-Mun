@@ -86,10 +86,28 @@ export const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = (
   hint,
 }) => {
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>(initialCountry);
-  const [nationalNumber, setNationalNumber] = useState<string>('');
+  const [nationalNumber, setNationalNumber] = useState<string>(() => {
+    if (!value) return '';
+    return value.replace(/^\+\d+\s*/, '');
+  });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [touched, setTouched] = useState(false);
+
+  // Sync external value when restoring draft
+  useEffect(() => {
+    if (value && value !== nationalNumber) {
+      if (value.startsWith('+')) {
+        const parsed = parsePhoneNumberFromString(value);
+        if (parsed && parsed.country) {
+          setSelectedCountry(parsed.country);
+          setNationalNumber(parsed.formatNational());
+          return;
+        }
+      }
+      setNationalNumber(value);
+    }
+  }, [value]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);

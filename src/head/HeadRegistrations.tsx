@@ -45,6 +45,7 @@ import { supabase } from '../lib/supabase';
 import type { SectionKey } from './departments';
 import { SECURITY_QUESTIONS, countWords, extractSecurityAnswers, getWordCountFeedback } from '../lib/securityQuestions';
 import { VOLUNTEER_QUESTIONS, extractVolunteerAnswers, getVolunteerWordCountFeedback } from '../lib/volunteerQuestions';
+import { extractApplicantProfile, stripProfileMarker } from '../lib/applicantProfile';
 
 type StatusTab = 'all' | 'pending' | 'approved' | 'accepted-secretariat' | 'waitlisted' | 'rejected';
 
@@ -886,6 +887,81 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
               </div>
             </div>
 
+            {/* Candidate Profile & Emergency Contact Card */}
+            {(() => {
+              const prof = extractApplicantProfile(activeItem);
+              const hasAny = Boolean(
+                prof.gender ||
+                prof.dateOfBirth ||
+                prof.educationLevel ||
+                prof.guardianName ||
+                prof.guardianPhone ||
+                prof.attendanceAvailability ||
+                prof.certificates ||
+                prof.medicalNotes
+              );
+              if (!hasAny) return null;
+
+              return (
+                <div className="rounded-md border border-[#d4af37]/35 bg-[#12110c] p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-[#d4af37]/20 pb-2">
+                    <span className="text-[9.5px] font-mono uppercase tracking-[0.14em] text-[#d4af37] font-semibold">
+                      Candidate Profile & Emergency Contact
+                    </span>
+                    {prof.attendanceAvailability && (
+                      <span className="text-[9px] font-mono px-2 py-0.5 rounded-sm bg-[#d4af37]/15 text-[#d4af37]">
+                        Availability: {prof.attendanceAvailability}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5 text-[11px] sm:grid-cols-3">
+                    {prof.gender && (
+                      <div>
+                        <span className="block text-[8.5px] font-mono uppercase text-neutral-400">Gender</span>
+                        <span className="capitalize text-neutral-200">{prof.gender}</span>
+                      </div>
+                    )}
+                    {prof.dateOfBirth && (
+                      <div>
+                        <span className="block text-[8.5px] font-mono uppercase text-neutral-400">Date of Birth</span>
+                        <span className="text-neutral-200">{prof.dateOfBirth}</span>
+                      </div>
+                    )}
+                    {prof.educationLevel && (
+                      <div>
+                        <span className="block text-[8.5px] font-mono uppercase text-neutral-400">Education Stage</span>
+                        <span className="text-neutral-200">{prof.educationLevel}</span>
+                      </div>
+                    )}
+                    {prof.guardianName && (
+                      <div>
+                        <span className="block text-[8.5px] font-mono uppercase text-neutral-400">Guardian / Emergency</span>
+                        <span className="text-neutral-200">{prof.guardianName} {prof.guardianRelationship ? `(${prof.guardianRelationship})` : ''}</span>
+                      </div>
+                    )}
+                    {prof.guardianPhone && (
+                      <div>
+                        <span className="block text-[8.5px] font-mono uppercase text-neutral-400">Guardian Phone</span>
+                        <span className="font-mono text-neutral-200">{prof.guardianPhone}</span>
+                      </div>
+                    )}
+                    {prof.certificates && (
+                      <div className="col-span-2 sm:col-span-3">
+                        <span className="block text-[8.5px] font-mono uppercase text-neutral-400">Certificates / Qualifications</span>
+                        <span className="text-neutral-200">{prof.certificates}</span>
+                      </div>
+                    )}
+                    {prof.medicalNotes && prof.medicalNotes !== 'None reported' && (
+                      <div className="col-span-2 sm:col-span-3">
+                        <span className="block text-[8.5px] font-mono uppercase text-neutral-400">Medical Accommodations</span>
+                        <span className="text-amber-300">{prof.medicalNotes}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
             {activeItem.experience && (
               <div>
                 <h3 className="mb-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
@@ -902,10 +978,10 @@ export const HeadRegistrations: React.FC<HeadRegistrationsProps> = ({
               !activeItem.statement.startsWith('=== VOLUNTEER TEAM ASSESSMENT ===') && (
               <div>
                 <h3 className="mb-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-neutral-400">
-                  Statement of motivation
+                  Statement of motivation / Responses
                 </h3>
                 <div className="wm-scroll max-h-32 overflow-y-auto whitespace-pre-wrap rounded-md border border-white/[0.07] bg-[#101013] p-3 text-[11.5px] leading-relaxed text-neutral-300">
-                  {stripExtraPhotoMarker(activeItem.statement)}
+                  {stripProfileMarker(stripExtraPhotoMarker(activeItem.statement))}
                 </div>
               </div>
             )}
