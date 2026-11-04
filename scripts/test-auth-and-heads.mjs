@@ -92,6 +92,26 @@ const server = createServer(async (req, res) => {
     return json(res, 200, { id: uid });
   }
 
+  if (path === '/auth/v1/invite' && req.method === 'POST') {
+    state.generateLinkCalls += 1;
+    const body = await readBody(req);
+    const existing = state.users.find((u) => u.email === body.email);
+    if (existing) {
+      return json(res, 422, { code: 422, msg: 'User already registered' });
+    }
+    const user = {
+      id: '44444444-4444-4444-8444-444444444444',
+      email: body.email,
+      user_metadata: body.data || {},
+    };
+    state.users.push(user);
+    return json(res, 200, user);
+  }
+
+  if (path === '/auth/v1/recover' && req.method === 'POST') {
+    return json(res, 200, {});
+  }
+
   if (path === '/auth/v1/admin/generate_link' && req.method === 'POST') {
     state.generateLinkCalls += 1;
     const body = await readBody(req);
@@ -102,7 +122,7 @@ const server = createServer(async (req, res) => {
     const user = existing || {
       id: '44444444-4444-4444-8444-444444444444',
       email: body.email,
-      user_metadata: body.data || {},
+      user_metadata: body.data || body.options?.data || {},
     };
     if (!existing) state.users.push(user);
     return json(res, 200, {

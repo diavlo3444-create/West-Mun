@@ -63,7 +63,10 @@ export const TiltCard3D: React.FC<TiltCard3DProps> = ({
   }, [isCoarse]);
 
   const cardTransform = useMemo(() => {
-    if (isCoarse || !transform.isHovered) {
+    if (isCoarse) {
+      return 'none';
+    }
+    if (!transform.isHovered) {
       return 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
     }
     return `perspective(1000px) rotateX(${transform.rx.toFixed(2)}deg) rotateY(${transform.ry.toFixed(2)}deg) scale3d(${scale}, ${scale}, ${scale})`;
@@ -78,7 +81,7 @@ export const TiltCard3D: React.FC<TiltCard3DProps> = ({
       className={`relative overflow-hidden ${className}`}
       style={{
         transform: cardTransform,
-        transformStyle: 'preserve-3d',
+        transformStyle: isCoarse ? 'flat' : 'preserve-3d',
         transition: transform.isHovered
           ? 'transform 0.08s ease-out, box-shadow 0.25s ease, border-color 0.25s ease'
           : 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease, border-color 0.4s ease',

@@ -467,41 +467,62 @@ export async function handleCreateHeadAccount(
       let invitationLink: string | undefined;
 
       if (isInvite) {
-        // IMPORTANT: generateLink() only creates an action URL; it does not send an email.
-        // Use inviteUserByEmail() so Supabase Auth actually submits the invitation email.
-        const { data: invData, error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-          cleanEmail,
-          {
+        // Try generateLink first so we get the action_link URL for the invitation
+        const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'invite',
+          email: cleanEmail,
+          options: {
+            redirectTo: `${origin}/head?type=invite`,
             data: {
               full_name: cleanName,
               department: cleanDept,
               section: cleanSec,
             },
-            redirectTo: `${origin}/head?type=invite`,
-          }
-        );
+          },
+        });
 
-        if (!invErr && invData?.user) {
-          authUser = invData.user;
-        } else if (invErr && invErr.message?.toLowerCase().includes('already')) {
-          // Existing accounts need a recovery email, not a generated link that nobody receives.
+        if (!linkErr && linkData?.user) {
+          authUser = linkData.user;
+          invitationLink = linkData.properties?.action_link;
+        } else if (linkErr && linkErr.message?.toLowerCase().includes('already')) {
+          // Existing accounts: reuse Auth user and generate recovery link
           const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
           if (listErr) throw new Error(`Could not verify existing account: ${listErr.message}`);
 
           const existing = listData?.users?.find(
             (u) => u.email?.toLowerCase().trim() === cleanEmail
           );
-          if (!existing) throw new Error(invErr.message);
+          if (!existing) throw new Error(linkErr.message);
 
           authUser = existing;
-          const { error: recoveryErr } = await supabaseAdmin.auth.resetPasswordForEmail(cleanEmail, {
-            redirectTo: `${origin}/head?type=recovery`,
+          const { data: recoveryData, error: recoveryErr } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'recovery',
+            email: cleanEmail,
+            options: {
+              redirectTo: `${origin}/head?type=recovery`,
+            },
           });
-          if (recoveryErr) {
-            throw new Error(`Account exists, but the recovery email could not be submitted: ${recoveryErr.message}`);
+          if (!recoveryErr && recoveryData?.properties?.action_link) {
+            invitationLink = recoveryData.properties.action_link;
           }
         } else {
-          throw new Error(invErr?.message || 'Failed to submit the Supabase Auth invitation email.');
+          // Fallback: inviteUserByEmail
+          const { data: invData, error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+            cleanEmail,
+            {
+              data: {
+                full_name: cleanName,
+                department: cleanDept,
+                section: cleanSec,
+              },
+              redirectTo: `${origin}/head?type=invite`,
+            }
+          );
+          if (!invErr && invData?.user) {
+            authUser = invData.user;
+          } else {
+            throw new Error(invErr?.message || linkErr?.message || 'Failed to submit the Supabase Auth invitation email.');
+          }
         }
       } else {
         // Direct password provisioning in Supabase Auth

@@ -58,9 +58,11 @@ const SecretariatAvatar: React.FC<{
       src={currentSrc}
       alt={name}
       onError={handleError}
+      width={128}
+      height={128}
+      decoding="async"
       className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${positionClass || 'object-center'}`}
       style={objectPosition ? { objectPosition } : undefined}
-      loading="lazy"
       referrerPolicy="no-referrer"
     />
   );
@@ -94,16 +96,16 @@ export const SecretariatSection: React.FC = React.memo(() => {
     let imageUrl = safeUrl(r.image_url) || undefined;
     let fallbackImage: string | undefined;
 
-    // Resolve any ImgBB page URL to direct image link
-    if (imageUrl && imageUrl.includes('ibb.co/9RcgM85')) {
-      imageUrl = 'https://i.ibb.co/L4YRGk7/Whats-App-Image-2026-10-27-at-8-52-57-PM.jpg';
-      fallbackImage = '/ibrahim-khan.jpg';
+    // Resolve any ImgBB page URL or remote Ibrahim image to the local reliable asset first
+    if (imageUrl && (imageUrl.includes('ibb.co') || imageUrl.includes('ibrahim'))) {
+      imageUrl = '/ibrahim-khan.jpg';
+      fallbackImage = 'https://i.ibb.co/L4YRGk7/Whats-App-Image-2026-10-27-at-8-52-57-PM.jpg';
     }
 
     if (isUsg) {
       name = 'Ibrahim Khan';
-      imageUrl = 'https://i.ibb.co/L4YRGk7/Whats-App-Image-2026-10-27-at-8-52-57-PM.jpg';
-      fallbackImage = '/ibrahim-khan.jpg';
+      imageUrl = '/ibrahim-khan.jpg';
+      fallbackImage = 'https://i.ibb.co/L4YRGk7/Whats-App-Image-2026-10-27-at-8-52-57-PM.jpg';
     } else if (isAdvisor) {
       // Senior Advisor Muaz El Amir
       if (!imageUrl || imageUrl.includes('i.ibb.co')) {

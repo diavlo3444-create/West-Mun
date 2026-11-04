@@ -9,7 +9,9 @@ import {
   LogOut,
   Globe,
   QrCode,
+  Network,
 } from 'lucide-react';
+import { RolesDashboard } from './roles/RolesDashboard';
 import { supabase } from '../lib/supabase';
 import { WebsiteEditor } from '../admin/WebsiteEditor';
 import {
@@ -29,7 +31,6 @@ import {
   type HeadStats,
 } from './HeadOverview';
 import { HeadRegistrations } from './HeadRegistrations';
-import { HeadDepartment } from './HeadDepartment';
 import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 import { HeadSponsorsManager } from './HeadSponsorsManager';
 import { HeadInquiriesManager } from './HeadInquiriesManager';
@@ -40,7 +41,6 @@ import { DepartmentWorkspace } from './DepartmentWorkspace';
 import { GroupManagementDashboard } from './groups/GroupManagementDashboard';
 import { ShiftManagementDashboard } from './shifts/ShiftManagementDashboard';
 import type { WmTeamGroup } from './services/operationsStore';
-import { HeadCoHeadManagement } from './HeadCoHeadManagement';
 import { WorkspaceModuleGrid, WorkspaceOverview } from './WorkspaceOverview';
 import {
   createDepartmentRecord,
@@ -74,11 +74,9 @@ interface DepartmentDashboardProps {
 type HeadView =
   | 'overview'
   | 'registrations'
-  | 'department'
   | 'sponsors'
   | 'inquiries'
   | 'dcc-applications'
-  | 'cohead-management'
   | string;
 
 function explainAccessError(error: { code?: string; message?: string } | null | undefined): string {
@@ -145,7 +143,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (initialView === 'shifts' && operationsAccess) return 'shifts';
     // Operational heads land directly in custom sections/roles.
     if (operationsAccess) return 'groups';
-    if (initialView === 'department') return 'department';
     if (initialView === 'registrations' && registrationAccess) return 'registrations';
     if (initialView && workspaceModules.some((module) => module.id === initialView)) return initialView;
     return 'overview';
@@ -153,8 +150,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
   const [registrations, setRegistrations] = useState<HeadRegistration[]>([]);
   const [selectedGroupForShift, setSelectedGroupForShift] = useState<WmTeamGroup | null>(null);
-  const [coHeads, setCoHeads] = useState<Array<{user_id:string;full_name:string;email:string;phone?:string|null;gender?:string|null}>>([]);
-  const [coHeadsError, setCoHeadsError] = useState("");
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [announcements, setAnnouncements] = useState<HeadAnnouncement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -324,19 +319,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     loadDepartmentData();
   }, [loadDepartmentData]);
 
-  useEffect(() => {
-    let active = true;
-    if (qrPassOnly || !supabase) return;
-    supabase.functions.invoke("wm-eb-access", { body: { action: "list_my_coheads", department, section: section || null } })
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error || !data?.success) { setCoHeadsError(data?.error || "Co-Head list unavailable."); return; }
-        setCoHeads(data.coHeads || []);
-        setCoHeadsError("");
-      })
-      .catch(() => { if (active) setCoHeadsError("Co-Head list unavailable."); });
-    return () => { active = false; };
-  }, [department, section, qrPassOnly]);
 
   useEffect(() => {
     document.title = `WEST MUN 2027 — ${meta.label} Dashboard`;
@@ -551,7 +533,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (id === 'sponsors' && !isPr) return;
     if (id === 'inquiries' && !isHr) return;
     if (['hr-applicants', 'hr-delegates', 'hr-chair', 'team-members'].includes(id) && !isHr) return;
-    if (isHr && ['cohead-management', 'department'].includes(id)) return;
     if (id === 'dcc-committees' && !committeeAccess) return;
     if (id === 'dcc-applications' && !committeeAccess) return;
     setView(id);
@@ -576,7 +557,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         ...(registrationAccess
           ? [{ id: 'registrations', label: 'Registrations', icon: Users, badge: stats.pending }]
           : []),
-        { id: 'groups', label: 'Sections / Roles', icon: Users },
+        ...(rolesAccess ? [{ id: 'roles', label: 'Roles', icon: Network }] : []),
+        { id: 'groups', label: 'Team groups', icon: Users },
         { id: 'shifts', label: 'Shifts', icon: Building2 },
       ]
     : [
@@ -584,12 +566,11 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           ? [{ id: 'registrations', label: 'Applications', icon: Users, badge: stats.pending }]
           : []),
         ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
-        ...(isHr ? [{ id: 'hr-delegates', label: 'Delegates', icon: Users }, { id: 'hr-chair', label: 'Chair', icon: Award }, { id: 'team-members', label: 'Team Members', icon: Users }, { id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
+        ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
+        ...(isHr ? [{ id: 'hr-delegates', label: 'Delegates', icon: Users }, { id: 'hr-chair', label: 'Chair', icon: Award }, { id: 'team-members', label: 'Team Members', icon: Users }] : []),
         ...(committeeAccess ? [{ id: 'dcc-applications', label: 'Applications', icon: Users }] : []),
         ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
         ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
-        ...(!isHr ? [{ id: 'cohead-management', label: 'Co-Head Management', icon: Users }] : []),
-        ...(!isHr ? [{ id: 'department', label: 'Assignment', icon: Building2 }] : []),
         ...(securityScannerAccess ? [{ id: 'security-website', label: 'Security Scanner', icon: QrCode }] : []),
       ];
 
@@ -612,7 +593,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
       : view === 'shifts'
         ? 'Shifts & Roster'
       : view === 'groups'
-        ? 'Sections / Roles'
+        ? 'Custom Team Groups'
       : view === 'website-editor'
         ? 'Website CMS'
         : view === 'registrations'
@@ -633,10 +614,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
                   ? 'Committee Management'
                 : view === 'dcc-applications'
                   ? 'Chair & Delegate Applications'
-                : view === 'cohead-management'
-                  ? 'Co-Head Management'
-                : view === 'department'
-                  ? 'Assignment'
                   : activeModule?.label || 'Workspace';
 
   const displayName = (headName && headName.trim()) || headEmail.split('@')[0] || 'Department head';
@@ -738,24 +715,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
 
         {view === 'overview' && registrationAccess && (
           <>
-            {coHeads.length > 0 && (
-              <section className="mb-5 rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/[0.06] p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-[#f3e5ab]">Your Co-Head{coHeads.length === 1 ? "" : "s"}</h2>
-                  <span className="rounded-full border border-[#d4af37]/30 px-2 py-0.5 text-[10px] text-[#e5c158]">{coHeads.length}</span>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {coHeads.map((member) => (
-                    <div key={member.user_id} className="rounded-lg border border-white/[0.08] bg-black/20 p-3">
-                      <p className="text-sm font-medium text-white">{member.full_name}</p>
-                      <p className="mt-1 text-xs text-neutral-400">{member.email}</p>
-                      {member.phone && <p className="mt-1 text-xs text-neutral-500">{member.phone}</p>}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-            {coHeadsError && <p className="mb-4 text-xs text-neutral-500">{coHeadsError}</p>}
             <HeadOverview
               meta={meta}
               section={section}
@@ -841,9 +800,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         {view === 'dcc-committees' && committeeAccess && <DCCCommitteeManager />}
         {view === 'dcc-applications' && committeeAccess && <DCCApplicationsManager />}
 
-        {view === 'cohead-management' && !isHr && (
-          <HeadCoHeadManagement department={department} section={section} headName={headName} />
-        )}
 
         {view === 'groups' && operationsAccess && (
           <GroupManagementDashboard
@@ -866,7 +822,14 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           />
         )}
 
-
+        {view === 'roles' && rolesAccess && (
+          <RolesDashboard
+            department={department}
+            section={section}
+            departmentLabel={meta?.label || department}
+            testToken={testMode?.token || null}
+          />
+        )}
 
         {view === 'website-editor' && isCmsDepartment && (
           <WebsiteEditor authorName={displayName} authorEmail={headEmail} />
@@ -886,19 +849,6 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           </div>
         )}
 
-        {view === 'department' && !isHr && (
-          <HeadDepartment
-            meta={meta}
-            section={section}
-            headName={headName}
-            headEmail={headEmail}
-            isOpen={isOpen}
-            stats={stats}
-            registrationAccess={registrationAccess}
-            onOpenRegistrations={() => setView('registrations')}
-            onOpenWorkspace={() => setView(workspaceModules[0]?.id || 'overview')}
-          />
-        )}
 
         {activeModule && (
           <DepartmentWorkspace

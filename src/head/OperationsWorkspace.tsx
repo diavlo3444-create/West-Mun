@@ -16,7 +16,7 @@ type Props = {
 type Tab = 'groups' | 'shifts';
 
 const tabs: { id: Tab; label: string; description: string; icon: React.ReactNode }[] = [
-  { id: 'groups', label: 'Sections / Roles', description: 'Create custom roles and assign team members.', icon: <Users size={17} /> },
+  { id: 'groups', label: 'Team groups', description: 'Create custom roles and assign team members.', icon: <Users size={17} /> },
   { id: 'shifts', label: 'Shifts', description: 'Schedule coverage and assign shifts.', icon: <Clock3 size={17} /> },
 ];
 

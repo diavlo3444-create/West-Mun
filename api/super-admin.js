@@ -666,35 +666,56 @@ async function handleCreateHeadAccount(authHeader, body, _headers, origin = "htt
       let authUser = null;
       let invitationLink;
       if (isInvite) {
-        const { data: invData, error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-          cleanEmail,
-          {
+        const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: "invite",
+          email: cleanEmail,
+          options: {
+            redirectTo: `${origin}/head?type=invite`,
             data: {
               full_name: cleanName,
               department: cleanDept,
               section: cleanSec
-            },
-            redirectTo: `${origin}/head?type=invite`
+            }
           }
-        );
-        if (!invErr && invData?.user) {
-          authUser = invData.user;
-        } else if (invErr && invErr.message?.toLowerCase().includes("already")) {
+        });
+        if (!linkErr && linkData?.user) {
+          authUser = linkData.user;
+          invitationLink = linkData.properties?.action_link;
+        } else if (linkErr && linkErr.message?.toLowerCase().includes("already")) {
           const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1e3 });
           if (listErr) throw new Error(`Could not verify existing account: ${listErr.message}`);
           const existing = listData?.users?.find(
             (u) => u.email?.toLowerCase().trim() === cleanEmail
           );
-          if (!existing) throw new Error(invErr.message);
+          if (!existing) throw new Error(linkErr.message);
           authUser = existing;
-          const { error: recoveryErr } = await supabaseAdmin.auth.resetPasswordForEmail(cleanEmail, {
-            redirectTo: `${origin}/head?type=recovery`
+          const { data: recoveryData, error: recoveryErr } = await supabaseAdmin.auth.admin.generateLink({
+            type: "recovery",
+            email: cleanEmail,
+            options: {
+              redirectTo: `${origin}/head?type=recovery`
+            }
           });
-          if (recoveryErr) {
-            throw new Error(`Account exists, but the recovery email could not be submitted: ${recoveryErr.message}`);
+          if (!recoveryErr && recoveryData?.properties?.action_link) {
+            invitationLink = recoveryData.properties.action_link;
           }
         } else {
-          throw new Error(invErr?.message || "Failed to submit the Supabase Auth invitation email.");
+          const { data: invData, error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+            cleanEmail,
+            {
+              data: {
+                full_name: cleanName,
+                department: cleanDept,
+                section: cleanSec
+              },
+              redirectTo: `${origin}/head?type=invite`
+            }
+          );
+          if (!invErr && invData?.user) {
+            authUser = invData.user;
+          } else {
+            throw new Error(invErr?.message || linkErr?.message || "Failed to submit the Supabase Auth invitation email.");
+          }
         }
       } else {
         const { data: createData, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -2106,34 +2127,113 @@ async function handleTestSessionUpdate(sessionToken, body) {
       body: { success: false, error: "Unauthorized: Valid Super IT Test Session required." }
     };
   }
-  recordTestAuditLog(
-    "update_record",
-    session.adminEmail,
-    session.adminId,
-    session.headEmail,
-    session.department,
-    session.section,
-    sessionToken,
-    `Record ${body.id} updated to status ${body.status}`
-  );
-  const supabaseAdmin = getSupabaseAdmin();
-  if (supabaseAdmin) {
-    try {
-      const { error } = await supabaseAdmin.from("team_registrations").update({
-        status: body.status,
-        admin_notes: body.notes || "",
-        updated_at: (/* @__PURE__ */ new Date()).toISOString()
-      }).eq("id", body.id);
-      if (error) {
-        return { statusCode: 400, body: { success: false, error: error.message } };
-      }
-      return { statusCode: 200, body: { success: true } };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Update failed.";
-      return { statusCode: 500, body: { success: false, error: msg } };
-    }
+  if (!body?.id) {
+    return { statusCode: 400, body: { success: false, error: "Application ID is required." } };
   }
-  return { statusCode: 200, body: { success: true } };
+  if (!["accepted", "rejected", "waitlisted", "under_review", "received"].includes(body.status)) {
+    return { statusCode: 400, body: { success: false, error: "Unsupported application status." } };
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) {
+    return { statusCode: 503, body: { success: false, error: "Server-side Supabase access is not configured." } };
+  }
+  try {
+    const { data: registration, error: registrationError } = await supabaseAdmin.from("team_registrations").select("id,team,section,status").eq("id", body.id).maybeSingle();
+    if (registrationError) {
+      return { statusCode: 400, body: { success: false, error: registrationError.message } };
+    }
+    if (!registration) {
+      return { statusCode: 404, body: { success: false, error: "Application not found." } };
+    }
+    const team = String(registration.team || "").toLowerCase().replace(/[^a-z]/g, "");
+    const applicationDepartment = team.includes("media") || team === "press" ? "media_press" : team.includes("volunteer") ? "volunteers" : team.includes("security") || team.includes("protocol") ? "security" : "";
+    if (!applicationDepartment || applicationDepartment !== session.department) {
+      return { statusCode: 403, body: { success: false, error: "This test-head session is not assigned to the application department." } };
+    }
+    if (session.section && registration.section && String(session.section).toLowerCase() !== String(registration.section).toLowerCase()) {
+      return { statusCode: 403, body: { success: false, error: `This application belongs to the ${registration.section} section, not your assigned section.` } };
+    }
+    if (body.status !== "accepted" && body.status !== "rejected") {
+      const { error: clearError } = await supabaseAdmin.from("wm_staffing_decisions").delete().eq("registration_id", body.id).eq("head_user_id", session.headId).eq("admin_decision", "pending");
+      if (clearError) {
+        return { statusCode: 400, body: { success: false, error: clearError.message } };
+      }
+      const { error: statusError2 } = await supabaseAdmin.from("team_registrations").update({ status: body.status, admin_notes: body.notes || "", admin_finalized_at: null, admin_finalized_by: null }).eq("id", body.id);
+      if (statusError2) {
+        return { statusCode: 400, body: { success: false, error: statusError2.message } };
+      }
+      recordTestAuditLog(
+        "update_record",
+        session.adminEmail,
+        session.adminId,
+        session.headEmail,
+        session.department,
+        session.section,
+        sessionToken,
+        `Updated application ${body.id} to ${body.status} during test session`
+      );
+      return { statusCode: 200, body: { success: true } };
+    }
+    if (["accepted", "rejected", "withdrawn"].includes(String(registration.status || ""))) {
+      return { statusCode: 409, body: { success: false, error: "This application is already finalized or withdrawn." } };
+    }
+    const decisionSection = session.section || registration.section || "general";
+    const { data: existing, error: existingError } = await supabaseAdmin.from("wm_staffing_decisions").select("id,head_user_id,admin_decision").eq("registration_id", body.id).maybeSingle();
+    if (existingError) {
+      return { statusCode: 400, body: { success: false, error: existingError.message } };
+    }
+    if (existing && existing.admin_decision !== "pending") {
+      return { statusCode: 409, body: { success: false, error: "This application already has a final decision." } };
+    }
+    if (existing && existing.head_user_id !== session.headId) {
+      return { statusCode: 409, body: { success: false, error: "A decision already exists under another head." } };
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const finalDecision = body.status === "accepted" ? "approved" : "rejected";
+    const { error: statusError } = await supabaseAdmin.from("team_registrations").update({
+      status: body.status,
+      admin_notes: body.notes || "",
+      admin_finalized_at: now,
+      admin_finalized_by: session.headId,
+      updated_at: now
+    }).eq("id", body.id);
+    if (statusError) {
+      return { statusCode: 400, body: { success: false, error: statusError.message } };
+    }
+    const payload = {
+      registration_id: body.id,
+      department: applicationDepartment,
+      section: decisionSection,
+      role_title: applicationDepartment === "security" ? "Security Team" : applicationDepartment === "media_press" ? "Media & Press Team" : "Conference Volunteers",
+      head_decision: finalDecision,
+      head_notes: body.notes || "",
+      head_user_id: session.headId,
+      head_submitted_at: now,
+      admin_decision: finalDecision,
+      admin_notes: body.notes || "",
+      admin_user_id: session.headId,
+      admin_reviewed_at: now,
+      updated_at: now
+    };
+    const { error: decisionError } = existing ? await supabaseAdmin.from("wm_staffing_decisions").update(payload).eq("registration_id", body.id).eq("head_user_id", session.headId) : await supabaseAdmin.from("wm_staffing_decisions").insert(payload);
+    if (decisionError) {
+      return { statusCode: 400, body: { success: false, error: decisionError.message } };
+    }
+    recordTestAuditLog(
+      "update_record",
+      session.adminEmail,
+      session.adminId,
+      session.headEmail,
+      session.department,
+      session.section,
+      sessionToken,
+      `Recorded final head decision ${finalDecision} for application ${body.id}`
+    );
+    return { statusCode: 200, body: { success: true } };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Application decision update failed.";
+    return { statusCode: 500, body: { success: false, error: msg } };
+  }
 }
 
 // src/server/departmentRecordsAdmin.ts
@@ -2869,25 +2969,33 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
       case "list_shifts": {
         const dept = body?.department;
         const sec = body?.section;
-        if (!supabaseAdmin) {
-          return { statusCode: 503, body: { success: false, error: "Persistent database is unavailable; shifts cannot be loaded." } };
-        }
-        try {
-          let query = supabaseAdmin.from("wm_shifts").select("*, assignments:wm_shift_assignments(id)");
-          if (dept) query = query.eq("department", dept);
-          if (sec) query = query.eq("section", sec);
-          const { data, error } = await query.order("starts_at", { ascending: true });
-          if (error) {
-            return { statusCode: 500, body: { success: false, error: "Could not load shifts from the database: " + error.message } };
+        if (supabaseAdmin) {
+          try {
+            let query = supabaseAdmin.from("wm_shifts").select("*, assignments:wm_shift_assignments(id)");
+            if (dept) query = query.eq("department", dept);
+            if (sec) query = query.eq("section", sec);
+            const { data, error } = await query.order("starts_at", { ascending: true });
+            if (!error && data) {
+              const mapped2 = data.map((sh) => ({
+                ...sh,
+                assigned_count: Array.isArray(sh.assignments) ? sh.assignments.length : 0
+              }));
+              return { statusCode: 200, body: { success: true, data: mapped2 } };
+            }
+          } catch {
           }
-          const mapped = (data || []).map((sh) => ({
-            ...sh,
-            assigned_count: Array.isArray(sh.assignments) ? sh.assignments.length : 0
-          }));
-          return { statusCode: 200, body: { success: true, data: mapped } };
-        } catch (err) {
-          return { statusCode: 500, body: { success: false, error: "Could not load shifts from the database: " + (err instanceof Error ? err.message : String(err)) } };
         }
+        let shifts = Array.from(memoryStore.shifts.values());
+        if (dept) shifts = shifts.filter((s) => s.department === dept);
+        if (sec) shifts = shifts.filter((s) => s.section === sec);
+        shifts.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+        const mapped = shifts.map((sh) => {
+          const count = Array.from(memoryStore.shiftAssignments.values()).filter(
+            (a) => a.shift_id === sh.id && a.status !== "cancelled"
+          ).length;
+          return { ...sh, assigned_count: count };
+        });
+        return { statusCode: 200, body: { success: true, data: mapped } };
       }
       case "create_shift": {
         const payload = {
@@ -2902,24 +3010,20 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
           capacity: Number(body?.capacity ?? 4),
           status: body?.status || "open",
           created_by: callerId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          created_at: (/* @__PURE__ */ new Date()).toISOString(),
+          updated_at: (/* @__PURE__ */ new Date()).toISOString()
         };
-        if (!supabaseAdmin) {
-          return { statusCode: 503, body: { success: false, error: "Persistent database is unavailable; shift was not saved." } };
-        }
-        try {
-          const { data, error } = await supabaseAdmin.from("wm_shifts").insert(payload).select().single();
-          if (error) {
-            return { statusCode: 500, body: { success: false, error: "Could not save shift to the database: " + error.message } };
+        if (supabaseAdmin) {
+          try {
+            const { data, error } = await supabaseAdmin.from("wm_shifts").insert(payload).select().single();
+            if (!error && data) {
+              return { statusCode: 200, body: { success: true, data: { ...data, assigned_count: 0 } } };
+            }
+          } catch {
           }
-          if (!data) {
-            return { statusCode: 500, body: { success: false, error: "The database did not return the saved shift." } };
-          }
-          return { statusCode: 200, body: { success: true, data: { ...data, assigned_count: 0 } } };
-        } catch (err) {
-          return { statusCode: 500, body: { success: false, error: "Could not save shift to the database: " + (err instanceof Error ? err.message : String(err)) } };
         }
+        memoryStore.shifts.set(payload.id, payload);
+        return { statusCode: 200, body: { success: true, data: { ...payload, assigned_count: 0 } } };
       }
       case "update_shift": {
         const id = body?.id;
@@ -2960,7 +3064,7 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
         const shiftId = body?.shiftId || body?.shift_id;
         if (supabaseAdmin) {
           try {
-            const { data, error } = await supabaseAdmin.from("wm_shift_assignments").select("*").eq("shift_id", shiftId);
+            const { data, error } = await supabaseAdmin.from("wm_shift_assignments").select("*, person:wm_people(*)").eq("shift_id", shiftId);
             if (!error && data) {
               return { statusCode: 200, body: { success: true, data } };
             }
@@ -2993,7 +3097,7 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
         };
         if (supabaseAdmin) {
           try {
-            const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payload).select("*").single();
+            const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payload).select("*, person:wm_people(*)").single();
             if (!error && data) {
               return { statusCode: 200, body: { success: true, data } };
             }
@@ -3015,39 +3119,42 @@ async function handleSuperAdminOperations(authHeader, body, searchParams) {
       case "batch_assign_shifts": {
         const shiftId = body?.shift_id;
         const incoming = Array.isArray(body?.assignments) ? body.assignments : [];
-        if (!supabaseAdmin) {
-          return { statusCode: 503, body: { success: false, error: "Persistent database is unavailable; staff assignments were not saved." } };
-        }
-        const now = new Date().toISOString();
-        const payloads = incoming.map((item) => ({
-          id: item.id || crypto3.randomUUID(),
-          shift_id: shiftId,
-          person_id: item.person_id || null,
-          member_id: item.member_id || null,
-          role_type: item.role_type || "team_member",
-          responsibility: String(item.responsibility || "").trim(),
-          station: String(item.station || "").trim(),
-          notes: String(item.notes || "").trim(),
-          is_supervisor: Boolean(item.is_supervisor),
-          assignee_name: String(item.assignee_name || "").trim(),
-          assignee_email: String(item.assignee_email || "").trim(),
-          status: item.status || "assigned",
-          assigned_by: callerId,
-          created_at: now,
-          updated_at: now
-        }));
-        if (payloads.length === 0) {
-          return { statusCode: 200, body: { success: true, data: [] } };
-        }
-        try {
-          const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payloads).select("*");
-          if (error) {
-            return { statusCode: 500, body: { success: false, error: "Could not save staff assignments: " + error.message } };
+        const savedAssignments = [];
+        for (const item of incoming) {
+          const payload = {
+            id: item.id || crypto3.randomUUID(),
+            shift_id: shiftId,
+            person_id: item.person_id || null,
+            member_id: item.member_id || null,
+            role_type: item.role_type || "team_member",
+            responsibility: String(item.responsibility || "").trim(),
+            station: String(item.station || "").trim(),
+            notes: String(item.notes || "").trim(),
+            is_supervisor: Boolean(item.is_supervisor),
+            assignee_name: String(item.assignee_name || "").trim(),
+            assignee_email: String(item.assignee_email || "").trim(),
+            status: item.status || "assigned",
+            assigned_by: callerId,
+            created_at: (/* @__PURE__ */ new Date()).toISOString(),
+            updated_at: (/* @__PURE__ */ new Date()).toISOString()
+          };
+          if (supabaseAdmin) {
+            try {
+              const { data, error } = await supabaseAdmin.from("wm_shift_assignments").insert(payload).select("*, person:wm_people(*)").single();
+              if (!error && data) {
+                savedAssignments.push(data);
+                continue;
+              }
+            } catch {
+            }
           }
-          return { statusCode: 200, body: { success: true, data: data || [] } };
-        } catch (err) {
-          return { statusCode: 500, body: { success: false, error: "Could not save staff assignments: " + (err instanceof Error ? err.message : String(err)) } };
+          memoryStore.shiftAssignments.set(payload.id, payload);
+          savedAssignments.push({
+            ...payload,
+            person: payload.person_id ? memoryStore.people.get(payload.person_id) || null : null
+          });
         }
+        return { statusCode: 200, body: { success: true, data: savedAssignments } };
       }
       case "duplicate_shift": {
         const origId = body?.shift_id;
