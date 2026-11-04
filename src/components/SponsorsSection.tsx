@@ -2,6 +2,29 @@ import React from 'react';
 import { usePublicTable, type SponsorRow } from '../lib/content';
 import { safeUrl } from '../lib/safe';
 
+const SponsorLogo: React.FC<{ src: string; name: string }> = ({ src, name }) => {
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  if (failed) {
+    return <span className="text-sm font-serif text-white">{name}</span>;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      loading="eager"
+      decoding="async"
+      onError={() => setFailed(true)}
+      className="block max-h-16 max-w-full w-auto object-contain"
+    />
+  );
+};
+
 /** Hidden until the first sponsor is added in the admin panel. */
 export const SponsorsSection: React.FC = React.memo(() => {
   const sponsors = usePublicTable<SponsorRow>('sponsors', []);
@@ -23,9 +46,7 @@ export const SponsorsSection: React.FC = React.memo(() => {
             const href = safeUrl(sp.website_url);
             const inner = (
               <div className="h-full p-5 bg-[#0e0e11] border border-neutral-800/90 hover:border-[#d4af37]/50 rounded-sm transition-colors flex flex-col items-center justify-center text-center gap-2 min-h-[120px]">
-                {logo ? (
-                  <img src={logo} alt={sp.name} loading="lazy" referrerPolicy="no-referrer" className="max-h-16 w-auto object-contain" />
-                ) : (
+                {logo ? <SponsorLogo src={logo} name={sp.name} /> : (
                   <span className="text-sm font-serif text-white">{sp.name}</span>
                 )}
                 {sp.tier && <span className="text-[10px] font-mono uppercase tracking-widest text-[#d4af37]">{sp.tier}</span>}
