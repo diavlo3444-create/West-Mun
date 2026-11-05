@@ -35,6 +35,7 @@ import { GoldenKeyUnlock } from './GoldenKeyUnlock';
 import { HeadSponsorsManager } from './HeadSponsorsManager';
 import { HeadInquiriesManager } from './HeadInquiriesManager';
 import { HrApplicantHub } from './HrApplicantHub';
+import { HrMagicMessaging } from './HrMagicMessaging';
 import { DCCCommitteeManager } from './DCCCommitteeManager';
 import { DCCApplicationsManager } from './DCCApplicationsManager';
 import { DepartmentWorkspace } from './DepartmentWorkspace';
@@ -136,7 +137,8 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (initialView === 'delegates' && isHr) return 'hr-delegates';
     if (initialView === 'chair' && isHr) return 'hr-chair';
     if (initialView === 'team-members' && isHr) return 'team-members';
-    if (isHr && !['inquiries', 'delegates', 'chair', 'team-members', 'hr-applicants'].includes(initialView || '')) return 'team-members';
+    if (initialView === 'hr-messages' && isHr) return 'hr-messages';
+    if (isHr && !['inquiries', 'delegates', 'chair', 'team-members', 'hr-applicants', 'hr-messages'].includes(initialView || '')) return 'team-members';
     if (initialView === 'dcc-applications' && department === 'dcc') return 'dcc-applications';
     if (initialView === 'dcc-committees' && department === 'dcc') return 'dcc-committees';
     if (['roles', 'groups'].includes(initialView || '') && operationsAccess) return 'groups';
@@ -532,7 +534,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
     if (id === 'roles' && !rolesAccess) return;
     if (id === 'sponsors' && !isPr) return;
     if (id === 'inquiries' && !isHr) return;
-    if (['hr-applicants', 'hr-delegates', 'hr-chair', 'team-members'].includes(id) && !isHr) return;
+    if (['hr-applicants', 'hr-delegates', 'hr-chair', 'team-members', 'hr-messages'].includes(id) && !isHr) return;
     if (id === 'dcc-committees' && !committeeAccess) return;
     if (id === 'dcc-applications' && !committeeAccess) return;
     setView(id);
@@ -567,7 +569,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
           : []),
         ...(isPr ? [{ id: 'sponsors', label: 'Sponsors', icon: Award }] : []),
         ...(isHr ? [{ id: 'inquiries', label: 'Inquiries', icon: MessageSquare }] : []),
-        ...(isHr ? [{ id: 'hr-delegates', label: 'Delegates', icon: Users }, { id: 'hr-chair', label: 'Chair', icon: Award }, { id: 'team-members', label: 'Team Members', icon: Users }] : []),
+        ...(isHr ? [{ id: 'hr-delegates', label: 'Delegates', icon: Users }, { id: 'hr-chair', label: 'Chair', icon: Award }, { id: 'team-members', label: 'Team Members', icon: Users }, { id: 'hr-messages', label: 'Magic Messaging', icon: MessageSquare }] : []),
         ...(committeeAccess ? [{ id: 'dcc-applications', label: 'Applications', icon: Users }] : []),
         ...(committeeAccess ? [{ id: 'dcc-committees', label: 'Committees', icon: Building2 }] : []),
         ...(isCmsDepartment ? [{ id: 'website-editor', label: 'Website CMS', icon: Globe }] : []),
@@ -608,8 +610,10 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
                   ? 'Team Member Applications'
                 : view === 'hr-delegates'
                   ? 'Delegate Applications'
-                : view === 'hr-chair'
+                 : view === 'hr-chair'
                   ? 'Chair Applications'
+                : view === 'hr-messages'
+                  ? 'Magic Messaging'
                 : view === 'dcc-committees'
                   ? 'Committee Management'
                 : view === 'dcc-applications'
@@ -796,6 +800,7 @@ export const DepartmentDashboard: React.FC<DepartmentDashboardProps> = ({
         {view === 'hr-delegates' && isHr && <HrApplicantHub area="delegates" />}
         {view === 'hr-chair' && isHr && <HrApplicantHub area="chair" />}
         {view === 'team-members' && isHr && <HrApplicantHub area="team" />}
+        {view === 'hr-messages' && isHr && <HrMagicMessaging />}
 
         {view === 'dcc-committees' && committeeAccess && <DCCCommitteeManager />}
         {view === 'dcc-applications' && committeeAccess && <DCCApplicationsManager />}
