@@ -7,6 +7,7 @@ type Template = { subject: string; body: string };
 type Counts = { total: number; ready: number; alreadyHandled: number; missingEmail: number };
 type Preview = { accepted: Counts; rejected: Counts; totalReady: number; providerConfigured: boolean };
 type Report = { sent: number; failed: number; skipped: number; errors: Array<{ name: string; reason: string }> };
+type HistoryRow = { id: string; applicant_type: string; recipient_email: string; recipient_name: string; subject: string; status: string; template_key: string; error_message: string | null; created_at: string; sent_at: string | null };
 
 const defaults: Record<'accepted' | 'rejected', Template> = {
   accepted: {
@@ -27,14 +28,19 @@ export const HrMagicMessaging: React.FC = () => {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [report, setReport] = useState<Report | null>(null);
+  const [history, setHistory] = useState<HistoryRow[]>([]);
 
   const refresh = useCallback(async () => {
     if (!supabase) { setError('Supabase is not configured.'); setLoading(false); return; }
     setLoading(true);
     setError('');
-    const { data, error: invokeError } = await supabase.functions.invoke('hr-bulk-email', { body: { action: 'preview' } });
+    const [{ data, error: invokeError }, historyResult] = await Promise.all([
+      supabase.functions.invoke('hr-bulk-email', { body: { action: 'preview' } }),
+      supabase.from('wm_email_messages').select('id,applicant_type,recipient_email,recipient_name,subject,status,template_key,error_message,created_at,sent_at').order('created_at', { ascending: false }).limit(20),
+    ]);
     if (invokeError || !data?.ok) setError(data?.error || invokeError?.message || 'Could not load messaging preview.');
     else setPreview(data.summary as Preview);
+    if (!historyResult.error) setHistory((historyResult.data || []) as HistoryRow[]);
     setLoading(false);
   }, []);
 
@@ -116,6 +122,10 @@ export const HrMagicMessaging: React.FC = () => {
           </Panel>
         ))}
       </div>
+      <Panel className="p-4 sm:p-5 space-y-3">
+        <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-white">Recent email history</h3><p className="mt-1 text-xs text-neutral-500">Latest 20 messages across all applicant groups.</p></div><span className="text-[10px] font-mono text-neutral-500">{history.length} records</span></div>
+        {history.length === 0 ? <p className="rounded-lg border border-dashed border-white/10 p-5 text-center text-xs text-neutral-500">No email messages have been logged yet.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead className="border-b border-white/10 text-[10px] uppercase tracking-wider text-neutral-500"><tr><th className="px-2 py-2">Applicant</th><th className="px-2 py-2">Group</th><th className="px-2 py-2">Template</th><th className="px-2 py-2">Status</th><th className="px-2 py-2">Date</th></tr></thead><tbody className="divide-y divide-white/[0.06]">{history.map((item) => <tr key={item.id}><td className="max-w-[220px] px-2 py-2"><p className="truncate text-neutral-200">{item.recipient_name || item.recipient_email}</p><p className="truncate text-[10px] text-neutral-500">{item.recipient_email}</p>{item.error_message && <p className="mt-1 text-[10px] text-rose-300">{item.error_message}</p>}</td><td className="px-2 py-2 capitalize text-neutral-300">{item.applicant_type === 'team' ? 'Team member' : item.applicant_type}</td><td className="px-2 py-2 capitalize text-neutral-300">{item.template_key}</td><td className="px-2 py-2"><span className={`rounded-full border px-2 py-1 text-[10px] uppercase ${item.status === 'sent' ? 'border-emerald-400/30 text-emerald-300' : item.status === 'failed' ? 'border-rose-400/30 text-rose-300' : 'border-amber-400/30 text-amber-300'}`}>{item.status}</span></td><td className="px-2 py-2 whitespace-nowrap text-neutral-500">{new Date(item.sent_at || item.created_at).toLocaleString()}</td></tr>)}</tbody></table></div>}
+      </Panel>
       {report && <Panel className="p-4 sm:p-5 space-y-3"><h3 className="text-sm font-semibold text-white">Latest send report</h3><div className="grid grid-cols-3 gap-3"><div><p className="text-[10px] text-neutral-500">Sent</p><p className="text-xl text-emerald-300">{report.sent}</p></div><div><p className="text-[10px] text-neutral-500">Failed</p><p className="text-xl text-rose-300">{report.failed}</p></div><div><p className="text-[10px] text-neutral-500">Skipped</p><p className="text-xl text-neutral-200">{report.skipped}</p></div></div>{report.errors.length > 0 && <ul className="space-y-1 text-xs text-rose-200">{report.errors.map((item, index) => <li key={index}>{item.name}: {item.reason}</li>)}</ul>}</Panel>}
       <p className="text-[11px] text-neutral-600">A queued or sent message is not automatically resent. Failed deliveries are logged and can be retried. A successful provider response confirms acceptance by Resend, not inbox delivery.</p>
     </div>
