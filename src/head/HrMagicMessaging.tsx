@@ -12,7 +12,7 @@ type HistoryRow = { id: string; applicant_type: string; recipient_email: string;
 const defaults: Record<'accepted' | 'rejected', Template> = {
   accepted: {
     subject: 'Your WEST MUN 2027 Application — Accepted',
-    body: 'Hello {name},\n\nCongratulations! Your application to WEST MUN 2027 has been accepted.\n\nDepartment / category: {department}\n\nFurther information and next steps will be shared by the WEST MUN Secretariat.\n\nBest regards,\nWEST MUN 2027 Secretariat',
+    body: 'Hello {name},\n\nCongratulations! Your application to WEST MUN 2027 has been accepted.\n\nDepartment / category: {department}\n\n{signup_link}\n\nFurther information and next steps will be shared by the WEST MUN Secretariat.\n\nBest regards,\nWEST MUN 2027 Secretariat',
   },
   rejected: {
     subject: 'Your WEST MUN 2027 Application Update',
@@ -109,7 +109,7 @@ export const HrMagicMessaging: React.FC = () => {
           ))}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[11px] text-neutral-500">Supported placeholders: <code>{'{name}'}</code>, <code>{'{department}'}</code>, <code>{'{institution}'}</code>.</p>
+          <p className="text-[11px] text-neutral-500">Supported placeholders: <code>{'{name}'}</code>, <code>{'{department}'}</code>, <code>{'{institution}'}</code>, <code>{'{signup_link}'}</code> (accepted team applicants).</p>
           <button type="button" onClick={() => void send()} disabled={loading || sending || !preview || preview.totalReady === 0 || !preview.providerConfigured} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#d4af37] px-5 py-3 text-xs font-semibold text-black transition hover:bg-[#e5c45d] disabled:cursor-not-allowed disabled:opacity-40">{sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}{sending ? 'Sending messages…' : `Send all notifications · ${preview?.totalReady ?? 0}`}</button>
         </div>
       </Panel>
@@ -127,7 +127,7 @@ export const HrMagicMessaging: React.FC = () => {
         {history.length === 0 ? <p className="rounded-lg border border-dashed border-white/10 p-5 text-center text-xs text-neutral-500">No email messages have been logged yet.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead className="border-b border-white/10 text-[10px] uppercase tracking-wider text-neutral-500"><tr><th className="px-2 py-2">Applicant</th><th className="px-2 py-2">Group</th><th className="px-2 py-2">Template</th><th className="px-2 py-2">Status</th><th className="px-2 py-2">Date</th></tr></thead><tbody className="divide-y divide-white/[0.06]">{history.map((item) => <tr key={item.id}><td className="max-w-[220px] px-2 py-2"><p className="truncate text-neutral-200">{item.recipient_name || item.recipient_email}</p><p className="truncate text-[10px] text-neutral-500">{item.recipient_email}</p>{item.error_message && <p className="mt-1 text-[10px] text-rose-300">{item.error_message}</p>}</td><td className="px-2 py-2 capitalize text-neutral-300">{item.applicant_type === 'team' ? 'Team member' : item.applicant_type}</td><td className="px-2 py-2 capitalize text-neutral-300">{item.template_key}</td><td className="px-2 py-2"><span className={`rounded-full border px-2 py-1 text-[10px] uppercase ${item.status === 'sent' ? 'border-emerald-400/30 text-emerald-300' : item.status === 'failed' ? 'border-rose-400/30 text-rose-300' : 'border-amber-400/30 text-amber-300'}`}>{item.status}</span></td><td className="px-2 py-2 whitespace-nowrap text-neutral-500">{new Date(item.sent_at || item.created_at).toLocaleString()}</td></tr>)}</tbody></table></div>}
       </Panel>
       {report && <Panel className="p-4 sm:p-5 space-y-3"><h3 className="text-sm font-semibold text-white">Latest send report</h3><div className="grid grid-cols-3 gap-3"><div><p className="text-[10px] text-neutral-500">Sent</p><p className="text-xl text-emerald-300">{report.sent}</p></div><div><p className="text-[10px] text-neutral-500">Failed</p><p className="text-xl text-rose-300">{report.failed}</p></div><div><p className="text-[10px] text-neutral-500">Skipped</p><p className="text-xl text-neutral-200">{report.skipped}</p></div></div>{report.errors.length > 0 && <ul className="space-y-1 text-xs text-rose-200">{report.errors.map((item, index) => <li key={index}>{item.name}: {item.reason}</li>)}</ul>}</Panel>}
-      <p className="text-[11px] text-neutral-600">A queued or sent message is not automatically resent. Failed deliveries are logged and can be retried. A successful provider response confirms acceptance by Resend, not inbox delivery.</p>
+      <p className="text-[11px] text-neutral-600">A queued or sent message is not automatically resent. Failed deliveries are logged and can be retried. Accepted team-member emails include a private account-creation link. A successful provider response confirms Gmail accepted the message, not inbox delivery.</p>
     </div>
   );
 };
