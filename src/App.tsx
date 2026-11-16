@@ -11,8 +11,7 @@ import { CommitteesSection } from './components/CommitteesSection';
 import { ScheduleSection } from './components/ScheduleSection';
 import { SecretariatSection } from './components/SecretariatSection';
 import { RegistrationSection } from './components/RegistrationSection';
-import { FAQSection } from './components/FAQSection';
-import { ContactSection } from './components/ContactSection';
+import { ExperienceSection } from './components/ExperienceSection';
 import { Footer } from './components/Footer';
 import { AnnouncementsSection } from './components/AnnouncementsSection';
 import { DocumentsSection } from './components/DocumentsSection';
@@ -64,8 +63,6 @@ export default function App() {
           schedule: 'schedule',
           secretariat: 'secretariat',
           registration: 'register',
-          faq: 'faq',
-          contact: 'contact',
           announcements: 'announcements',
           sponsors: 'sponsors',
           documents: 'documents',
@@ -164,11 +161,8 @@ export default function App() {
       {/* Sponsors (hidden until the first one is added) */}
       <SponsorsSection />
 
-      {/* J. Frequently Asked Questions */}
-      <FAQSection />
-
-      {/* K. Contact & Inquiries */}
-      <ContactSection />
+      {/* Final cinematic section: the WEST MUN delegate experience */}
+      <ExperienceSection />
 
       {/* User-Defined Custom CMS Sections */}
       <CustomSectionsRenderer sections={customSections} />
