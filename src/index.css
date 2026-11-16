@@ -1562,3 +1562,67 @@ body:not(.wm-app) .shimmer-platinum {
 #register .group:hover {
   box-shadow: none;
 }
+
+
+/* Editorial reset for the public conference site.
+   Prefer typography, real content and rules over repeated UI-card patterns. */
+body:not(.wm-app) .gold-gradient-text {
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  -webkit-text-fill-color: #d4af37 !important;
+  color: #d4af37 !important;
+}
+body:not(.wm-app) #intro [class*="grid"] > *,
+body:not(.wm-app) #highlights [class*="grid"] > *,
+body:not(.wm-app) #about [class*="grid"] > *,
+body:not(.wm-app) #committees [class*="grid"] > *,
+body:not(.wm-app) #secretariat [class*="grid"] > * {
+  box-shadow: none !important;
+}
+body:not(.wm-app) #intro [class*="grid"] > *,
+body:not(.wm-app) #highlights [class*="grid"] > * {
+  border-radius: 0 !important;
+}
+body:not(.wm-app) #intro [class*="grid"] > *,
+body:not(.wm-app) #highlights [class*="grid"] > * {
+  background: transparent !important;
+  border-width: 0 0 1px !important;
+  border-color: rgba(255,255,255,.13) !important;
+  padding-left: 0 !important;
+  padding-right: 1.25rem !important;
+}
+body:not(.wm-app) #intro [class*="grid"] > *:hover,
+body:not(.wm-app) #highlights [class*="grid"] > *:hover,
+body:not(.wm-app) #about [class*="grid"] > *:hover,
+body:not(.wm-app) #committees [class*="grid"] > *:hover,
+body:not(.wm-app) #secretariat [class*="grid"] > *:hover {
+  transform: none !important;
+  border-color: rgba(212,175,55,.35) !important;
+  box-shadow: none !important;
+}
+body:not(.wm-app) #intro [class*="grid"] > * > div:first-child,
+body:not(.wm-app) #highlights [class*="grid"] > * > div:first-child {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  transform: none !important;
+}
+body:not(.wm-app) #committees article,
+body:not(.wm-app) #secretariat article {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+body:not(.wm-app) #committees article:hover,
+body:not(.wm-app) #secretariat article:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+body:not(.wm-app) section[id] {
+  scroll-margin-top: 88px;
+}
+@media (max-width: 767px) {
+  body:not(.wm-app) section[id] {
+    padding-top: 4.5rem;
+    padding-bottom: 4.5rem;
+  }
+}
