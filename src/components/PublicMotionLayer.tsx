@@ -14,8 +14,8 @@ const CHAPTERS = [
 
 /**
  * Lightweight chapter navigation only.
- * Scroll-triggered text/card reveal effects are intentionally disabled so
- * content stays stable while scrolling. The cinematic hero remains untouched.
+ * Adds lightweight reveal animations to section headings, visual cards, and
+ * image panels as they enter the viewport. The cinematic hero remains untouched.
  */
 export function PublicMotionLayer() {
   const [activeChapter, setActiveChapter] = useState('intro');
@@ -37,10 +37,11 @@ export function PublicMotionLayer() {
     }, { threshold: [0.12, 0.3, 0.55], rootMargin: '-18% 0px -45% 0px' });
 
     chapterElements.forEach((section) => activeObserver.observe(section));
-    // Lightweight one-shot reveals: no scroll handlers or layout reads, and the hero video is untouched.
+    // One-shot reveals: animate headings, cards, and image panels without touching the cinematic hero video.
     const cardSelector = '#highlights [class*="grid"] > *, #committees [class*="grid"] > *, #schedule [class*="grid"] > *, #secretariat [class*="grid"] > *';
     const motionTargets = Array.from(document.querySelectorAll<HTMLElement>(
-      '#highlights h2, #about h2, #committees h2, #schedule h2, #secretariat h2, #register h2, #faq h2, #contact h2, ' + cardSelector
+      '#about h2, #committees h2, #schedule h2, #secretariat h2, #register h2, #faq h2, #contact h2, ' +
+      '#highlights h2, #highlights img, #about img, #committees img, #schedule img, #secretariat img, ' + cardSelector
     ));
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reducedMotion || !('IntersectionObserver' in window)) return () => activeObserver.disconnect();
