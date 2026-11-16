@@ -78,9 +78,9 @@ export const SecretariatSection: React.FC = React.memo(() => {
   // Keep Ibrahim Khan in the roster; his seeded profile and photo remain the default.
   const secretariat: TeamMember[] = rows
     .filter((r) => (r as SecretariatRow & { published?: boolean }).published !== false)
-    .filter((r) => !/zain\\s+firas|muaz\\s+el\\s*amir/i.test(r.name))
+    .filter((r) => !/zain\s+firas|muaz\s+el\s*amir/i.test(r.name))
     .map((r, i) => {
-      const isIbrahim = /ibrahim\\s+khan/i.test(r.name);
+      const isIbrahim = /ibrahim\s+khan/i.test(r.name);
       const image = safeUrl(r.image_url) || (isIbrahim ? '/ibrahim-khan.jpg' : undefined);
       return {
         role: r.role,
@@ -95,8 +95,8 @@ export const SecretariatSection: React.FC = React.memo(() => {
       };
     });
 
-  const ibrahimDefault = DEFAULT_SECRETARIAT.find((r) => /ibrahim\\s+khan/i.test(r.name));
-  if (ibrahimDefault && !secretariat.some((r) => /ibrahim\\s+khan/i.test(r.name))) {
+  const ibrahimDefault = DEFAULT_SECRETARIAT.find((r) => /ibrahim\s+khan/i.test(r.name));
+  if (ibrahimDefault && !secretariat.some((r) => /ibrahim\s+khan/i.test(r.name))) {
     secretariat.push({
       role: ibrahimDefault.role,
       name: ibrahimDefault.name,
