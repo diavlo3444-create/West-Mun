@@ -1537,3 +1537,28 @@ body:has(#hero) #faq h2 + p {
     transition: none;
   }
 }
+
+
+/* Public site: reduce template-like glow, shimmer and over-animated card effects. */
+body:not(.wm-app) .shimmer-gold,
+body:not(.wm-app) .shimmer-platinum {
+  animation: none !important;
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+#highlights::before,
+#about::before,
+#committees::before,
+#schedule::before,
+#secretariat::before,
+#register::before {
+  opacity: .22;
+  background: linear-gradient(180deg, rgba(255,255,255,.012), transparent 45%, rgba(0,0,0,.08));
+}
+#highlights .group:hover,
+#about .group:hover,
+#committees .group:hover,
+#secretariat .group:hover,
+#register .group:hover {
+  box-shadow: none;
+}
