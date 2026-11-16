@@ -18,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
   navVisible = true,
 }) => {
   const { t, navLinks } = useCmsContent();
+  const visibleNavLinks = navLinks.filter((link) => !['#faq', '#contact'].includes(link.href.toLowerCase()));
   const regLabel = t('nav_cta_label', 'Registration: TBA');
   const regHref = t('nav_cta_href', '#register');
   const brandTitle = t('nav_brand_title', 'WEST MUN');
@@ -110,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
             className="hidden lg:flex items-center gap-7 text-sm font-medium tracking-wide text-neutral-300"
             aria-label="Desktop Navigation"
           >
-            {navLinks.map((link) => (
+            {visibleNavLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
