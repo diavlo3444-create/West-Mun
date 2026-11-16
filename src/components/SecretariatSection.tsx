@@ -74,67 +74,26 @@ export const SecretariatSection: React.FC = React.memo(() => {
   const rows = usePublicTable<SecretariatRow>('secretariat', DEFAULT_SECRETARIAT);
   const positionClass = { center: 'object-center', top: 'object-top', bottom: 'object-bottom' } as const;
 
+  // The database is the source of truth so organiser edits appear on the public site.
+  // Keep Ibrahim Khan in the roster; his seeded profile and photo remain the default.
   const secretariat: TeamMember[] = rows
-    .filter((r) => r.id !== 'd-sec-4' && !/zain\s+firas|muaz\s+el\s*amir/i.test(r.name))
+    .filter((r) => (r as SecretariatRow & { published?: boolean }).published !== false)
+    .filter((r) => r.id !== 'd-sec-4' && !/zain\\s+firas|muaz\\s+el\\s*amir/i.test(r.name))
     .map((r, i) => {
-    const isUsg =
-      r.id === 'd-sec-3' ||
-      /under[- ]?secretary[- ]?general/i.test(r.role) ||
-      /\bUSG\b/i.test(r.role);
-
-    const isAdvisor = /muaz/i.test(r.name);
-
-    const isSecretaryGeneral =
-      r.id === 'd-sec-1' ||
-      (r.role === 'Secretary-General' && !isUsg && !/deputy/i.test(r.role));
-
-    const isDeputy =
-      r.id === 'd-sec-2' ||
-      /deputy/i.test(r.role);
-
-    let name = r.name;
-    let imageUrl = safeUrl(r.image_url) || undefined;
-    let fallbackImage: string | undefined;
-
-    // Resolve any ImgBB page URL or remote Ibrahim image to the local reliable asset first
-    if (imageUrl && (imageUrl.includes('ibb.co') || imageUrl.includes('ibrahim'))) {
-      imageUrl = '/ibrahim-khan.jpg';
-      fallbackImage = 'https://i.ibb.co/L4YRGk7/Whats-App-Image-2026-10-27-at-8-52-57-PM.jpg';
-    }
-
-    if (isUsg) {
-      name = 'Ibrahim Khan';
-      imageUrl = '/ibrahim-khan.jpg';
-      fallbackImage = 'https://i.ibb.co/L4YRGk7/Whats-App-Image-2026-10-27-at-8-52-57-PM.jpg';
-    } else if (isAdvisor) {
-      // Senior Advisor Muaz El Amir
-      if (!imageUrl || imageUrl.includes('i.ibb.co')) {
-        imageUrl = '/muaz.jpg';
-      }
-      fallbackImage = '/muaz.jpg';
-    } else if (isSecretaryGeneral) {
-      if (!imageUrl) imageUrl = '/rakan-almerbad.jpg';
-      fallbackImage = '/rakan-almerbad.jpg';
-    } else if (isDeputy) {
-      if (!imageUrl) imageUrl = '/yousef.jpg';
-      fallbackImage = '/yousef.jpg';
-    }
-
-    return {
-      role: isUsg ? 'Under-Secretary-General' : (r.id === 'd-sec-2' || /yousef/i.test(r.name) ? 'Senior Advisor' : r.role),
-      name,
-      department: isUsg ? 'Executive Secretariat' : r.department,
-      bio: isUsg
-        ? "As Under-Secretary-General of WEST MUN, Ibrahim Khan supports the Secretary-General in coordinating the conference's executive operations. He works closely with department heads to ensure effective communication, organizational efficiency, and the smooth execution of conference activities, helping deliver an exceptional experience for every delegate."
-        : r.bio,
-      image: imageUrl,
-      fallbackImage,
-      imagePosition: isUsg ? 'object-top' : (positionClass[r.image_position] ?? 'object-center'),
-      objectPosition: isUsg ? '50% 15%' : undefined,
-      isConfirmed: r.confirmed,
-      appointmentNumber: String(i + 1).padStart(2, '0'),
-    };
-  });
+      const isIbrahim = /ibrahim\\s+khan/i.test(r.name);
+      const image = safeUrl(r.image_url) || (isIbrahim ? '/ibrahim-khan.jpg' : undefined);
+      return {
+        role: r.role,
+        name: r.name,
+        department: r.department,
+        bio: r.bio,
+        image,
+        fallbackImage: isIbrahim ? '/ibrahim-khan.jpg' : undefined,
+        imagePosition: positionClass[r.image_position] ?? 'object-center',
+        isConfirmed: r.confirmed,
+        appointmentNumber: String(i + 1).padStart(2, '0'),
+      };
+    });
 
   return (
     <section id="secretariat" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
