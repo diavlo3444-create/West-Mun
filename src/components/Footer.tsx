@@ -177,46 +177,7 @@ export const Footer: React.FC<FooterProps> = React.memo(({ onReplayIntro }) => {
           </div>
         )}
 
-        {/* Subtle cinematic website inquiry CTA — final element on the page */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="group mt-10 sm:mt-12 relative isolate overflow-hidden border-y border-[#d4af37]/20 bg-gradient-to-r from-[#080809] via-[#11100c] to-[#080809] px-5 py-7 sm:px-8 sm:py-8"
-        >
-          <div className="absolute inset-y-0 left-0 w-1/3 bg-[radial-gradient(ellipse_at_left,rgba(212,175,55,0.09),transparent_75%)] pointer-events-none" />
-          <motion.div
-            aria-hidden="true"
-            className="absolute left-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/70 to-transparent"
-            initial={{ width: "0%" }}
-            animate={isInView ? { width: "100%" } : { width: "0%" }}
-            transition={{ duration: 1.2, delay: 0.35, ease: "easeOut" }}
-          />
-          <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center justify-between gap-5 text-center sm:flex-row sm:text-left">
-            <div>
-              <p className="mb-2 text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-[#d4af37]/80 font-semibold">
-                YOUR VISION. BUILT WITH PURPOSE.
-              </p>
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-serif font-normal tracking-tight text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                Want a website <span className="text-[#d4af37] italic">like this?</span>
-              </h3>
-              <p className="mt-2 text-xs sm:text-sm text-neutral-500 font-light">
-                Let’s create something people remember.
-              </p>
-            </div>
-            <motion.a
-              href="https://wa.me/966558792450?text=Hi%20Mohammed%2C%20I%27m%20interested%20in%20getting%20a%20website%20like%20WEST%20MUN."
-              target="_blank"
-              rel="noopener noreferrer"
-              whileHover={{ y: -2, scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-flex shrink-0 items-center justify-center gap-3 border border-[#d4af37]/60 bg-[#d4af37]/[0.08] px-5 py-3 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.16em] text-[#e7c75b] transition-all duration-300 hover:border-[#d4af37] hover:bg-[#d4af37] hover:text-black hover:shadow-[0_0_24px_rgba(212,175,55,0.16)]"
-            >
-              Contact Mohammed Magdi
-              <span aria-hidden="true" className="text-sm">↗</span>
-            </motion.a>
-          </div>
-        </motion.section>
+
       </div>
     </footer>
   );
