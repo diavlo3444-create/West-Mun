@@ -8,8 +8,7 @@ const CHAPTERS = [
   { id: 'schedule', label: 'The schedule', number: '05' },
   { id: 'secretariat', label: 'The team', number: '06' },
   { id: 'register', label: 'Registration', number: '07' },
-  { id: 'faq', label: 'Questions', number: '08' },
-  { id: 'contact', label: 'Contact', number: '09' },
+  { id: 'experience', label: 'The experience', number: '08' },
 ];
 
 /**
@@ -40,7 +39,7 @@ export function PublicMotionLayer() {
     // One-shot reveals: animate headings, cards, and image panels without touching the cinematic hero video.
     const cardSelector = '#highlights [class*="grid"] > *, #committees [class*="grid"] > *, #schedule [class*="grid"] > *, #secretariat [class*="grid"] > *';
     const motionTargets = Array.from(document.querySelectorAll<HTMLElement>(
-      '#about h2, #committees h2, #schedule h2, #secretariat h2, #register h2, #faq h2, #contact h2, ' +
+      '#about h2, #committees h2, #schedule h2, #secretariat h2, #register h2, #experience h2, ' +
       '#highlights h2, #highlights img, #about img, #committees img, #schedule img, #secretariat img, ' + cardSelector
     ));
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
