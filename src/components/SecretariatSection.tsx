@@ -78,7 +78,7 @@ export const SecretariatSection: React.FC = React.memo(() => {
   // Keep Ibrahim Khan in the roster; his seeded profile and photo remain the default.
   const secretariat: TeamMember[] = rows
     .filter((r) => (r as SecretariatRow & { published?: boolean }).published !== false)
-    .filter((r) => r.id !== 'd-sec-4' && !/zain\\s+firas|muaz\\s+el\\s*amir/i.test(r.name))
+    .filter((r) => !/zain\\s+firas|muaz\\s+el\\s*amir/i.test(r.name))
     .map((r, i) => {
       const isIbrahim = /ibrahim\\s+khan/i.test(r.name);
       const image = safeUrl(r.image_url) || (isIbrahim ? '/ibrahim-khan.jpg' : undefined);
@@ -94,6 +94,21 @@ export const SecretariatSection: React.FC = React.memo(() => {
         appointmentNumber: String(i + 1).padStart(2, '0'),
       };
     });
+
+  const ibrahimDefault = DEFAULT_SECRETARIAT.find((r) => /ibrahim\\s+khan/i.test(r.name));
+  if (ibrahimDefault && !secretariat.some((r) => /ibrahim\\s+khan/i.test(r.name))) {
+    secretariat.push({
+      role: ibrahimDefault.role,
+      name: ibrahimDefault.name,
+      department: ibrahimDefault.department,
+      bio: ibrahimDefault.bio,
+      image: ibrahimDefault.image_url,
+      fallbackImage: '/ibrahim-khan.jpg',
+      imagePosition: positionClass[ibrahimDefault.image_position] ?? 'object-top',
+      isConfirmed: ibrahimDefault.confirmed,
+      appointmentNumber: String(secretariat.length + 1).padStart(2, '0'),
+    });
+  }
 
   return (
     <section id="secretariat" ref={ref} className="section-content-visibility relative z-20 py-24 sm:py-32 bg-[#0a0a0c] text-white border-t border-neutral-900">
