@@ -1,114 +1,70 @@
 import React from 'react';
-import { ArrowDownRight, ArrowUpRight, Compass, Globe2, Landmark } from 'lucide-react';
-import { motion } from 'motion/react';
-import { useInView } from '../hooks/useInView';
+import { ArrowUpRight } from 'lucide-react';
 
 const JOURNEY = [
   {
     number: '01',
-    eyebrow: 'DISCOVER',
-    title: 'A world of perspectives.',
-    description: 'Step beyond the headlines. Explore the global issues, nations, and competing perspectives that shape every committee.',
+    title: 'Before the debate',
+    description: 'Research the committee, understand the agenda, and arrive ready to defend a position.',
     action: 'Explore committees',
     href: '#committees',
-    Icon: Globe2,
   },
   {
     number: '02',
-    eyebrow: 'ENGAGE',
-    title: 'Where ideas become action.',
-    description: 'Enter the room, build alliances, challenge assumptions, and turn diplomatic debate into meaningful resolutions.',
+    title: 'In the room',
+    description: 'Question, negotiate, build alliances, and work towards a resolution with other delegates.',
     action: 'View the schedule',
     href: '#schedule',
-    Icon: Landmark,
   },
   {
     number: '03',
-    eyebrow: 'LEAVE A MARK',
-    title: 'The work continues beyond the room.',
-    description: 'Carry forward the confidence, perspective, and connections built through the WEST MUN experience.',
-    action: 'Discover WEST MUN',
+    title: 'What stays with you',
+    description: 'New perspectives, sharper arguments, and connections that extend beyond the conference.',
+    action: 'About WEST MUN',
     href: '#about',
-    Icon: Compass,
   },
 ];
 
-export const ExperienceSection: React.FC = React.memo(() => {
-  const { ref, isInView } = useInView<HTMLElement>({ threshold: 0.08 });
-
-  return (
-    <section id="experience" ref={ref} className="relative z-20 overflow-hidden border-t border-neutral-900 bg-[#080809] py-24 sm:py-32 text-white">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 left-1/2 h-[30rem] w-[45rem] -translate-x-1/2 rounded-full bg-[#d4af37]/[0.045] blur-[110px]" />
-        <div className="absolute inset-0 opacity-[0.12]" style={{ backgroundImage: 'linear-gradient(rgba(212,175,55,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(212,175,55,0.12) 1px, transparent 1px)', backgroundSize: '72px 72px', maskImage: 'linear-gradient(to bottom, black, transparent 80%)' }} />
-      </div>
-
-      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 md:px-12">
-        <motion.div
-          initial={{ opacity: 0, y: 28 }}
-          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 28 }}
-          transition={{ duration: 0.8, ease: [0.2, 0.7, 0.2, 1] }}
-          className="mb-14 sm:mb-20"
-        >
-          <div className="mb-5 flex items-center gap-3">
-            <span className="h-px w-10 bg-[#d4af37]" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[#d4af37]">Beyond the conference</span>
-          </div>
-          <div className="grid gap-7 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
-            <h2 className="max-w-3xl font-serif text-4xl font-normal leading-[1.08] tracking-tight sm:text-6xl" style={{ fontFamily: 'var(--font-heading)' }}>
-              More than a debate.
-              <span className="gold-gradient-text block italic">A perspective that lasts.</span>
-            </h2>
-            <p className="max-w-xl text-sm font-light leading-7 text-neutral-400 sm:text-base">
-              Every delegate arrives with a point of view. The WEST MUN experience challenges it, sharpens it, and turns conversation into something greater.
-            </p>
-          </div>
-        </motion.div>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {JOURNEY.map(({ number, eyebrow, title, description, action, href, Icon }, index) => (
-            <motion.article
-              key={number}
-              initial={{ opacity: 0, y: 34 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 34 }}
-              transition={{ duration: 0.75, delay: 0.12 + index * 0.13, ease: [0.2, 0.7, 0.2, 1] }}
-              whileHover={{ y: -7, transition: { duration: 0.25 } }}
-              className="group relative flex min-h-[330px] flex-col overflow-hidden border border-neutral-800/90 bg-gradient-to-b from-[#111113] to-[#0a0a0c] p-7 sm:p-8"
-            >
-              <div className="absolute right-0 top-0 h-32 w-32 translate-x-10 -translate-y-10 rounded-full bg-[#d4af37]/[0.07] blur-3xl transition-all duration-700 group-hover:bg-[#d4af37]/[0.15]" />
-              <div className="relative mb-12 flex items-start justify-between">
-                <span className="font-mono text-xs tracking-[0.2em] text-[#d4af37]">{number} / 03</span>
-                <Icon className="h-6 w-6 text-neutral-500 transition-colors duration-300 group-hover:text-[#d4af37]" strokeWidth={1.25} />
-              </div>
-              <div className="relative">
-                <p className="mb-3 text-[9px] font-semibold tracking-[0.28em] text-neutral-500">{eyebrow}</p>
-                <h3 className="mb-4 max-w-xs font-serif text-2xl leading-tight text-white sm:text-[1.7rem]" style={{ fontFamily: 'var(--font-heading)' }}>{title}</h3>
-                <p className="max-w-sm text-sm font-light leading-6 text-neutral-400">{description}</p>
-              </div>
-              <a href={href} className="relative mt-auto inline-flex w-fit items-center gap-3 pt-9 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#d4af37] transition-colors hover:text-[#f3e5ab]">
-                {action}
-                <ArrowUpRight className="h-4 w-4 transition-transform duration-300 group-hover:-translate-y-1 group-hover:translate-x-1" />
-              </a>
-              <span aria-hidden="true" className="absolute bottom-0 left-0 h-px w-0 bg-gradient-to-r from-[#d4af37] to-transparent transition-all duration-700 group-hover:w-full" />
-            </motion.article>
-          ))}
+export const ExperienceSection: React.FC = React.memo(() => (
+  <section id="experience" className="relative z-20 border-t border-neutral-800 bg-[#090909] py-24 sm:py-32 text-white">
+    <div className="mx-auto max-w-6xl px-5 sm:px-8 md:px-12">
+      <div className="mb-16 grid gap-8 border-b border-neutral-800 pb-10 md:grid-cols-[1.1fr_0.9fr] md:items-end">
+        <div>
+          <p className="mb-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.24em] text-[#c5a059]">
+            <span className="h-px w-8 bg-[#c5a059]" />
+            The WEST MUN experience
+          </p>
+          <h2 className="max-w-2xl text-4xl font-normal leading-[1.12] tracking-tight sm:text-6xl" style={{ fontFamily: 'var(--font-heading)' }}>
+            It doesn't end when the committee does.
+          </h2>
         </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
-          transition={{ duration: 0.7, delay: 0.55 }}
-          className="mt-16 flex flex-col items-center justify-between gap-5 border-t border-neutral-800/80 pt-8 sm:flex-row"
-        >
-          <p className="font-serif text-lg text-neutral-300 sm:text-xl">The next chapter begins with you.</p>
-          <a href="#register" className="inline-flex items-center gap-3 border border-[#d4af37]/60 px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#e7c75b] transition-all duration-300 hover:border-[#d4af37] hover:bg-[#d4af37] hover:text-black">
-            Enter WEST MUN
-            <ArrowDownRight className="h-4 w-4" />
-          </a>
-        </motion.div>
+        <p className="max-w-md text-sm leading-7 text-neutral-400 md:justify-self-end">
+          A conference is built from the people in the room: the questions they ask, the positions they challenge, and the work they do together.
+        </p>
       </div>
-    </section>
-  );
-});
+
+      <div>
+        {JOURNEY.map((item) => (
+          <article key={item.number} className="group grid gap-5 border-b border-neutral-800 py-8 transition-colors hover:border-[#c5a059]/60 md:grid-cols-[90px_1fr_1fr_170px] md:items-center">
+            <span className="font-mono text-xs text-[#c5a059]">{item.number}</span>
+            <h3 className="text-2xl font-normal tracking-tight sm:text-3xl" style={{ fontFamily: 'var(--font-heading)' }}>{item.title}</h3>
+            <p className="max-w-md text-sm leading-6 text-neutral-400">{item.description}</p>
+            <a href={item.href} className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c5a059] transition-colors hover:text-[#f3e5ab]">
+              {item.action}
+              <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </a>
+          </article>
+        ))}
+      </div>
+
+      <div className="mt-12 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-lg text-neutral-300" style={{ fontFamily: 'var(--font-serif)' }}>Applications and conference information</p>
+        <a href="#register" className="inline-flex w-fit items-center gap-3 border border-[#c5a059] px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#d6b96b] transition-colors hover:bg-[#c5a059] hover:text-black">
+          Registration details <ArrowUpRight className="h-4 w-4" />
+        </a>
+      </div>
+    </div>
+  </section>
+));
 
 ExperienceSection.displayName = 'ExperienceSection';
